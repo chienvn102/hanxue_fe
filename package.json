@@ -1,5 +1,5 @@
 {
-  "name": "hanxue_temp",
+  "name": "hanxue-fe",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "hanzi-writer": "^3.7.3",
     "next": "16.1.2",
     "react": "19.2.3",
     "react-dom": "19.2.3"
