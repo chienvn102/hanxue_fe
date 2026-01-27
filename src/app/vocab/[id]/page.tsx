@@ -225,7 +225,16 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
                                             )}
                                             {examples.map((ex, i) => (
                                                 <div key={i} className="border-l-4 pl-4" style={{ borderColor: 'var(--accent)' }}>
-                                                    <p className="hanzi text-lg">{ex.zh}</p>
+                                                    <div className="flex items-start gap-2">
+                                                        <p className="hanzi text-lg flex-1">{ex.zh}</p>
+                                                        <button
+                                                            onClick={() => playAudio(ex.zh)}
+                                                            className="text-[var(--primary)] hover:scale-110 transition-transform p-1"
+                                                            title="Nghe mẫu câu"
+                                                        >
+                                                            🔊
+                                                        </button>
+                                                    </div>
                                                     <p className="mt-1" style={{ color: 'var(--text-muted)' }}>{ex.vi}</p>
                                                 </div>
                                             ))}

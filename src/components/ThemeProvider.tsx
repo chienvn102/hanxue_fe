@@ -8,7 +8,7 @@ interface ThemeContextType {
     theme: Theme;
     resolvedTheme: 'light' | 'dark';
     setTheme: (theme: Theme) => void;
-    toggleTheme: () => void;
+    toggleTheme: (event?: React.MouseEvent) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
@@ -76,13 +76,43 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setThemeState(newTheme);
     };
 
-    const toggleTheme = () => {
-        setThemeState(prev => {
-            if (prev === 'light') return 'dark';
-            if (prev === 'dark') return 'light';
-            // If system, toggle to opposite of current resolved
-            return resolvedTheme === 'dark' ? 'light' : 'dark';
-        });
+    const toggleTheme = (event?: React.MouseEvent) => {
+        const newTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
+
+        // Use View Transition API if supported
+        if ('startViewTransition' in document && event) {
+            const x = event.clientX;
+            const y = event.clientY;
+            const endRadius = Math.hypot(
+                Math.max(x, window.innerWidth - x),
+                Math.max(y, window.innerHeight - y)
+            );
+
+            // @ts-ignore - startViewTransition is not in TypeScript types yet
+            const transition = document.startViewTransition(() => {
+                setThemeState(newTheme);
+            });
+
+            transition.ready.then(() => {
+                // Always animate new view expanding from click point
+                document.documentElement.animate(
+                    {
+                        clipPath: [
+                            `circle(0px at ${x}px ${y}px)`,
+                            `circle(${endRadius}px at ${x}px ${y}px)`
+                        ]
+                    },
+                    {
+                        duration: 400,
+                        easing: 'ease-out',
+                        pseudoElement: '::view-transition-new(root)'
+                    }
+                );
+            });
+        } else {
+            // Fallback: direct switch
+            setThemeState(newTheme);
+        }
     };
 
     return (

@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 
-type QuizMode = 'write' | 'choice';
+type QuizMode = 'write' | 'choice' | 'listen';
 
 const hskLevels = [
     { level: 1, label: 'Cơ bản', color: 'blue' },
@@ -149,51 +149,59 @@ export default function FlashcardPage() {
                                 </span>
                                 Chế độ học
                             </h2>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-3">
                                 {/* Multiple Choice Mode */}
                                 <button
                                     onClick={() => setQuizMode('choice')}
-                                    className={`relative flex flex-col items-start justify-between rounded-2xl p-5 text-left transition-all cursor-pointer
+                                    className={`relative flex flex-col items-center justify-center rounded-2xl p-4 text-center transition-all cursor-pointer
                                         ${quizMode === 'choice'
                                             ? 'ring-2 ring-[var(--primary)] shadow-lg bg-[var(--surface)]'
                                             : 'bg-[var(--surface)] ring-1 ring-[var(--border)] hover:ring-[var(--primary)]/50'
                                         }`}
                                 >
-                                    <div className={`mb-4 rounded-lg p-3 ${quizMode === 'choice' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'}`}>
+                                    <div className={`mb-3 rounded-lg p-3 ${quizMode === 'choice' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'}`}>
                                         <Icon name="check_box" size="lg" />
                                     </div>
-                                    <div>
-                                        <p className={`font-bold ${quizMode === 'choice' ? 'text-[var(--primary)]' : 'text-[var(--text-main)]'}`}>
-                                            Trắc nghiệm
-                                        </p>
-                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Chọn đáp án đúng</p>
-                                    </div>
-                                    <div className={`absolute top-4 right-4 ${quizMode === 'choice' ? 'text-[var(--primary)]' : 'text-[var(--text-muted)]'}`}>
-                                        <Icon name={quizMode === 'choice' ? 'radio_button_checked' : 'radio_button_unchecked'} />
-                                    </div>
+                                    <p className={`font-bold text-sm ${quizMode === 'choice' ? 'text-[var(--primary)]' : 'text-[var(--text-main)]'}`}>
+                                        Trắc nghiệm
+                                    </p>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1">Chọn đáp án</p>
                                 </button>
 
                                 {/* Write Mode */}
                                 <button
                                     onClick={() => setQuizMode('write')}
-                                    className={`relative flex flex-col items-start justify-between rounded-2xl p-5 text-left transition-all cursor-pointer
+                                    className={`relative flex flex-col items-center justify-center rounded-2xl p-4 text-center transition-all cursor-pointer
                                         ${quizMode === 'write'
                                             ? 'ring-2 ring-[var(--primary)] shadow-lg bg-[var(--surface)]'
                                             : 'bg-[var(--surface)] ring-1 ring-[var(--border)] hover:ring-[var(--primary)]/50'
                                         }`}
                                 >
-                                    <div className={`mb-4 rounded-lg p-3 ${quizMode === 'write' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'}`}>
+                                    <div className={`mb-3 rounded-lg p-3 ${quizMode === 'write' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'}`}>
                                         <Icon name="edit_note" size="lg" />
                                     </div>
-                                    <div>
-                                        <p className={`font-bold ${quizMode === 'write' ? 'text-[var(--primary)]' : 'text-[var(--text-main)]'}`}>
-                                            Tự luận
-                                        </p>
-                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Gõ từ hoặc viết tay</p>
+                                    <p className={`font-bold text-sm ${quizMode === 'write' ? 'text-[var(--primary)]' : 'text-[var(--text-main)]'}`}>
+                                        Tự luận
+                                    </p>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1">Gõ nghĩa tiếng Việt</p>
+                                </button>
+
+                                {/* Dictation Mode (Listen & Write Chinese) */}
+                                <button
+                                    onClick={() => setQuizMode('listen')}
+                                    className={`relative flex flex-col items-center justify-center rounded-2xl p-4 text-center transition-all cursor-pointer
+                                        ${quizMode === 'listen'
+                                            ? 'ring-2 ring-[var(--primary)] shadow-lg bg-[var(--surface)]'
+                                            : 'bg-[var(--surface)] ring-1 ring-[var(--border)] hover:ring-[var(--primary)]/50'
+                                        }`}
+                                >
+                                    <div className={`mb-3 rounded-lg p-3 ${quizMode === 'listen' ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'}`}>
+                                        <Icon name="hearing" size="lg" />
                                     </div>
-                                    <div className={`absolute top-4 right-4 ${quizMode === 'write' ? 'text-[var(--primary)]' : 'text-[var(--text-muted)]'}`}>
-                                        <Icon name={quizMode === 'write' ? 'radio_button_checked' : 'radio_button_unchecked'} />
-                                    </div>
+                                    <p className={`font-bold text-sm ${quizMode === 'listen' ? 'text-[var(--primary)]' : 'text-[var(--text-main)]'}`}>
+                                        Nghe viết
+                                    </p>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1">Nghe → Viết chữ Hán</p>
                                 </button>
                             </div>
                         </section>

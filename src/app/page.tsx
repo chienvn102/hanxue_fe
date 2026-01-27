@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { VocabCard } from '@/components/VocabCard';
+import { playAudio, fetchProfile } from '@/lib/api';
+import { useAuth } from '@/components/AuthContext';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
@@ -38,10 +40,31 @@ const colorClasses: Record<string, { text: string; border: string; bg: string }>
   indigo: { text: 'text-indigo-500', border: 'border-indigo-500/20 hover:border-indigo-500', bg: 'group-hover:text-indigo-400' },
 };
 
+
+
 export default function HomePage() {
+  const { user, isAuthenticated, updateUser, logout } = useAuth();
   const [featuredVocab, setFeaturedVocab] = useState<Vocab[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Fetch fresh profile data on mount to keep stats updated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchProfile()
+        .then(data => {
+          if (data) updateUser(data);
+        })
+        .catch(err => {
+          // If token is invalid/expired, log out to clear state
+          if (err.message === 'Unauthorized') {
+            logout();
+          } else {
+            console.error('Failed to update stats:', err);
+          }
+        });
+    }
+  }, [isAuthenticated]); // Removed updateUser dependency to avoid loop if not stable, though likely stable
 
   useEffect(() => {
     const loadVocab = async () => {
@@ -63,6 +86,8 @@ export default function HomePage() {
       <Header />
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* ... Hero Section remains unchanged ... */}
+
         {/* Hero Section */}
         <section className="relative w-full rounded-2xl overflow-hidden min-h-[400px] flex items-center justify-center mb-10 bg-gradient-to-br from-[var(--primary)] to-red-600">
           <div className="absolute inset-0 opacity-20">
@@ -174,6 +199,7 @@ export default function HomePage() {
                       hanViet={vocab.hanViet}
                       meaningVi={vocab.meaningVi}
                       hskLevel={vocab.hskLevel}
+                      onAudio={() => playAudio(vocab.simplified)}
                     />
                   ))}
                 </div>
@@ -183,19 +209,50 @@ export default function HomePage() {
 
           {/* Sidebar */}
           <aside className="lg:w-80 flex flex-col gap-6">
-            {/* Daily Streak */}
-            <Card hover={false} className="text-center">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-bold text-[var(--text-main)]">Daily Streak</h4>
-                <Icon name="local_fire_department" className="text-orange-500" />
-              </div>
-              <div className="py-4">
-                <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">
-                  0
-                </span>
-                <p className="text-sm text-[var(--text-secondary)] font-medium mt-1">Days in a row</p>
-              </div>
-            </Card>
+            {/* User Stats or Login Prompt */}
+            {isAuthenticated && user ? (
+              <Card hover={false} className="text-center group hover:border-[var(--primary)]/30 transition-colors">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-bold text-[var(--text-main)] flex items-center gap-2">
+                    <Icon name="local_fire_department" className="text-orange-500" />
+                    Daily Streak
+                  </h4>
+                  <Link href="/profile" className="text-xs font-bold text-[var(--primary)] hover:underline">
+                    View Profile
+                  </Link>
+                </div>
+                <div className="py-2">
+                  <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">
+                    {user.currentStreak || 0}
+                  </span>
+                  <p className="text-sm text-[var(--text-secondary)] font-medium mt-1">Ngày liên tiếp</p>
+                </div>
+                <div className="mt-4 pt-4 border-t border-[var(--border)] grid grid-cols-2 gap-2 text-center">
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)] uppercase font-bold">Total XP</p>
+                    <p className="font-black text-[var(--text-main)]">{user.totalXp || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)] uppercase font-bold">Level</p>
+                    <p className="font-black text-[var(--text-main)]">HSK {user.targetHsk || 1}</p>
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <Card hover={false} className="text-center">
+                <Icon name="account_circle" size="xl" className="text-[var(--text-muted)] mb-2 inline-block" />
+                <h4 className="font-bold text-[var(--text-main)] mb-2">Chào mừng trở lại!</h4>
+                <p className="text-sm text-[var(--text-secondary)] mb-4">Đăng nhập để theo dõi tiến độ học tập của bạn.</p>
+                <div className="flex gap-2">
+                  <Link href="/login" className="flex-1">
+                    <Button fullWidth>Đăng nhập</Button>
+                  </Link>
+                  <Link href="/register" className="flex-1">
+                    <Button fullWidth variant="secondary">Đăng ký</Button>
+                  </Link>
+                </div>
+              </Card>
+            )}
 
             {/* Quick Practice */}
             <Card hover={false}>

@@ -34,7 +34,7 @@ export default function CharacterSidebar({ characters, mainWord }: CharacterSide
             <div className="space-y-6">
                 {characters.map((char, index) => (
                     <div
-                        key={`char-${char.id || index}`}
+                        key={`char-${char.id || 'no-id'}-${char.hanzi}-${index}`}
                         className="animate-fade-in"
                         style={{ animationDelay: `${index * 0.1}s` }}
                     >

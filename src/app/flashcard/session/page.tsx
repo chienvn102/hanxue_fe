@@ -7,6 +7,7 @@ import Header from '@/components/Header';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { submitReview } from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
@@ -52,6 +53,9 @@ function FlashcardSessionContent() {
     const [totalAttempts, setTotalAttempts] = useState(0);
     const [completed, setCompleted] = useState(false);
     const [wrongCards, setWrongCards] = useState<Set<number>>(new Set());
+
+    // Hint state for listen mode
+    const [showHint, setShowHint] = useState(false);
 
     // Load flashcards
     useEffect(() => {
@@ -109,6 +113,7 @@ function FlashcardSessionContent() {
                 setSelectedChoice(null);
                 setUserAnswer('');
                 setShowResult(false);
+                setShowHint(false); // Reset hint when moving to new card
             }
         }
     }, [currentIndex, flashcards, queue, loadChoices]);
@@ -121,14 +126,19 @@ function FlashcardSessionContent() {
     const accuracy = totalAttempts > 0 ? Math.round((correctCount / totalAttempts) * 100) : 0;
 
     // Check answer
-    const checkAnswer = () => {
+    const checkAnswer = async () => {
         if (!currentCard) return;
 
         let correct = false;
 
         if (mode === 'choice') {
             correct = selectedChoice === currentCard.id;
+        } else if (mode === 'listen') {
+            // Listen mode: compare Chinese characters
+            const userAns = userAnswer.trim();
+            correct = userAns === currentCard.simplified || userAns === currentCard.traditional;
         } else {
+            // Write mode: compare Vietnamese meaning
             const userAns = userAnswer.trim().toLowerCase();
             const correctAns = currentCard.meaningVi.toLowerCase();
 
@@ -158,6 +168,15 @@ function FlashcardSessionContent() {
             setCorrectCount(prev => prev + 1);
         } else {
             setWrongCards(prev => new Set([...prev, queue[currentIndex]]));
+        }
+
+        // Submit review to backend (updates SRS & Streak)
+        try {
+            // Quality 5 for correct, 0 for wrong
+            // In a real app we might want to measure time taken
+            await submitReview(currentCard.id, correct ? 5 : 0);
+        } catch (err) {
+            console.error('Failed to submit review:', err);
         }
     };
 
@@ -262,7 +281,7 @@ function FlashcardSessionContent() {
                     <div className="flex flex-col gap-2 w-full">
                         <div className="flex justify-between items-end">
                             <p className="text-[var(--text-secondary)] text-sm font-medium">
-                                HSK Level {hsk} • {mode === 'choice' ? 'Trắc nghiệm' : 'Tự luận'}
+                                HSK Level {hsk} • {mode === 'choice' ? 'Trắc nghiệm' : mode === 'listen' ? 'Nghe viết' : 'Tự luận'}
                             </p>
                             <p className="text-[var(--text-main)] text-sm font-bold">{progress}%</p>
                         </div>
@@ -278,23 +297,65 @@ function FlashcardSessionContent() {
                     {currentCard && (
                         <>
                             <Card hover={false} padding="none" className="relative w-full aspect-[4/3] md:aspect-[16/9] lg:aspect-[2/1] flex flex-col items-center justify-center p-8">
-                                {/* Audio button */}
-                                <button className="absolute top-4 right-4 p-2 text-[var(--text-muted)] hover:text-[var(--primary)] hover:bg-[var(--surface-secondary)] rounded-full transition-colors cursor-pointer">
-                                    <Icon name="volume_up" size="lg" />
+                                {/* Audio button - prominent in listen mode */}
+                                <button
+                                    onClick={() => {
+                                        const audioUrl = `${API_BASE}/audio/cmn-${encodeURIComponent(currentCard.simplified)}.mp3`;
+                                        const audio = new Audio(audioUrl);
+                                        audio.play();
+                                    }}
+                                    className={`${mode === 'listen' ? 'w-24 h-24 text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20' : 'absolute top-4 right-4 w-12 h-12 text-[var(--text-muted)] hover:text-[var(--primary)] hover:bg-[var(--surface-secondary)]'} p-2 rounded-full transition-colors cursor-pointer flex items-center justify-center`}
+                                >
+                                    <Icon name="volume_up" size={mode === 'listen' ? 'xl' : 'lg'} />
                                 </button>
 
-                                {/* Character Display */}
-                                <div className="flex flex-col items-center gap-4 text-center z-10">
-                                    <h1 className="hanzi text-7xl md:text-8xl lg:text-9xl font-normal text-[var(--text-main)] tracking-wide">
-                                        {currentCard.simplified}
-                                    </h1>
-                                    <div className="flex flex-col gap-1 items-center">
-                                        <p className="text-2xl text-[var(--primary)] font-medium">{currentCard.pinyin}</p>
-                                        {currentCard.hanViet && (
-                                            <p className="text-sm text-[var(--text-secondary)] italic">{currentCard.hanViet}</p>
+                                {/* Character Display - hidden in listen mode until answer shown */}
+                                {mode === 'listen' ? (
+                                    <div className="flex flex-col items-center gap-4 text-center z-10 mt-6">
+                                        {showResult ? (
+                                            <>
+                                                <h1 className="hanzi text-7xl md:text-8xl font-normal text-[var(--text-main)] tracking-wide">
+                                                    {currentCard.simplified}
+                                                </h1>
+                                                <div className="flex flex-col gap-1 items-center">
+                                                    <p className="text-xl text-[var(--primary)] font-medium">{currentCard.pinyin}</p>
+                                                    <p className="text-sm text-[var(--text-secondary)]">{currentCard.meaningVi}</p>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-lg text-[var(--text-secondary)]">Nhấn nút để nghe và viết chữ Hán</p>
+                                                {/* Hint Button */}
+                                                {!showHint ? (
+                                                    <button
+                                                        onClick={() => setShowHint(true)}
+                                                        className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-colors"
+                                                    >
+                                                        <Icon name="lightbulb" size="sm" />
+                                                        <span>Gợi ý</span>
+                                                    </button>
+                                                ) : (
+                                                    <div className="mt-4 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                                                        <p className="text-sm text-amber-400 mb-1">💡 Nghĩa:</p>
+                                                        <p className="text-lg text-[var(--text-main)] font-medium">{currentCard.meaningVi}</p>
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="flex flex-col items-center gap-4 text-center z-10">
+                                        <h1 className="hanzi text-7xl md:text-8xl lg:text-9xl font-normal text-[var(--text-main)] tracking-wide">
+                                            {currentCard.simplified}
+                                        </h1>
+                                        <div className="flex flex-col gap-1 items-center">
+                                            <p className="text-2xl text-[var(--primary)] font-medium">{currentCard.pinyin}</p>
+                                            {currentCard.hanViet && (
+                                                <p className="text-sm text-[var(--text-secondary)] italic">{currentCard.hanViet}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </Card>
 
                             {/* Answer Section */}
@@ -356,7 +417,39 @@ function FlashcardSessionContent() {
                                         );
                                     })}
                                 </div>
+                            ) : mode === 'listen' ? (
+                                /* Listen Mode - Write Chinese */
+                                <div className="mt-2">
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={userAnswer}
+                                            onChange={(e) => setUserAnswer(e.target.value)}
+                                            onKeyPress={(e) => e.key === 'Enter' && !showResult && userAnswer.trim() && checkAnswer()}
+                                            placeholder="Viết chữ Hán..."
+                                            disabled={showResult}
+                                            className={`input pr-24 text-2xl text-center hanzi
+                                                ${showResult
+                                                    ? isCorrect ? 'border-emerald-500' : 'border-red-500'
+                                                    : ''
+                                                }`}
+                                            lang="zh-CN"
+                                        />
+                                        {!showResult && (
+                                            <Button
+                                                onClick={checkAnswer}
+                                                disabled={!userAnswer.trim()}
+                                                size="sm"
+                                                className="absolute right-2 top-1/2 -translate-y-1/2"
+                                            >
+                                                Kiểm tra
+                                                <Icon name="arrow_forward" size="sm" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
                             ) : (
+                                /* Write Mode - Vietnamese meaning */
                                 <div className="mt-2">
                                     <div className="relative">
                                         <input
@@ -393,9 +486,9 @@ function FlashcardSessionContent() {
                                 </div>
                             )}
 
-                            {/* Feedback & Next Button */}
+                            {/* Feedback & Next Button - Mobile only */}
                             {showResult && (
-                                <>
+                                <div className="lg:hidden">
                                     <div className="flex items-center gap-2 justify-center pt-2">
                                         <span className={`text-sm font-bold tracking-wide uppercase flex items-center gap-2 ${isCorrect ? 'text-emerald-500' : 'text-red-400'}`}>
                                             <Icon name={isCorrect ? 'check_circle' : 'info'} size="sm" />
@@ -408,7 +501,7 @@ function FlashcardSessionContent() {
                                             <Icon name="arrow_forward" size="sm" />
                                         </Button>
                                     </div>
-                                </>
+                                </div>
                             )}
 
                             {/* Check Button (only for choice mode when not showing result) */}
@@ -436,6 +529,27 @@ function FlashcardSessionContent() {
                             <span className="text-[var(--text-secondary)] text-xs">Còn lại</span>
                         </Card>
                     </div>
+
+                    {/* Feedback & Next Button - Desktop only */}
+                    {showResult && (
+                        <Card hover={false} padding="md" className="hidden lg:flex flex-col gap-4">
+                            <div className="flex items-center gap-2 justify-center">
+                                <span className={`text-sm font-bold tracking-wide uppercase flex items-center gap-2 ${isCorrect ? 'text-emerald-500' : 'text-red-400'}`}>
+                                    <Icon name={isCorrect ? 'check_circle' : 'info'} size="sm" />
+                                    {isCorrect ? 'Chính xác!' : 'Chưa đúng'}
+                                </span>
+                            </div>
+                            {!isCorrect && (
+                                <p className="text-xs text-center text-[var(--text-secondary)]">
+                                    Từ này sẽ được lặp lại
+                                </p>
+                            )}
+                            <Button onClick={nextCard} fullWidth>
+                                <span>{isCorrect ? 'Từ tiếp theo' : 'Tiếp tục'}</span>
+                                <Icon name="arrow_forward" size="sm" />
+                            </Button>
+                        </Card>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="mt-auto flex flex-col gap-3">

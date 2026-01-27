@@ -53,6 +53,21 @@
   --border-hover: #4A5568;
 }
 
+/* ===== VIEW TRANSITIONS (Theme Toggle Animation) ===== */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
 /* ===== TAILWIND THEME INTEGRATION ===== */
 @theme inline {
   --color-background: var(--background);
