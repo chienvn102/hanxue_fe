@@ -117,7 +117,7 @@ export default function Header() {
                                         {user.avatarUrl ? (
                                             <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
                                         ) : (
-                                            user.displayName.charAt(0).toUpperCase()
+                                            (user.displayName || '?').charAt(0).toUpperCase()
                                         )}
                                     </div>
                                     <Icon name="expand_more" className="text-[var(--text-secondary)] group-hover:text-[var(--text-main)] transition-colors" />
@@ -136,7 +136,7 @@ export default function Header() {
                                                     {user.avatarUrl ? (
                                                         <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
                                                     ) : (
-                                                        user.displayName.charAt(0).toUpperCase()
+                                                        (user.displayName || '?').charAt(0).toUpperCase()
                                                     )}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
