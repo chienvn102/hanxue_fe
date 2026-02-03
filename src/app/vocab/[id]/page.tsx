@@ -16,8 +16,8 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<'meaning' | 'examples' | 'grammar'>('meaning');
 
-    // Examples state
-    const [examples, setExamples] = useState<Array<{ zh: string, vi: string }>>([]);
+    // Examples state - now includes pinyin
+    const [examples, setExamples] = useState<Array<{ zh: string, pinyin?: string, vi: string }>>([]);
     const [examplesLoading, setExamplesLoading] = useState(false);
     const [examplesSource, setExamplesSource] = useState<'database' | 'ai' | 'none' | null>(null);
 
@@ -226,7 +226,14 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
                                             {examples.map((ex, i) => (
                                                 <div key={i} className="border-l-4 pl-4" style={{ borderColor: 'var(--accent)' }}>
                                                     <div className="flex items-start gap-2">
-                                                        <p className="hanzi text-lg flex-1">{ex.zh}</p>
+                                                        <div className="flex-1">
+                                                            <p className="hanzi text-lg">{ex.zh}</p>
+                                                            {ex.pinyin && (
+                                                                <p className="pinyin text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                                                                    {ex.pinyin}
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                         <button
                                                             onClick={() => playAudio(ex.zh)}
                                                             className="text-[var(--primary)] hover:scale-110 transition-transform p-1"

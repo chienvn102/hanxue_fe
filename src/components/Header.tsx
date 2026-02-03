@@ -32,7 +32,7 @@ export default function Header() {
         { href: '/', label: 'Trang chủ', icon: 'home' },
         { href: '/vocab', label: 'Từ vựng', icon: 'menu_book' },
         { href: '/flashcard', label: 'Luyện tập', icon: 'school' },
-        { href: '/community', label: 'Cộng đồng', icon: 'groups' },
+        { href: '/courses', label: 'Khóa học', icon: 'play_circle' },
     ];
 
     return (
