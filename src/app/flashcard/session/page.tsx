@@ -348,12 +348,7 @@ function FlashcardSessionContent() {
                                         <h1 className="hanzi text-7xl md:text-8xl lg:text-9xl font-normal text-[var(--text-main)] tracking-wide">
                                             {currentCard.simplified}
                                         </h1>
-                                        <div className="flex flex-col gap-1 items-center">
-                                            <p className="text-2xl text-[var(--primary)] font-medium">{currentCard.pinyin}</p>
-                                            {currentCard.hanViet && (
-                                                <p className="text-sm text-[var(--text-secondary)] italic">{currentCard.hanViet}</p>
-                                            )}
-                                        </div>
+                                        <p className="text-2xl text-[var(--primary)] font-medium">{currentCard.pinyin}</p>
                                     </div>
                                 )}
                             </Card>
