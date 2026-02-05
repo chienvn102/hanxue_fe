@@ -198,10 +198,20 @@ function VocabList() {
     );
 }
 
-function VocabCard({ vocab, index }: { vocab: Vocabulary; index: number }) {
+function VocabCard({ vocab, index, isSavedInitial = false, onSaveToggle }: {
+    vocab: Vocabulary;
+    index: number;
+    isSavedInitial?: boolean;
+    onSaveToggle?: (vocabId: number, saved: boolean) => void;
+}) {
     const { token, isAuthenticated } = useAuth();
-    const [isSaved, setIsSaved] = useState(false);
+    const [isSaved, setIsSaved] = useState(isSavedInitial);
     const [saving, setSaving] = useState(false);
+
+    // Sync with parent state when it changes
+    useEffect(() => {
+        setIsSaved(isSavedInitial);
+    }, [isSavedInitial]);
 
     const handleSave = async (e: React.MouseEvent) => {
         e.preventDefault();
@@ -218,7 +228,9 @@ function VocabCard({ vocab, index }: { vocab: Vocabulary; index: number }) {
             });
 
             if (res.ok) {
-                setIsSaved(!isSaved);
+                const newSavedState = !isSaved;
+                setIsSaved(newSavedState);
+                onSaveToggle?.(vocab.id, newSavedState);
             }
         } catch (error) {
             console.error('Failed to save vocab', error);
