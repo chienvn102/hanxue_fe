@@ -118,10 +118,11 @@ export default function LessonPlayerPage() {
             const data = await res.json();
 
             if (data.success) {
-                setLesson(data.data.lesson);
+                // API returns data directly, not nested in .lesson
+                setLesson(data.data);
                 setContent({
-                    vocabulary: data.data.vocabulary || [],
-                    grammar: data.data.grammar || []
+                    vocabulary: data.data.contents?.filter((c: any) => c.type === 'vocab') || [],
+                    grammar: data.data.contents?.filter((c: any) => c.type === 'grammar') || []
                 });
             }
         } catch (error) {
