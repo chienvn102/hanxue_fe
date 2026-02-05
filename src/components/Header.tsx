@@ -41,8 +41,8 @@ export default function Header() {
                 <div className="flex items-center justify-between h-16 sm:h-20">
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-3 group">
-                        <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[var(--primary)] to-orange-600 text-white shadow-lg shadow-[var(--primary)]/20 group-hover:scale-105 transition-transform duration-300">
-                            <Icon name="school" size="md" />
+                        <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/20 group-hover:scale-105 transition-transform duration-300">
+                            <Icon name="translate" size="md" />
                         </div>
                         <h1 className="text-xl font-bold tracking-tight text-[var(--text-main)] group-hover:text-[var(--primary)] transition-colors">
                             HanXue
@@ -80,12 +80,15 @@ export default function Header() {
                             <Icon name={resolvedTheme === 'dark' ? 'light_mode' : 'dark_mode'} />
                         </button>
 
-                        {/* Notification Bell (Mock) */}
+                        {/* Notebook Link */}
                         {isAuthenticated && (
-                            <button className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-main)] transition-colors relative">
-                                <Icon name="notifications" />
-                                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[var(--surface)]"></span>
-                            </button>
+                            <Link
+                                href="/notebook"
+                                className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--primary)] transition-colors relative"
+                                title="Sổ tay từ vựng"
+                            >
+                                <Icon name="bookmark" />
+                            </Link>
                         )}
 
                         {/* User Area */}

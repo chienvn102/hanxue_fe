@@ -12,9 +12,11 @@ import { useAuth } from '@/components/AuthContext';
 interface Lesson {
     id: number;
     title: string;
+    description?: string;
     duration: number;
     order_index: number;
     content_count: number;
+    youtube_id?: string;
 }
 
 interface Course {
@@ -24,13 +26,134 @@ interface Course {
     hsk_level: number;
     thumbnail_url: string;
     lesson_count: number;
+    completed_lessons?: number;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
+
+// HSK Level colors
+const hskColors: Record<number, { badge: string; progress: string }> = {
+    1: { badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', progress: 'from-emerald-500 to-emerald-400' },
+    2: { badge: 'bg-sky-500/20 text-sky-400 border-sky-500/30', progress: 'from-sky-500 to-sky-400' },
+    3: { badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30', progress: 'from-amber-500 to-amber-400' },
+    4: { badge: 'bg-orange-500/20 text-orange-400 border-orange-500/30', progress: 'from-orange-500 to-orange-400' },
+    5: { badge: 'bg-rose-500/20 text-rose-400 border-rose-500/30', progress: 'from-rose-500 to-rose-400' },
+    6: { badge: 'bg-purple-500/20 text-purple-400 border-purple-500/30', progress: 'from-purple-500 to-purple-400' },
+};
+
+function ProgressRing({ progress, size = 120 }: { progress: number; size?: number }) {
+    const strokeWidth = 8;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = radius * 2 * Math.PI;
+    const offset = circumference - (progress / 100) * circumference;
+
+    return (
+        <div className="relative" style={{ width: size, height: size }}>
+            <svg className="transform -rotate-90" width={size} height={size}>
+                <circle
+                    className="text-[var(--surface-secondary)]"
+                    strokeWidth={strokeWidth}
+                    stroke="currentColor"
+                    fill="transparent"
+                    r={radius}
+                    cx={size / 2}
+                    cy={size / 2}
+                />
+                <circle
+                    className="text-[var(--primary)] transition-all duration-500"
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={circumference}
+                    strokeDashoffset={offset}
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r={radius}
+                    cx={size / 2}
+                    cy={size / 2}
+                />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-bold text-[var(--text-main)]">{progress}%</span>
+                <span className="text-xs text-[var(--text-muted)]">HOÀN THÀNH</span>
+            </div>
+        </div>
+    );
+}
+
+function LessonCard({ lesson, index, isCompleted, isLocked }: {
+    lesson: Lesson;
+    index: number;
+    isCompleted: boolean;
+    isLocked: boolean;
+}) {
+    const statusIcon = isCompleted ? 'check_circle' : isLocked ? 'lock' : 'play_circle';
+    const statusColor = isCompleted ? 'text-emerald-400' : isLocked ? 'text-[var(--text-muted)]' : 'text-[var(--primary)]';
+
+    return (
+        <Link
+            href={isLocked ? '#' : `/lessons/${lesson.id}`}
+            className={`group block ${isLocked ? 'cursor-not-allowed opacity-60' : ''}`}
+        >
+            <div className={`p-4 rounded-xl border transition-all duration-200 ${isLocked
+                ? 'bg-[var(--surface)] border-[var(--border)]'
+                : 'bg-[var(--surface)] border-[var(--border)] hover:border-[var(--primary)]/50 hover:bg-[var(--surface-secondary)]'
+                }`}>
+                <div className="flex items-start gap-4">
+                    {/* Thumbnail/Icon */}
+                    <div className="relative w-20 h-14 rounded-lg bg-[var(--background)] overflow-hidden flex-shrink-0">
+                        {lesson.youtube_id ? (
+                            <img
+                                src={`https://img.youtube.com/vi/${lesson.youtube_id}/mqdefault.jpg`}
+                                alt={lesson.title}
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <Icon name="play_circle" className="text-[var(--text-muted)]" />
+                            </div>
+                        )}
+                        {!isLocked && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Icon name="play_arrow" className="text-white" />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                            <div>
+                                <h3 className={`font-semibold text-[var(--text-main)] line-clamp-1 ${!isLocked ? 'group-hover:text-[var(--primary)]' : ''} transition-colors`}>
+                                    Bài {index + 1}: {lesson.title}
+                                </h3>
+                                <p className="text-sm text-[var(--text-secondary)] line-clamp-1 mt-0.5">
+                                    {lesson.description || 'Video bài giảng'}
+                                </p>
+                            </div>
+                            <Icon name={statusIcon} className={statusColor} />
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-[var(--text-muted)]">
+                            <span className="flex items-center gap-1">
+                                <Icon name="schedule" size="xs" />
+                                {Math.floor(lesson.duration / 60)} phút
+                            </span>
+                            {lesson.content_count > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <Icon name="translate" size="xs" />
+                                    {lesson.content_count} từ vựng
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Link>
+    );
+}
 
 export default function CourseDetailPage() {
     const params = useParams();
-    const { token, isAuthenticated } = useAuth();
+    const { token } = useAuth();
     const [course, setCourse] = useState<Course | null>(null);
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
@@ -39,20 +162,20 @@ export default function CourseDetailPage() {
         if (params.id) {
             fetchData();
         }
-    }, [params.id]);
+    }, [params.id, token]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const headers: any = {};
+            const headers: HeadersInit = {};
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            // Fetch course details
-            const courseRes = await fetch(`${API_BASE}/api/courses/${params.id}`, { headers });
-            const courseData = await courseRes.json();
+            const [courseRes, lessonsRes] = await Promise.all([
+                fetch(`${API_BASE}/api/courses/${params.id}`, { headers }),
+                fetch(`${API_BASE}/api/lessons/course/${params.id}`, { headers })
+            ]);
 
-            // Fetch lessons
-            const lessonsRes = await fetch(`${API_BASE}/api/lessons/course/${params.id}`, { headers });
+            const courseData = await courseRes.json();
             const lessonsData = await lessonsRes.json();
 
             if (courseData.success) setCourse(courseData.data);
@@ -64,9 +187,15 @@ export default function CourseDetailPage() {
         }
     };
 
+    const progress = course && course.lesson_count > 0 && course.completed_lessons
+        ? Math.round((course.completed_lessons / course.lesson_count) * 100)
+        : 0;
+
+    const totalDuration = lessons.reduce((acc, l) => acc + l.duration, 0);
+
     if (loading) {
         return (
-            <div className="min-h-screen flex flex-col bg-gray-50">
+            <div className="min-h-screen flex flex-col bg-[var(--background)]">
                 <Header />
                 <div className="flex-1 flex items-center justify-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary)]"></div>
@@ -77,11 +206,11 @@ export default function CourseDetailPage() {
 
     if (!course) {
         return (
-            <div className="min-h-screen flex flex-col bg-gray-50">
+            <div className="min-h-screen flex flex-col bg-[var(--background)]">
                 <Header />
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
                     <Icon name="error" size="xl" className="text-red-400 mb-4" />
-                    <h1 className="text-2xl font-bold text-gray-900">Không tìm thấy khóa học</h1>
+                    <h1 className="text-2xl font-bold text-[var(--text-main)]">Không tìm thấy khóa học</h1>
                     <Link href="/courses" className="mt-4 text-[var(--primary)] hover:underline">
                         Quay lại danh sách
                     </Link>
@@ -90,125 +219,162 @@ export default function CourseDetailPage() {
         );
     }
 
+    const colors = hskColors[course.hsk_level] || hskColors[1];
+
     return (
-        <div className="min-h-screen flex flex-col bg-gray-50">
+        <div className="min-h-screen flex flex-col bg-[var(--background)]">
             <Header />
 
-            {/* Hero Section */}
-            <div className="relative bg-gray-900 text-white overflow-hidden">
-                {/* Background Image with Blur */}
-                {course.thumbnail_url && (
-                    <div className="absolute inset-0 opacity-30 blur-xl scale-110">
-                        <img src={course.thumbnail_url} alt="" className="w-full h-full object-cover" />
-                    </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent"></div>
+            <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {/* Breadcrumb */}
+                <nav className="flex items-center gap-2 text-sm text-[var(--text-muted)] mb-6">
+                    <Link href="/" className="hover:text-[var(--primary)]">Trang chủ</Link>
+                    <Icon name="chevron_right" size="xs" />
+                    <Link href="/courses" className="hover:text-[var(--primary)]">Khóa học</Link>
+                    <Icon name="chevron_right" size="xs" />
+                    <span className="text-[var(--text-main)]">HSK {course.hsk_level}</span>
+                </nav>
 
-                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 flex flex-col md:flex-row gap-8 items-center">
-                    <div className="flex-1 space-y-4 text-center md:text-left">
-                        <span className="inline-block bg-[var(--primary)] text-white text-xs font-bold px-3 py-1 rounded-full mb-2">
-                            HSK {course.hsk_level}
-                        </span>
-                        <h1 className="text-4xl md:text-5xl font-bold leading-tight">{course.title}</h1>
-                        <p className="text-gray-300 text-lg max-w-2xl">{course.description}</p>
-
-                        <div className="flex items-center gap-6 justify-center md:justify-start pt-4 text-sm text-gray-400">
-                            <div className="flex items-center gap-2">
-                                <Icon name="play_lesson" size="sm" />
-                                <span>{lessons.length} Bài học</span>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Main Content */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {/* Course Header */}
+                        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
+                            <div className="flex items-start gap-4 mb-4">
+                                <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-bold border ${colors.badge}`}>
+                                    HSK {course.hsk_level}
+                                </span>
+                                {progress > 0 && (
+                                    <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--primary)]/10 text-[var(--primary)]">
+                                        Đang học
+                                    </span>
+                                )}
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Icon name="schedule" size="sm" />
-                                <span>{Math.floor(lessons.reduce((acc, l) => acc + l.duration, 0) / 60)} phút</span>
+                            <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-main)] mb-3">
+                                {course.title}
+                            </h1>
+                            <p className="text-[var(--text-secondary)] leading-relaxed">
+                                {course.description}
+                            </p>
+                        </div>
+
+                        {/* Lesson List */}
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-[var(--text-main)] flex items-center gap-2">
+                                    <Icon name="playlist_play" className="text-[var(--primary)]" />
+                                    Danh sách bài học
+                                </h2>
+                                <span className="text-sm text-[var(--text-muted)]">
+                                    {progress > 0 ? `${course.completed_lessons}/${lessons.length} hoàn thành` : `${lessons.length} bài`}
+                                </span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Icon name="group" size="sm" />
-                                <span>120+ Học viên</span>
-                            </div>
-                        </div>
 
-                        <div className="pt-6">
-                            {lessons.length > 0 ? (
-                                <Link href={`/learn/${lessons[0].id}`}>
-                                    <Button size="lg" className="rounded-full px-8 shadow-lg shadow-[var(--primary)]/30 hover:shadow-[var(--primary)]/50 transition-all">
-                                        <Icon name="play_arrow" className="mr-2" />
-                                        Bắt đầu học ngay
-                                    </Button>
-                                </Link>
-                            ) : (
-                                <Button disabled size="lg" variant="secondary" className="rounded-full">
-                                    Chưa có bài học
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Right Side: Course Thumbnail Card */}
-                    <div className="hidden md:block w-80 shrink-0">
-                        <div className="rounded-2xl overflow-hidden shadow-2xl border-4 border-white/10 rotate-3 hover:rotate-0 transition-all duration-500">
-                            {course.thumbnail_url ? (
-                                <img src={course.thumbnail_url} alt={course.title} className="w-full aspect-[3/4] object-cover" />
-                            ) : (
-                                <div className="w-full aspect-[3/4] bg-gray-800 flex items-center justify-center">
-                                    <Icon name="school" size="xl" className="text-gray-600" />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Syllabus Section */}
-            <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                    <Icon name="list_alt" className="text-[var(--primary)]" />
-                    Nội dung khóa học
-                </h2>
-
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    {lessons.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500">
-                            Đang cập nhật nội dung...
-                        </div>
-                    ) : (
-                        <div className="divide-y divide-gray-100">
-                            {lessons.map((lesson, index) => (
-                                <Link href={`/learn/${lesson.id}`} key={lesson.id} className="block group hover:bg-gray-50 transition-colors">
-                                    <div className="p-4 sm:p-6 flex items-center gap-4">
-                                        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 font-bold group-hover:bg-[var(--primary)] group-hover:text-white transition-colors">
-                                            {index + 1}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="text-lg font-bold text-gray-900 group-hover:text-[var(--primary)] transition-colors truncate">
-                                                {lesson.title}
-                                            </h3>
-                                            <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
-                                                <span className="flex items-center gap-1">
-                                                    <Icon name="schedule" size="xs" />
-                                                    {Math.floor(lesson.duration / 60)}:{(lesson.duration % 60).toString().padStart(2, '0')}
-                                                </span>
-                                                <span className="flex items-center gap-1">
-                                                    <Icon name="translate" size="xs" />
-                                                    {lesson.content_count} từ vựng
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="flex-shrink-0">
-                                            {index === 0 ? (
-                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--primary)]/10 text-[var(--primary)]">
-                                                    <Icon name="play_arrow" />
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-400">
-                                                    <Icon name="lock" size="sm" />
-                                                </span>
-                                            )}
-                                        </div>
+                            <div className="space-y-3">
+                                {lessons.length === 0 ? (
+                                    <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-8 text-center">
+                                        <Icon name="hourglass_empty" size="lg" className="text-[var(--text-muted)] mb-2" />
+                                        <p className="text-[var(--text-secondary)]">Đang cập nhật nội dung...</p>
                                     </div>
-                                </Link>
-                            ))}
+                                ) : (
+                                    lessons.map((lesson, index) => (
+                                        <LessonCard
+                                            key={lesson.id}
+                                            lesson={lesson}
+                                            index={index}
+                                            isCompleted={index === 0} // TODO: Get from user progress
+                                            isLocked={false} // TODO: Lock based on progress
+                                        />
+                                    ))
+                                )}
+                            </div>
                         </div>
-                    )}
+                    </div>
+
+                    {/* Sidebar */}
+                    <div className="space-y-6">
+                        {/* Stats Card */}
+                        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
+                            <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">
+                                Thông tin khóa học
+                            </h3>
+
+                            {/* Progress Ring */}
+                            <div className="flex justify-center mb-6">
+                                <ProgressRing progress={progress} />
+                            </div>
+
+                            {/* Stats Grid */}
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between py-3 border-b border-[var(--border)]">
+                                    <span className="flex items-center gap-2 text-[var(--text-secondary)]">
+                                        <Icon name="play_lesson" size="sm" />
+                                        Bài học
+                                    </span>
+                                    <span className="font-semibold text-[var(--text-main)]">{lessons.length} bài</span>
+                                </div>
+                                <div className="flex items-center justify-between py-3 border-b border-[var(--border)]">
+                                    <span className="flex items-center gap-2 text-[var(--text-secondary)]">
+                                        <Icon name="schedule" size="sm" />
+                                        Thời lượng
+                                    </span>
+                                    <span className="font-semibold text-[var(--text-main)]">{Math.round(totalDuration / 60)} giờ</span>
+                                </div>
+                                <div className="flex items-center justify-between py-3 border-b border-[var(--border)]">
+                                    <span className="flex items-center gap-2 text-[var(--text-secondary)]">
+                                        <Icon name="signal_cellular_alt" size="sm" />
+                                        Trình độ
+                                    </span>
+                                    <span className="font-semibold text-[var(--text-main)]">HSK {course.hsk_level}</span>
+                                </div>
+                                <div className="flex items-center justify-between py-3">
+                                    <span className="flex items-center gap-2 text-[var(--text-secondary)]">
+                                        <Icon name="group" size="sm" />
+                                        Học viên
+                                    </span>
+                                    <span className="font-semibold text-[var(--text-main)]">1,205</span>
+                                </div>
+                            </div>
+
+                            {/* CTA Button */}
+                            <div className="mt-6">
+                                {lessons.length > 0 ? (
+                                    <Link href={`/lessons/${lessons[0].id}`} className="block">
+                                        <Button fullWidth size="lg" className="justify-center">
+                                            <Icon name="play_arrow" size="sm" className="mr-2" />
+                                            {progress > 0 ? 'Tiếp tục học' : 'Bắt đầu học'}
+                                        </Button>
+                                    </Link>
+                                ) : (
+                                    <Button fullWidth size="lg" disabled variant="secondary" className="justify-center">
+                                        Chưa có bài học
+                                    </Button>
+                                )}
+                            </div>
+
+                            {/* Share */}
+                            <button className="w-full mt-3 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors flex items-center justify-center gap-2">
+                                <Icon name="share" size="sm" />
+                                Chia sẻ khóa học
+                            </button>
+                        </div>
+
+                        {/* Instructor Card (Mock) */}
+                        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
+                            <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">
+                                Giảng viên
+                            </h3>
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-full bg-[var(--primary)] flex items-center justify-center text-white font-bold">
+                                    TV
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-[var(--text-main)]">Cô Trương Mỹ Lan</p>
+                                    <p className="text-sm text-[var(--text-muted)]">Giảng viên HSK</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </main>
 

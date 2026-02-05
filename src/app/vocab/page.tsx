@@ -10,6 +10,9 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { HSKBadge } from '@/components/ui/Badge';
 import { fetchVocab, Vocabulary, playAudio } from '@/lib/api';
+import { useAuth } from '@/components/AuthContext';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
 function VocabList() {
     const searchParams = useSearchParams();
@@ -21,6 +24,8 @@ function VocabList() {
     const [totalPages, setTotalPages] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedQuery, setDebouncedQuery] = useState('');
+    const [savedVocabIds, setSavedVocabIds] = useState<Set<number>>(new Set());
+    const { token, isAuthenticated } = useAuth();
     const limit = 20;
 
     // Debounce search query (300ms)
@@ -31,6 +36,22 @@ function VocabList() {
         }, 300);
         return () => clearTimeout(timer);
     }, [searchQuery]);
+
+    // Fetch saved vocab IDs
+    useEffect(() => {
+        if (isAuthenticated && token) {
+            fetch(`${API_BASE}/api/notebooks/saved-ids`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        setSavedVocabIds(new Set(data.data));
+                    }
+                })
+                .catch(err => console.error('Failed to fetch saved IDs', err));
+        }
+    }, [isAuthenticated, token]);
 
     // Fetch vocab with search query
     useEffect(() => {
@@ -48,6 +69,18 @@ function VocabList() {
             })
             .finally(() => setLoading(false));
     }, [hskLevel, page, debouncedQuery]);
+
+    const handleSaveToggle = (vocabId: number, saved: boolean) => {
+        if (saved) {
+            setSavedVocabIds(prev => new Set([...prev, vocabId]));
+        } else {
+            setSavedVocabIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(vocabId);
+                return newSet;
+            });
+        }
+    };
 
     return (
         <>
@@ -126,7 +159,13 @@ function VocabList() {
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {vocabs.map((vocab, index) => (
-                        <VocabCard key={vocab.id} vocab={vocab} index={index} />
+                        <VocabCard
+                            key={vocab.id}
+                            vocab={vocab}
+                            index={index}
+                            isSavedInitial={savedVocabIds.has(vocab.id)}
+                            onSaveToggle={handleSaveToggle}
+                        />
                     ))}
                 </div>
             )}
@@ -160,6 +199,34 @@ function VocabList() {
 }
 
 function VocabCard({ vocab, index }: { vocab: Vocabulary; index: number }) {
+    const { token, isAuthenticated } = useAuth();
+    const [isSaved, setIsSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!isAuthenticated || !token) return;
+
+        setSaving(true);
+        try {
+            const method = isSaved ? 'DELETE' : 'POST';
+            const res = await fetch(`${API_BASE}/api/vocab/${vocab.id}/save`, {
+                method,
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                setIsSaved(!isSaved);
+            }
+        } catch (error) {
+            console.error('Failed to save vocab', error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <Link href={`/vocab/${vocab.id}`}>
             <Card
@@ -167,21 +234,38 @@ function VocabCard({ vocab, index }: { vocab: Vocabulary; index: number }) {
                 style={{ animationDelay: `${index * 0.03}s` }}
             >
                 <div className="flex flex-col h-full">
-                    {/* Header: HSK Badge + Audio */}
+                    {/* Header: HSK Badge + Actions */}
                     <div className="flex justify-between items-start mb-2">
                         {vocab.hskLevel && (
                             <HSKBadge level={vocab.hskLevel as 1 | 2 | 3 | 4 | 5 | 6} />
                         )}
-                        <button
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                playAudio(vocab.simplified);
-                            }}
-                            className="w-8 h-8 rounded-full bg-[var(--surface-secondary)] text-[var(--text-muted)] flex items-center justify-center hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer"
-                        >
-                            <Icon name="volume_up" size="sm" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            {/* Save to notebook button */}
+                            {isAuthenticated && (
+                                <button
+                                    onClick={handleSave}
+                                    disabled={saving}
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${isSaved
+                                        ? 'bg-[var(--primary)] text-white'
+                                        : 'bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:bg-[var(--primary)]/20 hover:text-[var(--primary)]'
+                                        } ${saving ? 'opacity-50' : ''}`}
+                                    title={isSaved ? 'Đã lưu vào sổ tay' : 'Lưu vào sổ tay'}
+                                >
+                                    <Icon name={isSaved ? 'bookmark' : 'bookmark_border'} size="sm" />
+                                </button>
+                            )}
+                            {/* Audio button */}
+                            <button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    playAudio(vocab.simplified);
+                                }}
+                                className="w-8 h-8 rounded-full bg-[var(--surface-secondary)] text-[var(--text-muted)] flex items-center justify-center hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer"
+                            >
+                                <Icon name="volume_up" size="sm" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Character Display */}
