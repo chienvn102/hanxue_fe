@@ -41,12 +41,12 @@ const colorClasses: Record<string, { text: string; border: string; bg: string }>
 };
 
 
-
 export default function HomePage() {
-  const { user, isAuthenticated, updateUser, logout } = useAuth();
+  const { user, isAuthenticated, updateUser, logout, token } = useAuth();
   const [featuredVocab, setFeaturedVocab] = useState<Vocab[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [savedVocabIds, setSavedVocabIds] = useState<Set<number>>(new Set());
 
   // Fetch fresh profile data on mount to keep stats updated
   useEffect(() => {
@@ -66,6 +66,22 @@ export default function HomePage() {
     }
   }, [isAuthenticated]); // Removed updateUser dependency to avoid loop if not stable, though likely stable
 
+  // Fetch saved vocab IDs
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      fetch(`${API_BASE}/api/notebooks/saved-ids`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data) {
+            setSavedVocabIds(new Set(data.data));
+          }
+        })
+        .catch(err => console.error('Failed to fetch saved IDs', err));
+    }
+  }, [isAuthenticated, token]);
+
   useEffect(() => {
     const loadVocab = async () => {
       try {
@@ -80,6 +96,34 @@ export default function HomePage() {
     };
     loadVocab();
   }, []);
+
+  const handleBookmark = async (vocabId: number) => {
+    if (!isAuthenticated || !token) return;
+
+    const isSaved = savedVocabIds.has(vocabId);
+    const method = isSaved ? 'DELETE' : 'POST';
+
+    try {
+      const res = await fetch(`${API_BASE}/api/vocab/${vocabId}/save`, {
+        method,
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        setSavedVocabIds(prev => {
+          const newSet = new Set(prev);
+          if (isSaved) {
+            newSet.delete(vocabId);
+          } else {
+            newSet.add(vocabId);
+          }
+          return newSet;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save vocab', error);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--background)]">
@@ -199,6 +243,8 @@ export default function HomePage() {
                       hanViet={vocab.hanViet}
                       meaningVi={vocab.meaningVi}
                       hskLevel={vocab.hskLevel}
+                      bookmarked={savedVocabIds.has(vocab.id)}
+                      onBookmark={handleBookmark}
                       onAudio={() => playAudio(vocab.simplified)}
                     />
                   ))}
@@ -289,9 +335,9 @@ export default function HomePage() {
             </div>
           </aside>
         </div>
-      </main>
+      </main >
 
       <Footer />
-    </div>
+    </div >
   );
 }
