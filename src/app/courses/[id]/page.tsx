@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
@@ -17,6 +17,7 @@ interface Lesson {
     order_index: number;
     content_count: number;
     youtube_id?: string;
+    progress_status?: 'not_started' | 'in_progress' | 'completed' | null;
 }
 
 interface Course {
@@ -158,13 +159,7 @@ export default function CourseDetailPage() {
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (params.id) {
-            fetchData();
-        }
-    }, [params.id, token]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             setLoading(true);
             const headers: HeadersInit = {};
@@ -185,7 +180,13 @@ export default function CourseDetailPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [params.id, token]);
+
+    useEffect(() => {
+        if (params.id) {
+            fetchData();
+        }
+    }, [params.id, token, fetchData]);
 
     const progress = course && course.lesson_count > 0 && course.completed_lessons
         ? Math.round((course.completed_lessons / course.lesson_count) * 100)
@@ -282,8 +283,8 @@ export default function CourseDetailPage() {
                                             key={lesson.id}
                                             lesson={lesson}
                                             index={index}
-                                            isCompleted={index === 0} // TODO: Get from user progress
-                                            isLocked={false} // TODO: Lock based on progress
+                                            isCompleted={lesson.progress_status === 'completed'}
+                                            isLocked={index > 0 && lessons[index - 1].progress_status !== 'completed' && lesson.progress_status !== 'completed' && lesson.progress_status !== 'in_progress'}
                                         />
                                     ))
                                 )}
@@ -339,7 +340,7 @@ export default function CourseDetailPage() {
                             {/* CTA Button */}
                             <div className="mt-6">
                                 {lessons.length > 0 ? (
-                                    <Link href={`/lessons/${lessons[0].id}`} className="block">
+                                    <Link href={`/lessons/${(lessons.find(l => l.progress_status !== 'completed') || lessons[0]).id}`} className="block">
                                         <Button fullWidth size="lg" className="justify-center">
                                             <Icon name="play_arrow" size="sm" className="mr-2" />
                                             {progress > 0 ? 'Tiếp tục học' : 'Bắt đầu học'}

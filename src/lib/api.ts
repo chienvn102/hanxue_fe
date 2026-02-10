@@ -294,6 +294,52 @@ export const QUALITY_RATINGS = [
 ] as const;
 
 // ============================================================
+// Grammar Functions
+// ============================================================
+
+export interface GrammarExample {
+    chinese: string;
+    pinyin: string;
+    vietnamese: string;
+}
+
+export interface Grammar {
+    id: number;
+    pattern: string[];
+    patternPinyin?: string[];
+    patternFormula?: string;
+    grammarPoint: string;
+    explanation: string;
+    examples: GrammarExample[];
+    hskLevel: number;
+    audioUrl?: string;
+    createdAt?: string;
+}
+
+export async function fetchGrammarList(params?: {
+    hsk?: number;
+    q?: string;
+    page?: number;
+    limit?: number;
+}): Promise<{ data: Grammar[]; pagination: { total: number; limit: number; page: number; totalPages: number } }> {
+    const searchParams = new URLSearchParams();
+    if (params?.hsk) searchParams.set('hsk', params.hsk.toString());
+    if (params?.q) searchParams.set('q', params.q);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+
+    const res = await fetch(`${API_BASE_URL}/api/grammar?${searchParams.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch grammar list');
+    return res.json();
+}
+
+export async function fetchGrammarById(id: number): Promise<Grammar> {
+    const res = await fetch(`${API_BASE_URL}/api/grammar/${id}`);
+    if (!res.ok) throw new Error('Grammar not found');
+    return res.json();
+}
+
+// ============================================================
 // User Profile Functions
 // ============================================================
 

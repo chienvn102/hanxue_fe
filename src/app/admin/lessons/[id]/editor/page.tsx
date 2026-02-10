@@ -9,17 +9,45 @@ import Link from 'next/link';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// Types
-interface Content {
+// Types — matches DB schema: contents table has type/timestamp/data(JSON)/order_index
+interface ContentRaw {
     id: number;
     lesson_id: number;
+    type: 'VOCABULARY' | 'GRAMMAR' | 'SENTENCE';
+    timestamp: number;
+    data: string | { text_content?: string; pinyin?: string; meaning?: string; explanation?: string; start_time?: number; end_time?: number };
+    order_index: number;
+}
+
+// Parsed content for display in editor
+interface ContentDisplay {
+    id: number;
     start_time: number;
     end_time: number;
-    content_type: 'vocabulary' | 'grammar' | 'sentence';
+    content_type: string;
     text_content: string;
     pinyin: string;
     meaning: string;
     explanation: string;
+}
+
+function parseContent(raw: ContentRaw): ContentDisplay {
+    let d: Record<string, unknown> = {};
+    try {
+        d = typeof raw.data === 'string' ? JSON.parse(raw.data) : (raw.data || {});
+    } catch {
+        d = {};
+    }
+    return {
+        id: raw.id,
+        start_time: (d.start_time as number) ?? raw.timestamp ?? 0,
+        end_time: (d.end_time as number) ?? 0,
+        content_type: (raw.type || 'vocabulary').toLowerCase(),
+        text_content: (d.text_content as string) || '',
+        pinyin: (d.pinyin as string) || '',
+        meaning: (d.meaning as string) || '',
+        explanation: (d.explanation as string) || '',
+    };
 }
 
 interface Lesson {
@@ -28,7 +56,7 @@ interface Lesson {
     title: string;
     youtube_id: string;
     duration: number;
-    contents: Content[];
+    contents: ContentRaw[];
 }
 
 export default function LessonEditorPage() {
@@ -315,7 +343,9 @@ export default function LessonEditorPage() {
                             {lesson.contents?.length === 0 && (
                                 <p className="text-center text-gray-400 py-8 text-sm">Chưa có nội dung nào.</p>
                             )}
-                            {lesson.contents?.map((content) => (
+                            {lesson.contents?.map((rawContent) => {
+                                const content = parseContent(rawContent);
+                                return (
                                 <div key={content.id} className="p-4 hover:bg-gray-50 transition-colors flex gap-4 group cursor-pointer" onClick={() => seekTo(content.start_time)}>
                                     <div className="mt-1">
                                         <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded">
@@ -344,7 +374,8 @@ export default function LessonEditorPage() {
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
 

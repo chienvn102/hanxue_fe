@@ -16,6 +16,7 @@ interface Course {
     thumbnail_url: string;
     is_active: number;
     lesson_count: number;
+    order_index?: number;
 }
 
 export default function AdminCoursesPage() {
@@ -23,6 +24,7 @@ export default function AdminCoursesPage() {
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingCourse, setEditingCourse] = useState<Course | null>(null);
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -32,7 +34,7 @@ export default function AdminCoursesPage() {
     });
 
     useEffect(() => {
-        fetchCourses();
+        if (token) fetchCourses();
     }, [token]);
 
     const fetchCourses = async () => {
@@ -51,11 +53,34 @@ export default function AdminCoursesPage() {
         }
     };
 
-    const handleCreateCourse = async (e: React.FormEvent) => {
+    const openCreateModal = () => {
+        setEditingCourse(null);
+        setFormData({ title: '', description: '', hsk_level: 1, thumbnail_url: '', order_index: 0 });
+        setIsModalOpen(true);
+    };
+
+    const openEditModal = (course: Course) => {
+        setEditingCourse(course);
+        setFormData({
+            title: course.title,
+            description: course.description || '',
+            hsk_level: course.hsk_level,
+            thumbnail_url: course.thumbnail_url || '',
+            order_index: course.order_index || 0
+        });
+        setIsModalOpen(true);
+    };
+
+    const handleSaveCourse = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_BASE}/api/courses`, {
-                method: 'POST',
+            const url = editingCourse
+                ? `${API_BASE}/api/courses/${editingCourse.id}`
+                : `${API_BASE}/api/courses`;
+            const method = editingCourse ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
@@ -65,15 +90,34 @@ export default function AdminCoursesPage() {
 
             if (res.ok) {
                 setIsModalOpen(false);
-                setFormData({ title: '', description: '', hsk_level: 1, thumbnail_url: '', order_index: 0 });
-                fetchCourses(); // Refresh list
+                setEditingCourse(null);
+                fetchCourses();
             } else {
                 const data = await res.json();
-                alert(`Lỗi: ${data.message}`);
-                console.error('Create failed:', data);
+                alert(`Lỗi: ${data.message || 'Không thể lưu khóa học'}`);
             }
         } catch (error) {
-            console.error('Failed to create course:', error);
+            console.error('Failed to save course:', error);
+            alert('Lỗi kết nối server');
+        }
+    };
+
+    const handleDelete = async (course: Course) => {
+        if (!confirm(`Bạn có chắc muốn xóa khóa học "${course.title}"?`)) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/api/courses/${course.id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                fetchCourses();
+            } else {
+                const data = await res.json();
+                alert(`Lỗi: ${data.message || 'Không thể xóa khóa học'}`);
+            }
+        } catch (error) {
+            console.error('Failed to delete course:', error);
             alert('Lỗi kết nối server');
         }
     };
@@ -83,9 +127,9 @@ export default function AdminCoursesPage() {
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Quản lý Khóa học</h1>
-                    <p className="text-gray-500 mt-1">Quản lý khóa học HSK và hệ thống bài giảng</p>
+                    <p className="text-gray-500 mt-1">Tổng cộng {courses.length} khóa học</p>
                 </div>
-                <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
+                <Button onClick={openCreateModal} className="flex items-center gap-2">
                     <Icon name="add" />
                     Thêm Khóa học
                 </Button>
@@ -123,10 +167,18 @@ export default function AdminCoursesPage() {
                                                 <Icon name="list" size="sm" />
                                             </button>
                                         </Link>
-                                        <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-[var(--primary)] transition-colors" title="Chỉnh sửa">
+                                        <button
+                                            onClick={() => openEditModal(course)}
+                                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-[var(--primary)] transition-colors"
+                                            title="Chỉnh sửa"
+                                        >
                                             <Icon name="edit" size="sm" />
                                         </button>
-                                        <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-500 transition-colors" title="Xóa">
+                                        <button
+                                            onClick={() => handleDelete(course)}
+                                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-500 transition-colors"
+                                            title="Xóa"
+                                        >
                                             <Icon name="delete" size="sm" />
                                         </button>
                                     </div>
@@ -137,17 +189,19 @@ export default function AdminCoursesPage() {
                 </div>
             )}
 
-            {/* Create Modal */}
+            {/* Create/Edit Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-gray-900">Tạo Khóa học Mới</h2>
+                            <h2 className="text-xl font-bold text-gray-900">
+                                {editingCourse ? 'Chỉnh sửa Khóa học' : 'Tạo Khóa học Mới'}
+                            </h2>
                             <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
                                 <Icon name="close" />
                             </button>
                         </div>
-                        <form onSubmit={handleCreateCourse} className="p-6 space-y-4">
+                        <form onSubmit={handleSaveCourse} className="p-6 space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Tên khóa học</label>
                                 <input
@@ -208,7 +262,7 @@ export default function AdminCoursesPage() {
                                     Hủy
                                 </Button>
                                 <Button type="submit" className="flex-1">
-                                    Tạo
+                                    {editingCourse ? 'Lưu thay đổi' : 'Tạo'}
                                 </Button>
                             </div>
                         </form>
