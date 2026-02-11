@@ -193,8 +193,8 @@ export default function AdminGrammarPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Quản lý Ngữ pháp</h1>
-                    <p className="text-gray-500 text-sm">Tổng cộng {total.toLocaleString()} mẫu ngữ pháp</p>
+                    <h1 className="text-2xl font-bold text-[var(--text-main)]">Quản lý Ngữ pháp</h1>
+                    <p className="text-[var(--text-muted)] text-sm">Tổng cộng {total.toLocaleString()} mẫu ngữ pháp</p>
                 </div>
                 <Button onClick={openCreateModal} className="flex items-center gap-2">
                     <Icon name="add" />
@@ -203,12 +203,12 @@ export default function AdminGrammarPage() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 flex flex-wrap gap-4 items-center">
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 mb-6 flex flex-wrap gap-4 items-center">
                 <div className="flex-1 min-w-[200px]">
                     <input
                         type="text"
                         placeholder="Tìm kiếm (tên, công thức, giải thích...)"
-                        className="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-900 focus:border-[var(--primary)] outline-none"
+                        className="w-full px-4 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
                         value={searchQuery}
                         onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                     />
@@ -216,7 +216,7 @@ export default function AdminGrammarPage() {
                 <div className="flex gap-2">
                     <button
                         onClick={() => { setHskFilter(null); setPage(1); }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!hskFilter ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!hskFilter ? 'bg-[var(--primary)] text-white' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--border)]'}`}
                     >
                         Tất cả
                     </button>
@@ -224,7 +224,7 @@ export default function AdminGrammarPage() {
                         <button
                             key={level}
                             onClick={() => { setHskFilter(level); setPage(1); }}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${hskFilter === level ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${hskFilter === level ? 'bg-[var(--primary)] text-white' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--border)]'}`}
                         >
                             HSK {level}
                         </button>
@@ -233,15 +233,15 @@ export default function AdminGrammarPage() {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden">
                 {loading ? (
-                    <div className="p-8 text-center text-gray-500">Đang tải...</div>
+                    <div className="p-8 text-center text-[var(--text-muted)]">Đang tải...</div>
                 ) : grammars.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">Không tìm thấy ngữ pháp nào.</div>
+                    <div className="p-8 text-center text-[var(--text-muted)]">Không tìm thấy ngữ pháp nào.</div>
                 ) : (
                     <table className="w-full text-left">
-                        <thead className="bg-gray-50 border-b border-gray-100">
-                            <tr className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <thead className="bg-[var(--background)] border-b border-[var(--border)]">
+                            <tr className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                                 <th className="px-4 py-3">ID</th>
                                 <th className="px-4 py-3">Điểm Ngữ pháp</th>
                                 <th className="px-4 py-3">Công thức</th>
@@ -250,26 +250,26 @@ export default function AdminGrammarPage() {
                                 <th className="px-4 py-3 text-right">Thao tác</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-[var(--border)]">
                             {grammars.map(grammar => (
-                                <tr key={grammar.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-4 py-3 text-xs text-gray-400 font-mono">{grammar.id}</td>
-                                    <td className="px-4 py-3 font-semibold text-gray-900">{grammar.grammarPoint}</td>
+                                <tr key={grammar.id} className="hover:bg-[var(--background)] transition-colors">
+                                    <td className="px-4 py-3 text-xs text-[var(--text-muted)] font-mono">{grammar.id}</td>
+                                    <td className="px-4 py-3 font-semibold text-[var(--text-main)]">{grammar.grammarPoint}</td>
                                     <td className="px-4 py-3 text-sm text-[var(--primary)] font-mono">{grammar.patternFormula}</td>
                                     <td className="px-4 py-3">
                                         <span className={`${HSK_COLORS[grammar.hskLevel]} text-white text-xs font-bold px-2 py-0.5 rounded`}>
                                             {grammar.hskLevel}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-gray-500">
+                                    <td className="px-4 py-3 text-sm text-[var(--text-muted)]">
                                         {grammar.examples?.length || 0} ví dụ
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            <button onClick={() => openEditModal(grammar)} className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors">
+                                            <button onClick={() => openEditModal(grammar)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 transition-colors">
                                                 <Icon name="edit" size="sm" />
                                             </button>
-                                            <button onClick={() => handleDelete(grammar.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+                                            <button onClick={() => handleDelete(grammar.id)} className="p-1.5 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                                                 <Icon name="delete" size="sm" />
                                             </button>
                                         </div>
@@ -287,15 +287,15 @@ export default function AdminGrammarPage() {
                     <button
                         disabled={page <= 1}
                         onClick={() => setPage(p => p - 1)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
+                        className="px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--border)]"
                     >
                         <Icon name="chevron_left" size="sm" />
                     </button>
-                    <span className="text-sm text-gray-600">Trang {page} / {totalPages}</span>
+                    <span className="text-sm text-[var(--text-secondary)]">Trang {page} / {totalPages}</span>
                     <button
                         disabled={page >= totalPages}
                         onClick={() => setPage(p => p + 1)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
+                        className="px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--border)]"
                     >
                         <Icon name="chevron_right" size="sm" />
                     </button>
@@ -305,23 +305,23 @@ export default function AdminGrammarPage() {
             {/* Edit/Create Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl my-8">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-                            <h2 className="text-xl font-bold text-gray-900">
+                    <div className="bg-[var(--surface)] rounded-2xl w-full max-w-3xl shadow-2xl my-8">
+                        <div className="p-6 border-b border-[var(--border)] flex items-center justify-between sticky top-0 bg-[var(--surface)] rounded-t-2xl">
+                            <h2 className="text-xl font-bold text-[var(--text-main)]">
                                 {editingGrammar ? 'Chỉnh sửa Ngữ pháp' : 'Thêm Ngữ pháp Mới'}
                             </h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                            <button onClick={() => setIsModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)]">
                                 <Icon name="close" />
                             </button>
                         </div>
                         <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                             {/* Grammar Point */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Điểm ngữ pháp *</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Điểm ngữ pháp *</label>
                                 <input
                                     type="text" required
                                     placeholder="Ví dụ: Cấu trúc 很 + Tính từ"
-                                    className="w-full px-3 py-2 border rounded-lg bg-white text-gray-900"
+                                    className="w-full px-3 py-2 border rounded-lg bg-[var(--surface)] text-[var(--text-main)]"
                                     value={formData.grammar_point}
                                     onChange={e => setFormData({ ...formData, grammar_point: e.target.value })}
                                 />
@@ -329,22 +329,22 @@ export default function AdminGrammarPage() {
 
                             {/* Pattern Formula */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Công thức *</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Công thức *</label>
                                 <input
                                     type="text" required
                                     placeholder="Ví dụ: S + 很 + Adj"
-                                    className="w-full px-3 py-2 border rounded-lg bg-white text-gray-900 font-mono"
+                                    className="w-full px-3 py-2 border rounded-lg bg-[var(--surface)] text-[var(--text-main)] font-mono"
                                     value={formData.pattern_formula}
                                     onChange={e => setFormData({ ...formData, pattern_formula: e.target.value })}
                                 />
-                                <p className="text-xs text-gray-400 mt-1">Dùng dấu + để phân tách các thành phần</p>
+                                <p className="text-xs text-[var(--text-muted)] mt-1">Dùng dấu + để phân tách các thành phần</p>
                             </div>
 
                             {/* HSK Level */}
                             <div className="w-1/2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">HSK Level *</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">HSK Level *</label>
                                 <select
-                                    className="w-full px-3 py-2 border rounded-lg bg-white text-gray-900"
+                                    className="w-full px-3 py-2 border rounded-lg bg-[var(--surface)] text-[var(--text-main)]"
                                     value={formData.hsk_level}
                                     onChange={e => setFormData({ ...formData, hsk_level: parseInt(e.target.value) })}
                                 >
@@ -354,11 +354,11 @@ export default function AdminGrammarPage() {
 
                             {/* Explanation */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Giải thích *</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Giải thích *</label>
                                 <textarea
                                     required rows={4}
                                     placeholder="Giải thích cách sử dụng, ngữ cảnh áp dụng..."
-                                    className="w-full px-3 py-2 border rounded-lg bg-white text-gray-900"
+                                    className="w-full px-3 py-2 border rounded-lg bg-[var(--surface)] text-[var(--text-main)]"
                                     value={formData.explanation}
                                     onChange={e => setFormData({ ...formData, explanation: e.target.value })}
                                 />
@@ -366,12 +366,12 @@ export default function AdminGrammarPage() {
 
                             {/* Examples */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Ví dụ minh họa</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Ví dụ minh họa</label>
                                 <div className="space-y-3">
                                     {formData.examples.map((ex, idx) => (
-                                        <div key={idx} className="p-3 border rounded-lg bg-gray-50 space-y-2">
+                                        <div key={idx} className="p-3 border rounded-lg bg-[var(--background)] space-y-2">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-xs font-semibold text-gray-400">#{idx + 1}</span>
+                                                <span className="text-xs font-semibold text-[var(--text-muted)]">#{idx + 1}</span>
                                                 {formData.examples.length > 1 && (
                                                     <button type="button" onClick={() => removeExample(idx)} className="ml-auto text-red-400 hover:text-red-600">
                                                         <Icon name="close" size="sm" />
@@ -381,21 +381,21 @@ export default function AdminGrammarPage() {
                                             <input
                                                 type="text"
                                                 placeholder="Tiếng Trung (Ví dụ: 我很好)"
-                                                className="w-full px-3 py-2 border rounded-lg bg-white text-gray-900 text-lg"
+                                                className="w-full px-3 py-2 border rounded-lg bg-[var(--surface)] text-[var(--text-main)] text-lg"
                                                 value={ex.chinese}
                                                 onChange={e => updateExample(idx, 'chinese', e.target.value)}
                                             />
                                             <input
                                                 type="text"
                                                 placeholder="Pinyin (Ví dụ: wǒ hěn hǎo)"
-                                                className="w-full px-3 py-2 border rounded-lg bg-white text-gray-900 text-[var(--primary)]"
+                                                className="w-full px-3 py-2 border rounded-lg bg-[var(--surface)] text-[var(--text-main)] text-[var(--primary)]"
                                                 value={ex.pinyin}
                                                 onChange={e => updateExample(idx, 'pinyin', e.target.value)}
                                             />
                                             <input
                                                 type="text"
                                                 placeholder="Nghĩa tiếng Việt (Ví dụ: Tôi khỏe)"
-                                                className="w-full px-3 py-2 border rounded-lg bg-white text-gray-900"
+                                                className="w-full px-3 py-2 border rounded-lg bg-[var(--surface)] text-[var(--text-main)]"
                                                 value={ex.vietnamese}
                                                 onChange={e => updateExample(idx, 'vietnamese', e.target.value)}
                                             />
@@ -411,7 +411,7 @@ export default function AdminGrammarPage() {
                                 </button>
                             </div>
 
-                            <div className="flex gap-4 pt-4 sticky bottom-0 bg-white pb-2">
+                            <div className="flex gap-4 pt-4 sticky bottom-0 bg-[var(--surface)] pb-2">
                                 <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="flex-1">
                                     Hủy
                                 </Button>

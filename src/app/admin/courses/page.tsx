@@ -126,8 +126,8 @@ export default function AdminCoursesPage() {
         <div>
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Quản lý Khóa học</h1>
-                    <p className="text-gray-500 mt-1">Tổng cộng {courses.length} khóa học</p>
+                    <h1 className="text-2xl font-bold text-[var(--text-main)]">Quản lý Khóa học</h1>
+                    <p className="text-[var(--text-muted)] mt-1">Tổng cộng {courses.length} khóa học</p>
                 </div>
                 <Button onClick={openCreateModal} className="flex items-center gap-2">
                     <Icon name="add" />
@@ -136,16 +136,16 @@ export default function AdminCoursesPage() {
             </div>
 
             {loading ? (
-                <div className="text-center py-12 text-gray-500">Đang tải danh sách...</div>
+                <div className="text-center py-12 text-[var(--text-muted)]">Đang tải danh sách...</div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {courses.map(course => (
-                        <div key={course.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all group">
-                            <div className="h-40 bg-gray-100 relative">
+                        <div key={course.id} className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] overflow-hidden shadow-sm hover:shadow-md transition-all group">
+                            <div className="h-40 bg-[var(--surface-secondary)] relative">
                                 {course.thumbnail_url ? (
                                     <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                    <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
                                         <Icon name="image" size="lg" />
                                     </div>
                                 )}
@@ -154,29 +154,29 @@ export default function AdminCoursesPage() {
                                 </div>
                             </div>
                             <div className="p-5">
-                                <h3 className="font-bold text-lg text-gray-900 mb-2 truncate" title={course.title}>{course.title}</h3>
-                                <p className="text-sm text-gray-500 line-clamp-2 mb-4 h-10">{course.description}</p>
+                                <h3 className="font-bold text-lg text-[var(--text-main)] mb-2 truncate" title={course.title}>{course.title}</h3>
+                                <p className="text-sm text-[var(--text-muted)] line-clamp-2 mb-4 h-10">{course.description}</p>
 
-                                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                                    <span className="text-xs font-semibold text-gray-400 uppercase">
+                                <div className="flex items-center justify-between pt-4 border-t border-[var(--border)]">
+                                    <span className="text-xs font-semibold text-[var(--text-muted)] uppercase">
                                         {course.lesson_count} Bài học
                                     </span>
                                     <div className="flex gap-2">
                                         <Link href={`/admin/courses/${course.id}/lessons`}>
-                                            <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-[var(--primary)] transition-colors" title="Quản lý bài học">
+                                            <button className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors" title="Quản lý bài học">
                                                 <Icon name="list" size="sm" />
                                             </button>
                                         </Link>
                                         <button
                                             onClick={() => openEditModal(course)}
-                                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-[var(--primary)] transition-colors"
+                                            className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
                                             title="Chỉnh sửa"
                                         >
                                             <Icon name="edit" size="sm" />
                                         </button>
                                         <button
                                             onClick={() => handleDelete(course)}
-                                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-500 transition-colors"
+                                            className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-red-500 transition-colors"
                                             title="Xóa"
                                         >
                                             <Icon name="delete" size="sm" />
@@ -192,22 +192,22 @@ export default function AdminCoursesPage() {
             {/* Create/Edit Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-gray-900">
+                    <div className="bg-[var(--surface)] rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-[var(--text-main)]">
                                 {editingCourse ? 'Chỉnh sửa Khóa học' : 'Tạo Khóa học Mới'}
                             </h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                            <button onClick={() => setIsModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">
                                 <Icon name="close" />
                             </button>
                         </div>
                         <form onSubmit={handleSaveCourse} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Tên khóa học</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Tên khóa học</label>
                                 <input
                                     type="text"
                                     required
-                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
+                                    className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] placeholder-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
                                     value={formData.title}
                                     onChange={e => setFormData({ ...formData, title: e.target.value })}
                                 />
@@ -215,9 +215,9 @@ export default function AdminCoursesPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Cấp độ HSK</label>
+                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Cấp độ HSK</label>
                                     <select
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
+                                        className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
                                         value={formData.hsk_level}
                                         onChange={e => setFormData({ ...formData, hsk_level: parseInt(e.target.value) })}
                                     >
@@ -227,10 +227,10 @@ export default function AdminCoursesPage() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Thứ tự sắp xếp</label>
+                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Thứ tự sắp xếp</label>
                                     <input
                                         type="number"
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
+                                        className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
                                         value={formData.order_index}
                                         onChange={e => setFormData({ ...formData, order_index: parseInt(e.target.value) })}
                                     />
@@ -238,19 +238,19 @@ export default function AdminCoursesPage() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Mô tả</label>
                                 <textarea
-                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all resize-none h-24"
+                                    className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] placeholder-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all resize-none h-24"
                                     value={formData.description}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Link ảnh bìa</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Link ảnh bìa</label>
                                 <input
                                     type="url"
-                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
+                                    className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] placeholder-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
                                     placeholder="https://"
                                     value={formData.thumbnail_url}
                                     onChange={e => setFormData({ ...formData, thumbnail_url: e.target.value })}

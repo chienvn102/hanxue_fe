@@ -194,24 +194,24 @@ export default function LessonEditorPage() {
         playerRef.current?.seekTo(time, true);
     };
 
-    if (loading) return <div className="p-8 text-center text-gray-500">Đang tải trình soạn thảo...</div>;
+    if (loading) return <div className="p-8 text-center text-[var(--text-muted)]">Đang tải trình soạn thảo...</div>;
     if (!lesson) return <div className="p-8 text-center text-red-500">Không tìm thấy bài học</div>;
 
     return (
-        <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+        <div className="h-screen flex flex-col bg-[var(--background)] overflow-hidden">
             {/* Header */}
-            <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
+            <header className="bg-[var(--surface)] border-b border-[var(--border)] px-6 py-4 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
-                    <Link href={`/admin/courses/${lesson.course_id}/lessons`} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                    <Link href={`/admin/courses/${lesson.course_id}/lessons`} className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] transition-colors">
                         <Icon name="arrow_back" />
                     </Link>
                     <div>
-                        <h1 className="text-lg font-bold text-gray-900">{lesson.title}</h1>
-                        <p className="text-xs text-gray-500 font-mono">ID: {lesson.youtube_id}</p>
+                        <h1 className="text-lg font-bold text-[var(--text-main)]">{lesson.title}</h1>
+                        <p className="text-xs text-[var(--text-muted)] font-mono">ID: {lesson.youtube_id}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <span className="text-sm font-mono bg-gray-100 px-3 py-1 rounded-md text-gray-600">
+                    <span className="text-sm font-mono bg-[var(--surface-secondary)] px-3 py-1 rounded-md text-[var(--text-secondary)]">
                         {new Date(currentTime * 1000).toISOString().substr(11, 8)}
                     </span>
                     <Button variant="outline" size="sm">Xem trước</Button>
@@ -242,40 +242,40 @@ export default function LessonEditorPage() {
                 </div>
 
                 {/* Right: Content Editor & List */}
-                <div className="w-1/2 flex flex-col bg-white border-l border-gray-200">
+                <div className="w-1/2 flex flex-col bg-[var(--surface)] border-l border-[var(--border)]">
 
                     {/* Add Content Form */}
-                    <div className="p-6 border-b border-gray-200 bg-gray-50 overflow-y-auto max-h-[50%] shrink-0">
-                        <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <div className="p-6 border-b border-[var(--border)] bg-[var(--background)] overflow-y-auto max-h-[50%] shrink-0">
+                        <h3 className="font-bold text-[var(--text-main)] mb-4 flex items-center gap-2">
                             <Icon name="add_circle" className="text-[var(--primary)]" />
                             Thêm Điểm kiến thức
                         </h3>
                         <form onSubmit={handleAddContent} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Thời gian bắt đầu (s)</label>
+                                    <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1">Thời gian bắt đầu (s)</label>
                                     <div className="flex gap-2">
                                         <input
                                             type="number"
                                             value={contentForm.start_time}
                                             onChange={e => setContentForm({ ...contentForm, start_time: Number(e.target.value) })}
-                                            className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:border-[var(--primary)] outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--surface)] rounded-lg border border-[var(--border)] text-sm focus:border-[var(--primary)] outline-none"
                                         />
-                                        <button type="button" onClick={handleCaptureStart} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200" title="Capture Current Time">
+                                        <button type="button" onClick={handleCaptureStart} className="p-2 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20" title="Capture Current Time">
                                             <Icon name="timer" size="sm" />
                                         </button>
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Thời gian kết thúc (s)</label>
+                                    <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1">Thời gian kết thúc (s)</label>
                                     <div className="flex gap-2">
                                         <input
                                             type="number"
                                             value={contentForm.end_time}
                                             onChange={e => setContentForm({ ...contentForm, end_time: Number(e.target.value) })}
-                                            className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:border-[var(--primary)] outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--surface)] rounded-lg border border-[var(--border)] text-sm focus:border-[var(--primary)] outline-none"
                                         />
-                                        <button type="button" onClick={handleCaptureEnd} className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200" title="Capture Current Time">
+                                        <button type="button" onClick={handleCaptureEnd} className="p-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20" title="Capture Current Time">
                                             <Icon name="timer" size="sm" />
                                         </button>
                                     </div>
@@ -283,11 +283,11 @@ export default function LessonEditorPage() {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-semibold text-gray-500 mb-1">Loại nội dung</label>
+                                <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1">Loại nội dung</label>
                                 <select
                                     value={contentForm.content_type}
                                     onChange={e => setContentForm({ ...contentForm, content_type: e.target.value as any })}
-                                    className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:border-[var(--primary)] outline-none"
+                                    className="w-full px-3 py-2 bg-[var(--surface)] rounded-lg border border-[var(--border)] text-sm focus:border-[var(--primary)] outline-none"
                                 >
                                     <option value="vocabulary">Từ vựng (Vocabulary)</option>
                                     <option value="grammar">Ngữ pháp (Grammar)</option>
@@ -297,35 +297,35 @@ export default function LessonEditorPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Nội dung (Hanzi)</label>
+                                    <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1">Nội dung (Hanzi)</label>
                                     <input
                                         type="text"
                                         required
                                         value={contentForm.text_content}
                                         onChange={e => setContentForm({ ...contentForm, text_content: e.target.value })}
-                                        className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:border-[var(--primary)] outline-none font-medium"
+                                        className="w-full px-3 py-2 bg-[var(--surface)] rounded-lg border border-[var(--border)] text-sm focus:border-[var(--primary)] outline-none font-medium"
                                         placeholder="ví dụ: 你好"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Pinyin</label>
+                                    <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1">Pinyin</label>
                                     <input
                                         type="text"
                                         value={contentForm.pinyin}
                                         onChange={e => setContentForm({ ...contentForm, pinyin: e.target.value })}
-                                        className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:border-[var(--primary)] outline-none"
+                                        className="w-full px-3 py-2 bg-[var(--surface)] rounded-lg border border-[var(--border)] text-sm focus:border-[var(--primary)] outline-none"
                                         placeholder="ví dụ: nǐ hǎo"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-semibold text-gray-500 mb-1">Ý nghĩa (Tiếng Việt)</label>
+                                <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1">Ý nghĩa (Tiếng Việt)</label>
                                 <input
                                     type="text"
                                     value={contentForm.meaning}
                                     onChange={e => setContentForm({ ...contentForm, meaning: e.target.value })}
-                                    className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm focus:border-[var(--primary)] outline-none"
+                                    className="w-full px-3 py-2 bg-[var(--surface)] rounded-lg border border-[var(--border)] text-sm focus:border-[var(--primary)] outline-none"
                                     placeholder="ví dụ: Xin chào"
                                 />
                             </div>
@@ -336,40 +336,40 @@ export default function LessonEditorPage() {
 
                     {/* Content List */}
                     <div className="flex-1 overflow-y-auto p-0">
-                        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-3 flex justify-between items-center shadow-sm z-10">
-                            <h3 className="font-bold text-gray-900">Danh sách nội dung ({lesson.contents?.length || 0})</h3>
+                        <div className="sticky top-0 bg-[var(--surface)] border-b border-[var(--border)] px-6 py-3 flex justify-between items-center shadow-sm z-10">
+                            <h3 className="font-bold text-[var(--text-main)]">Danh sách nội dung ({lesson.contents?.length || 0})</h3>
                         </div>
-                        <div className="divide-y divide-gray-100">
+                        <div className="divide-y divide-[var(--border)]">
                             {lesson.contents?.length === 0 && (
-                                <p className="text-center text-gray-400 py-8 text-sm">Chưa có nội dung nào.</p>
+                                <p className="text-center text-[var(--text-muted)] py-8 text-sm">Chưa có nội dung nào.</p>
                             )}
                             {lesson.contents?.map((rawContent) => {
                                 const content = parseContent(rawContent);
                                 return (
-                                <div key={content.id} className="p-4 hover:bg-gray-50 transition-colors flex gap-4 group cursor-pointer" onClick={() => seekTo(content.start_time)}>
+                                <div key={content.id} className="p-4 hover:bg-[var(--background)] transition-colors flex gap-4 group cursor-pointer" onClick={() => seekTo(content.start_time)}>
                                     <div className="mt-1">
-                                        <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                        <span className="text-xs font-mono bg-[var(--surface-secondary)] text-[var(--text-secondary)] px-2 py-1 rounded">
                                             {content.start_time}s - {content.end_time}s
                                         </span>
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${content.content_type === 'vocabulary' ? 'border-green-200 text-green-700 bg-green-50' :
-                                                    content.content_type === 'grammar' ? 'border-purple-200 text-purple-700 bg-purple-50' :
-                                                        'border-blue-200 text-blue-700 bg-blue-50'
+                                            <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${content.content_type === 'vocabulary' ? 'border-green-500/20 text-green-500 bg-green-500/10' :
+                                                    content.content_type === 'grammar' ? 'border-purple-500/20 text-purple-500 bg-purple-500/10' :
+                                                        'border-blue-500/20 text-blue-500 bg-blue-500/10'
                                                 }`}>
                                                 {content.content_type}
                                             </span>
-                                            <h4 className="font-bold text-gray-900">{content.text_content}</h4>
-                                            <span className="text-sm text-gray-500">[{content.pinyin}]</span>
+                                            <h4 className="font-bold text-[var(--text-main)]">{content.text_content}</h4>
+                                            <span className="text-sm text-[var(--text-muted)]">[{content.pinyin}]</span>
                                         </div>
-                                        <p className="text-sm text-gray-600">{content.meaning}</p>
+                                        <p className="text-sm text-[var(--text-secondary)]">{content.meaning}</p>
                                     </div>
                                     <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
-                                        <button className="p-1.5 text-gray-400 hover:text-blue-500 rounded hover:bg-blue-50">
+                                        <button className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 rounded hover:bg-blue-500/10">
                                             <Icon name="edit" size="sm" />
                                         </button>
-                                        <button className="p-1.5 text-gray-400 hover:text-red-500 rounded hover:bg-red-50">
+                                        <button className="p-1.5 text-[var(--text-muted)] hover:text-red-500 rounded hover:bg-red-500/10">
                                             <Icon name="delete" size="sm" />
                                         </button>
                                     </div>

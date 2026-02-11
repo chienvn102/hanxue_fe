@@ -157,14 +157,14 @@ export default function AdminLessonsPage() {
     return (
         <div>
             <div className="flex items-center gap-4 mb-8">
-                <Link href="/admin/courses" className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                <Link href="/admin/courses" className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] transition-colors">
                     <Icon name="arrow_back" />
                 </Link>
                 <div className="flex-1">
-                    <h1 className="text-2xl font-bold text-gray-900">
+                    <h1 className="text-2xl font-bold text-[var(--text-main)]">
                         {course ? `Bài học: ${course.title}` : 'Quản lý Bài học'}
                     </h1>
-                    <p className="text-gray-500 mt-1">Danh sách bài học video trong khóa</p>
+                    <p className="text-[var(--text-muted)] mt-1">Danh sách bài học video trong khóa</p>
                 </div>
                 <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
                     <Icon name="add" />
@@ -173,16 +173,16 @@ export default function AdminLessonsPage() {
             </div>
 
             {loading ? (
-                <div className="text-center py-12 text-gray-500">Đang tải danh sách bài học...</div>
+                <div className="text-center py-12 text-[var(--text-muted)]">Đang tải danh sách bài học...</div>
             ) : lessons.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-2xl border border-gray-200 border-dashed">
-                    <p className="text-gray-500">Chưa có bài học nào trong khóa này.</p>
+                <div className="text-center py-12 bg-[var(--surface)] rounded-2xl border border-[var(--border)] border-dashed">
+                    <p className="text-[var(--text-muted)]">Chưa có bài học nào trong khóa này.</p>
                 </div>
             ) : (
-                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] overflow-hidden shadow-sm">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            <tr className="bg-[var(--background)] border-b border-[var(--border)] text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                                 <th className="px-6 py-4">STT</th>
                                 <th className="px-6 py-4">Tiêu đề</th>
                                 <th className="px-6 py-4">Video ID</th>
@@ -192,22 +192,22 @@ export default function AdminLessonsPage() {
                                 <th className="px-6 py-4 text-right">Thao tác</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-[var(--border)]">
                             {lessons.map((lesson) => (
-                                <tr key={lesson.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 text-gray-500">#{lesson.order_index}</td>
-                                    <td className="px-6 py-4 font-medium text-gray-900">{lesson.title}</td>
-                                    <td className="px-6 py-4 font-mono text-xs text-blue-600 bg-blue-50 py-1 px-2 rounded w-fit">
+                                <tr key={lesson.id} className="hover:bg-[var(--background)] transition-colors">
+                                    <td className="px-6 py-4 text-[var(--text-muted)]">#{lesson.order_index}</td>
+                                    <td className="px-6 py-4 font-medium text-[var(--text-main)]">{lesson.title}</td>
+                                    <td className="px-6 py-4 font-mono text-xs text-blue-400 bg-blue-500/10 py-1 px-2 rounded w-fit">
                                         {lesson.youtube_id}
                                     </td>
-                                    <td className="px-6 py-4 text-gray-500">{Math.floor(lesson.duration / 60)} phút</td>
+                                    <td className="px-6 py-4 text-[var(--text-muted)]">{Math.floor(lesson.duration / 60)} phút</td>
                                     <td className="px-6 py-4 text-center">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-500">
                                             {lesson.content_count || 0}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/10 text-purple-500">
                                             {lesson.question_count || 0}
                                         </span>
                                     </td>
@@ -219,7 +219,7 @@ export default function AdminLessonsPage() {
                                                     Soạn thảo
                                                 </Button>
                                             </Link>
-                                            <button className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                                            <button className="p-2 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                                                 <Icon name="delete" size="sm" />
                                             </button>
                                         </div>
@@ -234,33 +234,33 @@ export default function AdminLessonsPage() {
             {/* Create Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-gray-900">Thêm Bài học Mới</h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                    <div className="bg-[var(--surface)] rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-[var(--text-main)]">Thêm Bài học Mới</h2>
+                            <button onClick={() => setIsModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">
                                 <Icon name="close" />
                             </button>
                         </div>
                         <form onSubmit={handleCreateLesson} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề bài học</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Tiêu đề bài học</label>
                                 <input
                                     type="text"
                                     required
-                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
+                                    className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
                                     value={formData.title}
                                     onChange={e => setFormData({ ...formData, title: e.target.value })}
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">YouTube Video URL / ID</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">YouTube Video URL / ID</label>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
                                         required
                                         placeholder="Paste YouTube Link or ID"
-                                        className="flex-1 px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 font-mono focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
+                                        className="flex-1 px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] font-mono focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
                                         value={formData.youtube_id}
                                         onChange={e => {
                                             const val = e.target.value;
@@ -279,25 +279,25 @@ export default function AdminLessonsPage() {
                                         }}
                                     />
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">Hỗ trợ link đầy đủ (ví dụ: https://www.youtube.com/watch?v=...) hoặc ID</p>
+                                <p className="text-xs text-[var(--text-muted)] mt-1">Hỗ trợ link đầy đủ (ví dụ: https://www.youtube.com/watch?v=...) hoặc ID</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Thời lượng (giây)</label>
+                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Thời lượng (giây)</label>
                                     <input
                                         type="number"
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
+                                        className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
                                         value={formData.duration}
                                         onChange={e => setFormData({ ...formData, duration: parseInt(e.target.value) })}
                                     />
-                                    <p className="text-[10px] text-gray-400 mt-1">Tự động lấy khi nhập đúng YouTube ID</p>
+                                    <p className="text-[10px] text-[var(--text-muted)] mt-1">Tự động lấy khi nhập đúng YouTube ID</p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Thứ tự</label>
+                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Thứ tự</label>
                                     <input
                                         type="number"
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
+                                        className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
                                         value={formData.order_index}
                                         onChange={e => setFormData({ ...formData, order_index: parseInt(e.target.value) })}
                                     />

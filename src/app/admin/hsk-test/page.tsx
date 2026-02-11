@@ -325,8 +325,8 @@ export default function HskExamAdminPage() {
             {/* Header */}
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Quản lý Đề thi HSK</h1>
-                    <p className="text-sm text-gray-500 mt-1">Tổng cộng {exams.length} đề thi</p>
+                    <h1 className="text-2xl font-bold text-[var(--text-main)]">Quản lý Đề thi HSK</h1>
+                    <p className="text-sm text-[var(--text-muted)] mt-1">Tổng cộng {exams.length} đề thi</p>
                 </div>
                 <Button onClick={openCreateExamModal}>
                     <Icon name="add" size="sm" className="mr-1" /> Tạo Đề thi
@@ -334,19 +334,19 @@ export default function HskExamAdminPage() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+            <div className="bg-[var(--surface)] rounded-xl shadow-sm border border-[var(--border)] p-4 mb-6">
                 <div className="flex gap-4 items-center">
                     <input
                         type="text"
                         placeholder="Tìm kiếm đề thi..."
-                        className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                        className="flex-1 px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
                     <div className="flex gap-1">
                         <button
                             onClick={() => setHskFilter(null)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!hskFilter ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!hskFilter ? 'bg-[var(--primary)] text-white' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--border)]'}`}
                         >
                             Tất cả
                         </button>
@@ -354,7 +354,7 @@ export default function HskExamAdminPage() {
                             <button
                                 key={level}
                                 onClick={() => setHskFilter(level)}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${hskFilter === level ? `${HSK_COLORS[level]} text-white` : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${hskFilter === level ? `${HSK_COLORS[level]} text-white` : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--border)]'}`}
                             >
                                 HSK {level}
                             </button>
@@ -366,17 +366,17 @@ export default function HskExamAdminPage() {
             {/* Exams List */}
             <div className="space-y-4">
                 {loading ? (
-                    <div className="text-center py-12 text-gray-500">Đang tải...</div>
+                    <div className="text-center py-12 text-[var(--text-muted)]">Đang tải...</div>
                 ) : filteredExams.length === 0 ? (
-                    <div className="text-center py-12 text-gray-500">Chưa có đề thi nào</div>
+                    <div className="text-center py-12 text-[var(--text-muted)]">Chưa có đề thi nào</div>
                 ) : filteredExams.map(exam => (
-                    <div key={exam.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div key={exam.id} className="bg-[var(--surface)] rounded-xl shadow-sm border border-[var(--border)] overflow-hidden">
                         {/* Exam Header */}
                         <div className="p-4 flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <button
                                     onClick={() => toggleExpandExam(exam.id)}
-                                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                    className="p-1 hover:bg-[var(--surface-secondary)] rounded transition-colors"
                                 >
                                     <Icon name={expandedExam === exam.id ? "expand_more" : "chevron_right"} />
                                 </button>
@@ -384,20 +384,20 @@ export default function HskExamAdminPage() {
                                     HSK {exam.hsk_level}
                                 </span>
                                 <div>
-                                    <h3 className="font-semibold text-gray-900">{exam.title}</h3>
-                                    <p className="text-xs text-gray-500">
+                                    <h3 className="font-semibold text-[var(--text-main)]">{exam.title}</h3>
+                                    <p className="text-xs text-[var(--text-muted)]">
                                         {exam.total_questions} câu • {exam.duration_minutes} phút • Đạt: {exam.passing_score}đ
                                     </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className={`text-xs px-2 py-0.5 rounded ${exam.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                <span className={`text-xs px-2 py-0.5 rounded ${exam.is_active ? 'bg-green-500/10 text-green-500' : 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'}`}>
                                     {exam.is_active ? 'Đang hoạt động' : 'Tắt'}
                                 </span>
-                                <button onClick={() => openEditExamModal(exam)} className="p-1.5 text-gray-400 hover:text-blue-500">
+                                <button onClick={() => openEditExamModal(exam)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400">
                                     <Icon name="edit" size="sm" />
                                 </button>
-                                <button onClick={() => handleDeleteExam(exam.id)} className="p-1.5 text-gray-400 hover:text-red-500">
+                                <button onClick={() => handleDeleteExam(exam.id)} className="p-1.5 text-[var(--text-muted)] hover:text-red-500">
                                     <Icon name="delete" size="sm" />
                                 </button>
                             </div>
@@ -405,34 +405,34 @@ export default function HskExamAdminPage() {
 
                         {/* Expanded Sections */}
                         {expandedExam === exam.id && (
-                            <div className="border-t border-gray-100 bg-gray-50 p-4">
+                            <div className="border-t border-[var(--border)] bg-[var(--background)] p-4">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h4 className="font-medium text-gray-700">Phần thi ({examSections.length})</h4>
+                                    <h4 className="font-medium text-[var(--text-secondary)]">Phần thi ({examSections.length})</h4>
                                     <Button variant="outline" size="sm" onClick={() => openCreateSectionModal(exam)}>
                                         <Icon name="add" size="sm" className="mr-1" /> Thêm phần
                                     </Button>
                                 </div>
 
                                 {examSections.length === 0 ? (
-                                    <p className="text-sm text-gray-500 text-center py-4">Chưa có phần thi nào</p>
+                                    <p className="text-sm text-[var(--text-muted)] text-center py-4">Chưa có phần thi nào</p>
                                 ) : examSections.map(section => (
-                                    <div key={section.id} className="bg-white rounded-lg border border-gray-200 p-3 mb-3">
+                                    <div key={section.id} className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-3 mb-3">
                                         <div className="flex justify-between items-center mb-2">
                                             <div className="flex items-center gap-2">
-                                                <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded">
+                                                <span className="bg-blue-500/10 text-blue-500 text-xs font-medium px-2 py-0.5 rounded">
                                                     {SECTION_TYPES.find(t => t.value === section.section_type)?.label}
                                                 </span>
                                                 <span className="font-medium text-sm">{section.title || `Phần ${section.section_order}`}</span>
-                                                <span className="text-xs text-gray-500">({section.total_questions} câu)</span>
+                                                <span className="text-xs text-[var(--text-muted)]">({section.total_questions} câu)</span>
                                             </div>
                                             <div className="flex gap-1">
-                                                <button onClick={() => openCreateQuestionModal(section)} className="p-1 text-green-500 hover:bg-green-50 rounded">
+                                                <button onClick={() => openCreateQuestionModal(section)} className="p-1 text-green-500 hover:bg-green-500/10 rounded">
                                                     <Icon name="add_circle" size="sm" />
                                                 </button>
-                                                <button onClick={() => openEditSectionModal(section)} className="p-1 text-gray-400 hover:text-blue-500">
+                                                <button onClick={() => openEditSectionModal(section)} className="p-1 text-[var(--text-muted)] hover:text-blue-400">
                                                     <Icon name="edit" size="sm" />
                                                 </button>
-                                                <button onClick={() => handleDeleteSection(section.id)} className="p-1 text-gray-400 hover:text-red-500">
+                                                <button onClick={() => handleDeleteSection(section.id)} className="p-1 text-[var(--text-muted)] hover:text-red-500">
                                                     <Icon name="delete" size="sm" />
                                                 </button>
                                             </div>
@@ -440,24 +440,24 @@ export default function HskExamAdminPage() {
 
                                         {/* Questions in section */}
                                         {section.questions && section.questions.length > 0 && (
-                                            <div className="mt-2 pl-4 border-l-2 border-gray-200">
+                                            <div className="mt-2 pl-4 border-l-2 border-[var(--border)]">
                                                 {section.questions.map(q => (
                                                     <div key={q.id} className="flex items-center justify-between py-1 text-sm">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-gray-400 font-mono w-6">#{q.question_number}</span>
-                                                            <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                                                            <span className="text-[var(--text-muted)] font-mono w-6">#{q.question_number}</span>
+                                                            <span className="text-xs bg-[var(--surface-secondary)] px-1.5 py-0.5 rounded">
                                                                 {QUESTION_TYPES.find(t => t.value === q.question_type)?.label?.split(' ')[0]}
                                                             </span>
-                                                            <span className="text-gray-700 truncate max-w-[300px]">
+                                                            <span className="text-[var(--text-secondary)] truncate max-w-[300px]">
                                                                 {q.question_text || '(Không có nội dung)'}
                                                             </span>
                                                         </div>
                                                         <div className="flex gap-1">
-                                                            <span className="text-xs text-green-600 font-mono">[{q.correct_answer}]</span>
-                                                            <button onClick={() => openEditQuestionModal(q)} className="p-0.5 text-gray-400 hover:text-blue-500">
+                                                            <span className="text-xs text-green-500 font-mono">[{q.correct_answer}]</span>
+                                                            <button onClick={() => openEditQuestionModal(q)} className="p-0.5 text-[var(--text-muted)] hover:text-blue-400">
                                                                 <Icon name="edit" size="sm" />
                                                             </button>
-                                                            <button onClick={() => handleDeleteQuestion(q.id)} className="p-0.5 text-gray-400 hover:text-red-500">
+                                                            <button onClick={() => handleDeleteQuestion(q.id)} className="p-0.5 text-[var(--text-muted)] hover:text-red-500">
                                                                 <Icon name="delete" size="sm" />
                                                             </button>
                                                         </div>
@@ -476,7 +476,7 @@ export default function HskExamAdminPage() {
             {/* Exam Modal */}
             {showExamModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-lg">
+                    <div className="bg-[var(--surface)] rounded-xl p-6 w-full max-w-lg">
                         <h3 className="text-lg font-bold mb-4">{selectedExam ? 'Sửa đề thi' : 'Tạo đề thi mới'}</h3>
                         <div className="space-y-4">
                             <input
@@ -504,7 +504,7 @@ export default function HskExamAdminPage() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs text-gray-500">Thời gian (phút)</label>
+                                    <label className="text-xs text-[var(--text-muted)]">Thời gian (phút)</label>
                                     <input
                                         type="number"
                                         className="w-full px-3 py-2 border rounded-lg"
@@ -513,7 +513,7 @@ export default function HskExamAdminPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500">Điểm đạt</label>
+                                    <label className="text-xs text-[var(--text-muted)]">Điểm đạt</label>
                                     <input
                                         type="number"
                                         className="w-full px-3 py-2 border rounded-lg"
@@ -541,7 +541,7 @@ export default function HskExamAdminPage() {
             {/* Section Modal */}
             {showSectionModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-lg">
+                    <div className="bg-[var(--surface)] rounded-xl p-6 w-full max-w-lg">
                         <h3 className="text-lg font-bold mb-4">{selectedSection ? 'Sửa phần thi' : 'Thêm phần thi'}</h3>
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
@@ -576,7 +576,7 @@ export default function HskExamAdminPage() {
                             />
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs text-gray-500">Thời gian (giây)</label>
+                                    <label className="text-xs text-[var(--text-muted)]">Thời gian (giây)</label>
                                     <input
                                         type="number"
                                         className="w-full px-3 py-2 border rounded-lg"
@@ -585,7 +585,7 @@ export default function HskExamAdminPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500">Audio URL</label>
+                                    <label className="text-xs text-[var(--text-muted)]">Audio URL</label>
                                     <input
                                         type="text"
                                         className="w-full px-3 py-2 border rounded-lg"
@@ -606,12 +606,12 @@ export default function HskExamAdminPage() {
             {/* Question Modal */}
             {showQuestionModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-2xl my-8">
+                    <div className="bg-[var(--surface)] rounded-xl p-6 w-full max-w-2xl my-8">
                         <h3 className="text-lg font-bold mb-4">Thêm câu hỏi</h3>
                         <div className="space-y-4">
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
-                                    <label className="text-xs text-gray-500">Số câu</label>
+                                    <label className="text-xs text-[var(--text-muted)]">Số câu</label>
                                     <input
                                         type="number"
                                         className="w-full px-3 py-2 border rounded-lg"
@@ -620,7 +620,7 @@ export default function HskExamAdminPage() {
                                     />
                                 </div>
                                 <div className="col-span-2">
-                                    <label className="text-xs text-gray-500">Loại câu hỏi</label>
+                                    <label className="text-xs text-[var(--text-muted)]">Loại câu hỏi</label>
                                     <select
                                         className="w-full px-3 py-2 border rounded-lg"
                                         value={questionForm.question_type}
@@ -658,7 +658,7 @@ export default function HskExamAdminPage() {
 
                             {questionForm.question_type !== 'fill_blank' && questionForm.question_type !== 'short_answer' && (
                                 <div>
-                                    <label className="text-xs text-gray-500 block mb-2">Đáp án (A, B, C, D)</label>
+                                    <label className="text-xs text-[var(--text-muted)] block mb-2">Đáp án (A, B, C, D)</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {['A', 'B', 'C', 'D'].map((opt, idx) => (
                                             <input
@@ -680,7 +680,7 @@ export default function HskExamAdminPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs text-gray-500">Đáp án đúng</label>
+                                    <label className="text-xs text-[var(--text-muted)]">Đáp án đúng</label>
                                     <input
                                         type="text"
                                         placeholder="VD: A, Đúng, 好..."
@@ -690,7 +690,7 @@ export default function HskExamAdminPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-500">Audio timing (giây)</label>
+                                    <label className="text-xs text-[var(--text-muted)]">Audio timing (giây)</label>
                                     <div className="flex gap-2">
                                         <input
                                             type="number"
