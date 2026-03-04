@@ -136,6 +136,13 @@ export function getAudioUrl(audioPath: string): string {
     return `${API_BASE_URL}${audioPath}`;
 }
 
+// Media URL helper — normalizes relative paths from BE to absolute URLs
+export function getMediaUrl(path: string | null | undefined): string {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    return `${API_BASE_URL}${path}`;
+}
+
 export async function playAudio(word: string): Promise<void> {
     const audioUrl = `${API_BASE_URL}/audio/cmn-${encodeURIComponent(word)}.mp3`;
     try {

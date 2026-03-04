@@ -7,7 +7,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
-import { fetchHskExamResult, type HskExamResult, type HskResultQuestion } from '@/lib/api';
+import { fetchHskExamResult, getMediaUrl, type HskExamResult, type HskResultQuestion } from '@/lib/api';
 
 const SECTION_TYPE_LABELS: Record<string, string> = {
     listening: 'Nghe hiểu',
@@ -102,7 +102,7 @@ function QuestionReview({ question, index }: { question: HskResultQuestion; inde
                         {/* Question image */}
                         {question.questionImage && (
                             <img
-                                src={question.questionImage}
+                                src={getMediaUrl(question.questionImage)}
                                 alt={`Câu ${index + 1}`}
                                 className="max-h-40 rounded-lg border border-[var(--border)] object-contain"
                             />

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
-import { startHskExam, submitHskAnswer, finishHskExam, type HskExamStartResponse, type HskQuestion, type HskSection } from '@/lib/api';
+import { startHskExam, submitHskAnswer, finishHskExam, getMediaUrl, type HskExamStartResponse, type HskQuestion, type HskSection } from '@/lib/api';
 
 // Flatten all questions across sections into a single ordered list
 interface FlatQuestion extends HskQuestion {
@@ -436,7 +436,7 @@ export default function ExamTakingPage() {
                         {currentQuestion.questionImage && (
                             <div className="mb-6">
                                 <img
-                                    src={currentQuestion.questionImage}
+                                    src={getMediaUrl(currentQuestion.questionImage)}
                                     alt={`Câu ${currentQuestion.questionNumber}`}
                                     className="max-w-full max-h-64 rounded-xl border border-[var(--border)] object-contain"
                                 />
@@ -509,7 +509,7 @@ export default function ExamTakingPage() {
                                             <div className="flex-1 min-w-0">
                                                 {hasImage && (
                                                     <img
-                                                        src={currentQuestion.optionImages![oIdx]}
+                                                        src={getMediaUrl(currentQuestion.optionImages![oIdx])}
                                                         alt={`Option ${label}`}
                                                         className="max-h-24 rounded-lg mb-2 object-contain"
                                                     />
