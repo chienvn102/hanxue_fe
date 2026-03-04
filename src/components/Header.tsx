@@ -52,14 +52,14 @@ export default function Header() {
                     </Link>
 
                     {/* Desktop Nav */}
-                    <nav className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+                    <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center min-w-0">
                         {navItems.map(item => {
                             const isActive = pathname === item.href;
                             return (
                                 <Link
                                     key={item.href}
                                     href={item.href}
-                                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${isActive
+                                    className={`px-3 xl:px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${isActive
                                         ? 'text-[var(--primary)] bg-[var(--primary)]/10'
                                         : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--surface-secondary)]'
                                         }`}
@@ -231,7 +231,7 @@ export default function Header() {
 
                         {/* Mobile menu button */}
                         <button
-                            className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-[var(--text-main)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
+                            className="lg:hidden flex items-center justify-center w-10 h-10 rounded-xl text-[var(--text-main)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
                             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                         >
                             <Icon name={mobileMenuOpen ? 'close' : 'menu'} />
@@ -241,7 +241,7 @@ export default function Header() {
 
                 {/* Mobile Nav */}
                 {mobileMenuOpen && (
-                    <nav className="md:hidden py-4 border-t border-[var(--border)] animate-in slide-in-from-top-2">
+                    <nav className="lg:hidden py-4 border-t border-[var(--border)] animate-in slide-in-from-top-2">
                         {navItems.map(item => {
                             const isActive = pathname === item.href;
                             return (

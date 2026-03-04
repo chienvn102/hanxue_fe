@@ -6,6 +6,70 @@ import { Icon } from '@/components/ui/Icon';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
+// Upload helper: uploads file and returns relative URL
+async function uploadFile(file: File, type: 'audio' | 'image'): Promise<string> {
+    const token = localStorage.getItem('adminToken');
+    const formData = new FormData();
+    formData.append(type, file);
+
+    const res = await fetch(`${API_BASE}/api/upload/${type}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+    });
+    if (!res.ok) throw new Error('Upload failed');
+    const data = await res.json();
+    return data.url; // relative path like /uploads/images/img-xxx.jpg
+}
+
+// Reusable upload input component
+function UploadField({ label, value, onChange, type, accept }: {
+    label: string; value: string; onChange: (v: string) => void;
+    type: 'audio' | 'image'; accept: string;
+}) {
+    const [uploading, setUploading] = useState(false);
+
+    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploading(true);
+        try {
+            const url = await uploadFile(file, type);
+            onChange(url);
+        } catch {
+            alert('Upload th\u1EA5t b\u1EA1i');
+        } finally {
+            setUploading(false);
+            e.target.value = '';
+        }
+    };
+
+    return (
+        <div>
+            <label className="text-xs text-[var(--text-muted)] block mb-1">{label}</label>
+            <div className="flex gap-2">
+                <input
+                    type="text"
+                    placeholder={`URL ${type} (ho\u1EB7c upload)`}
+                    className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                    value={value}
+                    onChange={e => onChange(e.target.value)}
+                />
+                <label className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${uploading ? 'bg-[var(--surface-secondary)] text-[var(--text-muted)]' : 'bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20'}`}>
+                    {uploading ? '...' : <span>&#8593;</span>}
+                    <input type="file" accept={accept} className="hidden" onChange={handleFile} disabled={uploading} />
+                </label>
+            </div>
+            {value && type === 'image' && (
+                <img src={value.startsWith('/') ? `${API_BASE}${value}` : value} alt="preview" className="mt-2 max-h-20 rounded border border-[var(--border)] object-contain" />
+            )}
+            {value && type === 'audio' && (
+                <audio src={value.startsWith('/') ? `${API_BASE}${value}` : value} controls className="mt-2 h-8 w-full" />
+            )}
+        </div>
+    );
+}
+
 const HSK_COLORS: Record<number, string> = {
     1: 'bg-green-500', 2: 'bg-teal-500', 3: 'bg-blue-500',
     4: 'bg-purple-500', 5: 'bg-orange-500', 6: 'bg-red-500'
@@ -87,6 +151,7 @@ export default function HskExamAdminPage() {
     // Selected items
     const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
     const [selectedSection, setSelectedSection] = useState<Section | null>(null);
+    const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
     const [expandedExam, setExpandedExam] = useState<number | null>(null);
     const [examSections, setExamSections] = useState<Section[]>([]);
 
@@ -257,6 +322,7 @@ export default function HskExamAdminPage() {
     // QUESTION CRUD
     const openCreateQuestionModal = (section: Section) => {
         setSelectedSection(section);
+        setSelectedQuestion(null);
         const nextNumber = (section.questions?.length || 0) + 1;
         setQuestionForm({
             question_number: nextNumber, question_type: 'multiple_choice',
@@ -268,6 +334,7 @@ export default function HskExamAdminPage() {
     };
 
     const openEditQuestionModal = (question: Question) => {
+        setSelectedQuestion(question);
         setQuestionForm({
             question_number: question.question_number,
             question_type: question.question_type,
@@ -287,10 +354,13 @@ export default function HskExamAdminPage() {
     const handleSaveQuestion = async () => {
         try {
             const token = localStorage.getItem('adminToken');
-            const url = `${API_BASE}/api/hsk-exams/sections/${selectedSection?.id}/questions`;
+            const method = selectedQuestion ? 'PUT' : 'POST';
+            const url = selectedQuestion
+                ? `${API_BASE}/api/hsk-exams/questions/${selectedQuestion.id}`
+                : `${API_BASE}/api/hsk-exams/sections/${selectedSection?.id}/questions`;
 
             await fetch(url, {
-                method: 'POST',
+                method,
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(questionForm)
             });
@@ -584,15 +654,13 @@ export default function HskExamAdminPage() {
                                         onChange={e => setSectionForm({ ...sectionForm, duration_seconds: parseInt(e.target.value) })}
                                     />
                                 </div>
-                                <div>
-                                    <label className="text-xs text-[var(--text-muted)]">Audio URL</label>
-                                    <input
-                                        type="text"
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        value={sectionForm.audio_url}
-                                        onChange={e => setSectionForm({ ...sectionForm, audio_url: e.target.value })}
-                                    />
-                                </div>
+                                <UploadField
+                                    label="Audio phần thi"
+                                    value={sectionForm.audio_url}
+                                    onChange={v => setSectionForm({ ...sectionForm, audio_url: v })}
+                                    type="audio"
+                                    accept="audio/mpeg,audio/wav,audio/ogg,audio/webm"
+                                />
                             </div>
                         </div>
                         <div className="flex justify-end gap-2 mt-6">
@@ -607,7 +675,7 @@ export default function HskExamAdminPage() {
             {showQuestionModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
                     <div className="bg-[var(--surface)] rounded-xl p-6 w-full max-w-2xl my-8">
-                        <h3 className="text-lg font-bold mb-4">Thêm câu hỏi</h3>
+                        <h3 className="text-lg font-bold mb-4">{selectedQuestion ? 'Sửa câu hỏi' : 'Thêm câu hỏi'}</h3>
                         <div className="space-y-4">
                             <div className="grid grid-cols-3 gap-4">
                                 <div>
@@ -640,19 +708,19 @@ export default function HskExamAdminPage() {
                             />
 
                             <div className="grid grid-cols-2 gap-4">
-                                <input
-                                    type="text"
-                                    placeholder="URL ảnh (nếu có)"
-                                    className="px-3 py-2 border rounded-lg"
+                                <UploadField
+                                    label="Ảnh câu hỏi"
                                     value={questionForm.question_image}
-                                    onChange={e => setQuestionForm({ ...questionForm, question_image: e.target.value })}
+                                    onChange={v => setQuestionForm({ ...questionForm, question_image: v })}
+                                    type="image"
+                                    accept="image/jpeg,image/png,image/webp,image/gif"
                                 />
-                                <input
-                                    type="text"
-                                    placeholder="URL audio (nếu có)"
-                                    className="px-3 py-2 border rounded-lg"
+                                <UploadField
+                                    label="Audio câu hỏi"
                                     value={questionForm.question_audio}
-                                    onChange={e => setQuestionForm({ ...questionForm, question_audio: e.target.value })}
+                                    onChange={v => setQuestionForm({ ...questionForm, question_audio: v })}
+                                    type="audio"
+                                    accept="audio/mpeg,audio/wav,audio/ogg,audio/webm"
                                 />
                             </div>
 
