@@ -34,6 +34,7 @@ export default function Header() {
         { href: '/grammar', label: 'Ngữ pháp', icon: 'auto_stories' },
         { href: '/flashcard', label: 'Luyện tập', icon: 'school' },
         { href: '/courses', label: 'Khóa học', icon: 'play_circle' },
+        { href: '/hsk-test', label: 'Luyện thi HSK', icon: 'quiz' },
     ];
 
     return (

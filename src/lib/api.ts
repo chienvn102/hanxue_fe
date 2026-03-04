@@ -368,3 +368,196 @@ export async function updateProfile(data: { displayName?: string; targetHsk?: nu
         throw new Error('Failed to update profile');
     }
 }
+
+// ============================================================
+// HSK Exam Functions
+// ============================================================
+
+export interface HskExam {
+    id: number;
+    title: string;
+    hskLevel: number;
+    examType: 'practice' | 'mock' | 'official';
+    totalQuestions: number;
+    durationMinutes: number;
+    passingScore: number;
+    description?: string;
+}
+
+export interface HskQuestion {
+    id: number;
+    questionNumber: number;
+    questionType: 'image_match' | 'true_false' | 'multiple_choice' | 'fill_blank' | 'sentence_order' | 'error_identify' | 'short_answer';
+    questionText?: string;
+    questionImage?: string;
+    questionAudio?: string;
+    audioStartTime?: number;
+    audioEndTime?: number;
+    audioPlayCount?: number;
+    options: string[];
+    optionImages?: string[];
+    points: number;
+}
+
+export interface HskSection {
+    id: number;
+    section_type: 'listening' | 'reading' | 'writing';
+    section_order: number;
+    title?: string;
+    instructions?: string;
+    total_questions: number;
+    duration_seconds: number;
+    audio_url?: string;
+    questions: HskQuestion[];
+}
+
+export interface HskExamStartResponse {
+    id: number;
+    title: string;
+    hsk_level: number;
+    exam_type: string;
+    total_questions: number;
+    duration_minutes: number;
+    passing_score: number;
+    attemptId: number;
+    startedAt: string;
+    savedAnswers: { questionId: number; answer: string }[];
+    sections: HskSection[];
+}
+
+export interface HskExamAttempt {
+    id: number;
+    user_id: number;
+    exam_id: number;
+    started_at: string;
+    completed_at?: string;
+    status: 'in_progress' | 'completed' | 'abandoned';
+    listening_score: number;
+    reading_score: number;
+    writing_score: number;
+    total_score: number;
+    max_score: number;
+    is_passed: boolean;
+    correct_count: number;
+    wrong_count: number;
+    unanswered_count: number;
+    time_spent_seconds: number;
+    title?: string;
+    hsk_level?: number;
+}
+
+export interface HskResultQuestion {
+    id: number;
+    questionNumber: number;
+    questionType: string;
+    questionText?: string;
+    questionImage?: string;
+    options: string[];
+    optionImages?: string[];
+    correctAnswer: string;
+    explanation?: string;
+    points: number;
+    userAnswer: string | null;
+    isCorrect: boolean | null;
+    pointsEarned: number;
+}
+
+export interface HskResultSection {
+    id: number;
+    section_type: string;
+    title?: string;
+    questions: HskResultQuestion[];
+}
+
+export interface HskExamResult {
+    attempt: HskExamAttempt;
+    exam: {
+        title: string;
+        hskLevel: number;
+        passingScore: number;
+        totalQuestions: number;
+        durationMinutes: number;
+        sections: HskResultSection[];
+    };
+}
+
+export async function fetchHskExams(params?: { hsk?: number; type?: string; page?: number; limit?: number }): Promise<{ data: HskExam[]; pagination: { total: number; page: number; limit: number; totalPages: number } }> {
+    const searchParams = new URLSearchParams();
+    if (params?.hsk) searchParams.set('hsk', params.hsk.toString());
+    if (params?.type) searchParams.set('type', params.type);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+
+    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/public?${searchParams.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch HSK exams');
+    return res.json();
+}
+
+export async function startHskExam(examId: number): Promise<HskExamStartResponse> {
+    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/${examId}/start`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeader()
+        }
+    });
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to start exam');
+    }
+    return res.json();
+}
+
+export async function submitHskAnswer(attemptId: number, questionId: number, answer: string, timeSpent?: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/attempts/${attemptId}/answer`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeader()
+        },
+        body: JSON.stringify({ questionId, answer, timeSpent: timeSpent || 0 })
+    });
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to submit answer');
+    }
+}
+
+export async function finishHskExam(attemptId: number): Promise<{ success: boolean; result: { listeningScore: number; readingScore: number; writingScore: number; totalScore: number; maxScore: number; isPassed: boolean; correctCount: number; wrongCount: number; unansweredCount: number } }> {
+    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/attempts/${attemptId}/finish`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeader()
+        }
+    });
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to finish exam');
+    }
+    return res.json();
+}
+
+export async function fetchHskExamResult(attemptId: number): Promise<HskExamResult> {
+    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/attempts/${attemptId}/result`, {
+        headers: getAuthHeader()
+    });
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch exam result');
+    }
+    return res.json();
+}
+
+export async function fetchHskHistory(): Promise<{ data: HskExamAttempt[] }> {
+    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/history`, {
+        headers: getAuthHeader()
+    });
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch history');
+    }
+    return res.json();
+}
