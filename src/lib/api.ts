@@ -568,3 +568,52 @@ export async function fetchHskHistory(): Promise<{ data: HskExamAttempt[] }> {
     }
     return res.json();
 }
+
+// ============================================================
+// AI Chat
+// ============================================================
+
+export interface ChatSendResponse {
+    reply: string;
+    remaining: number;
+}
+
+export interface ChatUsage {
+    used: number;
+    limit: number;
+    isPremium: boolean;
+}
+
+export async function sendChatMessage(
+    message: string,
+    mode: 'chat' | 'conversation',
+    history: { role: 'user' | 'assistant'; content: string }[]
+): Promise<ChatSendResponse> {
+    const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeader()
+        },
+        body: JSON.stringify({ message, mode, history })
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || 'Loi gui tin nhan');
+    }
+    const data = await res.json();
+    return data.data;
+}
+
+export async function fetchChatUsage(): Promise<ChatUsage> {
+    const res = await fetch(`${API_BASE_URL}/api/chat/usage`, {
+        headers: getAuthHeader()
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) {
+        throw new Error('Loi lay thong tin su dung');
+    }
+    const data = await res.json();
+    return data.data;
+}
