@@ -8,6 +8,45 @@ import { useAuth } from '@/components/AuthContext';
 import { sendChatMessage, fetchChatUsage, playAudio } from '@/lib/api';
 import Link from 'next/link';
 
+// Web Speech API type declarations (not in standard TS lib)
+interface SpeechRecognitionResult {
+    readonly isFinal: boolean;
+    readonly length: number;
+    [index: number]: { readonly transcript: string; readonly confidence: number };
+}
+interface SpeechRecognitionResultList {
+    readonly length: number;
+    [index: number]: SpeechRecognitionResult;
+}
+interface SpeechRecognitionEvent extends Event {
+    readonly results: SpeechRecognitionResultList;
+    readonly resultIndex: number;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+    readonly error: string;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    maxAlternatives: number;
+    onresult: ((event: SpeechRecognitionEvent) => void) | null;
+    onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+    onend: (() => void) | null;
+    start(): void;
+    stop(): void;
+    abort(): void;
+}
+interface SpeechRecognitionConstructor {
+    new(): SpeechRecognitionInstance;
+}
+declare global {
+    interface Window {
+        SpeechRecognition?: SpeechRecognitionConstructor;
+        webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    }
+}
+
 interface Message {
     role: 'user' | 'assistant';
     content: string;
@@ -52,15 +91,14 @@ export default function ChatPage() {
     const [isListening, setIsListening] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [transcript, setTranscript] = useState('');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const recognitionRef = useRef<any>(null);
+    const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
     const shouldAutoSendRef = useRef(true);
 
     const tutor = TUTOR[mode];
 
     // Check STT support on mount (client only)
     useEffect(() => {
-        const SR = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         setSttSupported(!!SR);
     }, []);
 
@@ -197,14 +235,14 @@ export default function ChatPage() {
         setError(null);
         shouldAutoSendRef.current = true;
 
-        const SR = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const recognition = new SR();
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SR!();
         recognition.lang = 'zh-CN';
         recognition.interimResults = true;
         recognition.continuous = false;
         recognition.maxAlternatives = 1;
 
-        recognition.onresult = (event: any) => {
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
             let final = '';
             let interim = '';
             for (let i = 0; i < event.results.length; i++) {
@@ -232,7 +270,7 @@ export default function ChatPage() {
             }
         };
 
-        recognition.onerror = (event: any) => {
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
             setIsListening(false);
             recognitionRef.current = null;
             if (event.error === 'not-allowed') {
