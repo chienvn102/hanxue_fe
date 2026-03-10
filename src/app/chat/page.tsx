@@ -21,6 +21,19 @@ const SUGGESTION_CHIPS = [
     'Từ vựng chủ đề ăn uống',
 ];
 
+const CONVERSATION_CHIPS = [
+    '你好，你叫什么名字？',
+    '今天天气怎么样？',
+    '你喜欢吃什么？',
+    '我想学中文',
+];
+
+// Tutor config per mode
+const TUTOR = {
+    chat: { name: '小明', pinyin: 'Xiǎo Míng', avatar: '明', color: 'bg-emerald-500/10 text-emerald-600' },
+    conversation: { name: '小红', pinyin: 'Xiǎo Hóng', avatar: '红', color: 'bg-rose-500/10 text-rose-600' },
+} as const;
+
 export default function ChatPage() {
     const { user, isAuthenticated } = useAuth();
     const [messages, setMessages] = useState<Message[]>([]);
@@ -29,15 +42,32 @@ export default function ChatPage() {
     const [remaining, setRemaining] = useState<number | null>(null);
     const [usageLimit, setUsageLimit] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [mode] = useState<'chat' | 'conversation'>('chat');
+    const [mode, setMode] = useState<'chat' | 'conversation'>('chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const sendingRef = useRef(false);
 
-    // Scroll to bottom when messages change
+    // --- Conversation mode state ---
+    const [sttSupported, setSttSupported] = useState(false);
+    const [isListening, setIsListening] = useState(false);
+    const [isSpeaking, setIsSpeaking] = useState(false);
+    const [transcript, setTranscript] = useState('');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognitionRef = useRef<any>(null);
+    const shouldAutoSendRef = useRef(true);
+
+    const tutor = TUTOR[mode];
+
+    // Check STT support on mount (client only)
+    useEffect(() => {
+        const SR = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+        setSttSupported(!!SR);
+    }, []);
+
+    // Scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isLoading]);
+    }, [messages, isLoading, transcript]);
 
     // Load usage on mount
     useEffect(() => {
@@ -52,13 +82,54 @@ export default function ChatPage() {
                 if (msg === 'Unauthorized') {
                     setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
                 } else {
-                    // Fallback: allow chatting but show unknown usage
                     setRemaining(-1);
                 }
             });
     }, [isAuthenticated]);
 
-    // Auto-resize textarea
+    // Cleanup STT/TTS on unmount or mode change
+    useEffect(() => {
+        return () => {
+            recognitionRef.current?.abort();
+            window.speechSynthesis?.cancel();
+        };
+    }, [mode]);
+
+    // --- TTS (SpeechSynthesis for conversation auto-read) ---
+    const speakChinese = useCallback((text: string) => {
+        const chineseMatch = text.match(/[\u4e00-\u9fff\u3400-\u4dbf]+/g);
+        if (chineseMatch) {
+            playAudio(chineseMatch.join(''));
+        }
+    }, []);
+
+    const speakReply = useCallback((text: string) => {
+        // Extract Chinese text for TTS
+        const chineseMatch = text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uff0c\u3002\uff1f\uff01]+/g);
+        if (!chineseMatch) return;
+        const chineseText = chineseMatch.join('');
+
+        const synth = window.speechSynthesis;
+        if (!synth) return;
+        synth.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(chineseText);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 0.85;
+
+        // Try to find a Chinese voice
+        const voices = synth.getVoices();
+        const zhVoice = voices.find(v => v.lang.startsWith('zh'));
+        if (zhVoice) utterance.voice = zhVoice;
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+
+        synth.speak(utterance);
+    }, []);
+
+    // --- Auto-resize textarea ---
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setInput(e.target.value);
         const textarea = e.target;
@@ -66,6 +137,7 @@ export default function ChatPage() {
         textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
     }, []);
 
+    // --- Send message ---
     const sendMessage = useCallback(async (text?: string) => {
         const messageText = (text || input).trim();
         if (!messageText || sendingRef.current) return;
@@ -73,6 +145,7 @@ export default function ChatPage() {
 
         setError(null);
         setInput('');
+        setTranscript('');
         if (inputRef.current) {
             inputRef.current.style.height = 'auto';
         }
@@ -85,8 +158,14 @@ export default function ChatPage() {
         try {
             const history = newMessages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
             const result = await sendChatMessage(messageText, mode, history);
-            setMessages(prev => [...prev, { role: 'assistant', content: result.reply }]);
+            const reply = result.reply;
+            setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
             setRemaining(result.remaining);
+
+            // Auto-TTS in conversation mode
+            if (mode === 'conversation') {
+                speakReply(reply);
+            }
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Lỗi gửi tin nhắn';
             if (msg === 'Unauthorized') {
@@ -97,9 +176,9 @@ export default function ChatPage() {
         } finally {
             sendingRef.current = false;
             setIsLoading(false);
-            inputRef.current?.focus();
+            if (mode === 'chat') inputRef.current?.focus();
         }
-    }, [input, messages, mode]);
+    }, [input, messages, mode, speakReply]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -108,16 +187,99 @@ export default function ChatPage() {
         }
     }, [sendMessage]);
 
-    // TTS for Chinese text
-    const speakChinese = useCallback((text: string) => {
-        // Extract Chinese characters from text
-        const chineseMatch = text.match(/[\u4e00-\u9fff\u3400-\u4dbf]+/g);
-        if (chineseMatch) {
-            playAudio(chineseMatch.join(''));
+    // --- STT (SpeechRecognition) ---
+    const startListening = useCallback(() => {
+        if (!sttSupported || isLoading || remaining === 0) return;
+
+        window.speechSynthesis?.cancel();
+        setIsSpeaking(false);
+        setTranscript('');
+        setError(null);
+        shouldAutoSendRef.current = true;
+
+        const SR = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const recognition = new SR();
+        recognition.lang = 'zh-CN';
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onresult = (event: any) => {
+            let final = '';
+            let interim = '';
+            for (let i = 0; i < event.results.length; i++) {
+                const result = event.results[i];
+                if (result.isFinal) {
+                    final += result[0].transcript;
+                } else {
+                    interim += result[0].transcript;
+                }
+            }
+            setTranscript(final || interim);
+        };
+
+        recognition.onend = () => {
+            setIsListening(false);
+            recognitionRef.current = null;
+            // Auto-send final transcript
+            if (shouldAutoSendRef.current) {
+                setTranscript(prev => {
+                    if (prev.trim()) {
+                        sendMessage(prev.trim());
+                    }
+                    return '';
+                });
+            }
+        };
+
+        recognition.onerror = (event: any) => {
+            setIsListening(false);
+            recognitionRef.current = null;
+            if (event.error === 'not-allowed') {
+                setError('Trình duyệt chưa cấp quyền microphone. Vui lòng cho phép trong cài đặt.');
+            } else if (event.error === 'no-speech') {
+                // Silence — do nothing
+            } else if (event.error !== 'aborted') {
+                setError(`Lỗi nhận diện giọng nói: ${event.error}`);
+            }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+        setIsListening(true);
+    }, [sttSupported, isLoading, remaining, sendMessage]);
+
+    const stopListening = useCallback(() => {
+        if (recognitionRef.current) {
+            shouldAutoSendRef.current = true;
+            recognitionRef.current.stop();
         }
     }, []);
 
-    // Guest view
+    const cancelListening = useCallback(() => {
+        if (recognitionRef.current) {
+            shouldAutoSendRef.current = false;
+            recognitionRef.current.abort();
+            setTranscript('');
+            setIsListening(false);
+            recognitionRef.current = null;
+        }
+    }, []);
+
+    // --- Mode switch ---
+    const switchMode = useCallback((newMode: 'chat' | 'conversation') => {
+        if (newMode === mode) return;
+        if (newMode === 'conversation' && !sttSupported) return;
+        // Stop any ongoing STT/TTS
+        recognitionRef.current?.abort();
+        window.speechSynthesis?.cancel();
+        setIsListening(false);
+        setIsSpeaking(false);
+        setTranscript('');
+        setMode(newMode);
+    }, [mode, sttSupported]);
+
+    // --- Guest view ---
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen flex flex-col bg-[var(--background)]">
@@ -145,6 +307,9 @@ export default function ChatPage() {
         );
     }
 
+    const chips = mode === 'chat' ? SUGGESTION_CHIPS : CONVERSATION_CHIPS;
+    const isInputDisabled = isLoading || remaining === 0 || isSpeaking;
+
     return (
         <div className="min-h-screen flex flex-col bg-[var(--background)]">
             <Header />
@@ -161,7 +326,7 @@ export default function ChatPage() {
                                 Học cùng AI
                             </h1>
                             <p className="text-xs text-[var(--text-secondary)]">
-                                Gia sư 小明 (Xiǎo Míng) &middot; HSK {user?.targetHsk || 1}
+                                {mode === 'chat' ? 'Gia sư' : 'Bạn trò chuyện'} {tutor.name} ({tutor.pinyin}) &middot; HSK {user?.targetHsk || 1}
                             </p>
                         </div>
                     </div>
@@ -169,15 +334,27 @@ export default function ChatPage() {
                     {/* Mode Tabs */}
                     <div className="flex items-center gap-1 p-1 bg-[var(--surface-secondary)] rounded-xl border border-[var(--border)]">
                         <button
-                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--primary)] text-white transition-colors"
+                            onClick={() => switchMode('chat')}
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                mode === 'chat'
+                                    ? 'bg-[var(--primary)] text-white'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--surface)]'
+                            }`}
                         >
                             <Icon name="chat" size="xs" className="mr-1 align-middle" />
                             Chat
                         </button>
                         <button
-                            className="px-3 py-1.5 text-xs font-semibold rounded-lg text-[var(--text-muted)] cursor-not-allowed transition-colors"
-                            title="Sắp ra mắt"
-                            disabled
+                            onClick={() => switchMode('conversation')}
+                            disabled={!sttSupported}
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                mode === 'conversation'
+                                    ? 'bg-[var(--primary)] text-white'
+                                    : sttSupported
+                                        ? 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--surface)]'
+                                        : 'text-[var(--text-muted)] cursor-not-allowed'
+                            }`}
+                            title={!sttSupported ? 'Trình duyệt không hỗ trợ nhận diện giọng nói' : ''}
                         >
                             <Icon name="mic" size="xs" className="mr-1 align-middle" />
                             Hội thoại
@@ -206,19 +383,28 @@ export default function ChatPage() {
                     {/* Empty State */}
                     {messages.length === 0 && !isLoading && (
                         <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                            <div className="w-16 h-16 mb-4 rounded-full bg-[var(--primary)]/10 flex items-center justify-center">
-                                <Icon name="waving_hand" size="lg" className="text-[var(--primary)]" />
+                            <div className={`w-16 h-16 mb-4 rounded-full ${tutor.color} flex items-center justify-center`}>
+                                {mode === 'chat'
+                                    ? <Icon name="waving_hand" size="lg" className="text-[var(--primary)]" />
+                                    : <Icon name="record_voice_over" size="lg" className="text-rose-500" />
+                                }
                             </div>
                             <h2 className="text-lg font-bold text-[var(--text-main)] mb-2">
-                                Xin chào! Mình là 小明
+                                {mode === 'chat'
+                                    ? `Xin chào! Mình là ${tutor.name}`
+                                    : `Xin chào! Mình là ${tutor.name}`
+                                }
                             </h2>
                             <p className="text-sm text-[var(--text-secondary)] mb-6 max-w-sm">
-                                Hỏi mình bất cứ điều gì về tiếng Trung nhé! Ngữ pháp, từ vựng, cách phát âm...
+                                {mode === 'chat'
+                                    ? 'Hỏi mình bất cứ điều gì về tiếng Trung nhé! Ngữ pháp, từ vựng, cách phát âm...'
+                                    : 'Nhấn mic và nói tiếng Trung để luyện hội thoại. Mình sẽ trả lời và sửa lỗi cho bạn!'
+                                }
                             </p>
 
                             {/* Suggestion Chips */}
                             <div className="flex flex-wrap justify-center gap-2 max-w-lg">
-                                {SUGGESTION_CHIPS.map((chip) => (
+                                {chips.map((chip) => (
                                     <button
                                         key={chip}
                                         onClick={() => sendMessage(chip)}
@@ -229,7 +415,6 @@ export default function ChatPage() {
                                 ))}
                             </div>
 
-                            {/* Notice */}
                             <p className="mt-6 text-[10px] text-[var(--text-muted)] flex items-center gap-1">
                                 <Icon name="info" size="xs" />
                                 Lịch sử chat sẽ mất khi tải lại trang
@@ -247,11 +432,11 @@ export default function ChatPage() {
                             <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                                 msg.role === 'user'
                                     ? 'bg-[var(--primary)] text-white'
-                                    : 'bg-emerald-500/10 text-emerald-600'
+                                    : tutor.color
                             }`}>
                                 {msg.role === 'user'
                                     ? (user?.displayName || '?').charAt(0).toUpperCase()
-                                    : '明'
+                                    : tutor.avatar
                                 }
                             </div>
 
@@ -266,7 +451,7 @@ export default function ChatPage() {
                                 {/* TTS button for assistant messages */}
                                 {msg.role === 'assistant' && /[\u4e00-\u9fff]/.test(msg.content) && (
                                     <button
-                                        onClick={() => speakChinese(msg.content)}
+                                        onClick={() => mode === 'conversation' ? speakReply(msg.content) : speakChinese(msg.content)}
                                         className="mt-2 flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
                                         title="Nghe phát âm"
                                     >
@@ -281,8 +466,8 @@ export default function ChatPage() {
                     {/* Typing Indicator */}
                     {isLoading && (
                         <div className="flex gap-3 mb-4">
-                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-sm font-bold">
-                                明
+                            <div className={`flex-shrink-0 w-8 h-8 rounded-full ${tutor.color} flex items-center justify-center text-sm font-bold`}>
+                                {tutor.avatar}
                             </div>
                             <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-[var(--surface-secondary)] border border-[var(--border)]">
                                 <div className="flex gap-1.5 items-center h-5">
@@ -305,32 +490,108 @@ export default function ChatPage() {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input Area */}
-                <div className="flex items-end gap-2 p-3 rounded-2xl bg-[var(--surface)] border border-[var(--border)] focus-within:border-[var(--primary)]/50 transition-colors">
-                    <textarea
-                        ref={inputRef}
-                        value={input}
-                        onChange={handleInputChange}
-                        onKeyDown={handleKeyDown}
-                        placeholder={remaining === 0 ? 'Đã hết lượt chat hôm nay...' : 'Hỏi về tiếng Trung...'}
-                        disabled={isLoading || remaining === 0}
-                        rows={1}
-                        className="flex-1 resize-none bg-transparent text-sm text-[var(--text-main)] placeholder-[var(--text-muted)] outline-none max-h-[120px] py-1.5 disabled:opacity-50"
-                    />
-                    <button
-                        onClick={() => sendMessage()}
-                        disabled={!input.trim() || isLoading || remaining === 0}
-                        className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
-                        title="Gửi (Enter)"
-                    >
-                        <Icon name={isLoading ? 'hourglass_top' : 'send'} size="sm" />
-                    </button>
-                </div>
+                {/* Input Area — Chat Mode */}
+                {mode === 'chat' && (
+                    <>
+                        <div className="flex items-end gap-2 p-3 rounded-2xl bg-[var(--surface)] border border-[var(--border)] focus-within:border-[var(--primary)]/50 transition-colors">
+                            <textarea
+                                ref={inputRef}
+                                value={input}
+                                onChange={handleInputChange}
+                                onKeyDown={handleKeyDown}
+                                placeholder={remaining === 0 ? 'Đã hết lượt chat hôm nay...' : 'Hỏi về tiếng Trung...'}
+                                disabled={isInputDisabled}
+                                rows={1}
+                                className="flex-1 resize-none bg-transparent text-sm text-[var(--text-main)] placeholder-[var(--text-muted)] outline-none max-h-[120px] py-1.5 disabled:opacity-50"
+                            />
+                            <button
+                                onClick={() => sendMessage()}
+                                disabled={!input.trim() || isInputDisabled}
+                                className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                title="Gửi (Enter)"
+                            >
+                                <Icon name={isLoading ? 'hourglass_top' : 'send'} size="sm" />
+                            </button>
+                        </div>
+                        <p className="text-center mt-2 text-[10px] text-[var(--text-muted)]">
+                            Enter để gửi &middot; Shift+Enter xuống dòng
+                        </p>
+                    </>
+                )}
 
-                {/* Keyboard hint */}
-                <p className="text-center mt-2 text-[10px] text-[var(--text-muted)]">
-                    Enter để gửi &middot; Shift+Enter xuống dòng
-                </p>
+                {/* Input Area — Conversation Mode */}
+                {mode === 'conversation' && (
+                    <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
+                        {/* Live transcript */}
+                        {transcript && (
+                            <div className="w-full px-4 py-2 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border)] text-sm text-[var(--text-main)] text-center min-h-[36px]">
+                                {transcript}
+                            </div>
+                        )}
+
+                        {/* Mic button + controls */}
+                        <div className="flex items-center gap-4">
+                            {/* Cancel button (only while listening) */}
+                            {isListening && (
+                                <button
+                                    onClick={cancelListening}
+                                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--error)] hover:border-[var(--error)]/30 transition-colors"
+                                    title="Hủy"
+                                >
+                                    <Icon name="close" size="sm" />
+                                </button>
+                            )}
+
+                            {/* Main mic button */}
+                            <button
+                                onClick={isListening ? stopListening : startListening}
+                                disabled={isInputDisabled}
+                                className={`relative w-16 h-16 flex items-center justify-center rounded-full transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                                    isListening
+                                        ? 'bg-[var(--error)] text-white shadow-lg shadow-[var(--error)]/30'
+                                        : isSpeaking
+                                            ? 'bg-emerald-500 text-white'
+                                            : 'bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] shadow-md'
+                                }`}
+                                title={isListening ? 'Nhấn để gửi' : isSpeaking ? '小红 đang nói...' : 'Nhấn để nói'}
+                            >
+                                <Icon
+                                    name={isListening ? 'stop' : isSpeaking ? 'volume_up' : isLoading ? 'hourglass_top' : 'mic'}
+                                    size="lg"
+                                />
+                                {/* Pulse ring while listening */}
+                                {isListening && (
+                                    <span className="absolute inset-0 rounded-full border-2 border-[var(--error)] animate-ping opacity-50" />
+                                )}
+                            </button>
+
+                            {/* Send button (only while listening with transcript) */}
+                            {isListening && transcript && (
+                                <button
+                                    onClick={stopListening}
+                                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors"
+                                    title="Gửi"
+                                >
+                                    <Icon name="send" size="sm" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Status text */}
+                        <p className="text-xs text-[var(--text-muted)]">
+                            {isListening
+                                ? 'Đang nghe... nhấn để gửi'
+                                : isSpeaking
+                                    ? `${tutor.name} đang trả lời...`
+                                    : isLoading
+                                        ? 'Đang xử lý...'
+                                        : remaining === 0
+                                            ? 'Đã hết lượt hôm nay'
+                                            : 'Nhấn mic và nói tiếng Trung'
+                            }
+                        </p>
+                    </div>
+                )}
             </main>
 
             <Footer />
