@@ -3,99 +3,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { UploadField } from '@/components/admin/UploadField';
+import { QuestionTypePicker } from '@/components/admin/QuestionTypePicker';
+import { QuestionFormByType } from '@/components/admin/QuestionFormByType';
+import { QuestionPreview } from '@/components/admin/QuestionPreview';
+import {
+    HSK_COLORS, EXAM_TYPES, SECTION_TYPES, QUESTION_TYPES, HSK_PRESETS,
+    DEFAULT_QUESTION_FORM,
+    type QuestionFormData,
+} from '@/components/admin/hsk-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
-
-// Upload helper: uploads file and returns relative URL
-async function uploadFile(file: File, type: 'audio' | 'image'): Promise<string> {
-    const token = localStorage.getItem('adminToken');
-    const formData = new FormData();
-    formData.append(type, file);
-
-    const res = await fetch(`${API_BASE}/api/upload/${type}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-    });
-    if (!res.ok) throw new Error('Upload failed');
-    const data = await res.json();
-    return data.url; // relative path like /uploads/images/img-xxx.jpg
-}
-
-// Reusable upload input component
-function UploadField({ label, value, onChange, type, accept }: {
-    label: string; value: string; onChange: (v: string) => void;
-    type: 'audio' | 'image'; accept: string;
-}) {
-    const [uploading, setUploading] = useState(false);
-
-    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setUploading(true);
-        try {
-            const url = await uploadFile(file, type);
-            onChange(url);
-        } catch {
-            alert('Upload th\u1EA5t b\u1EA1i');
-        } finally {
-            setUploading(false);
-            e.target.value = '';
-        }
-    };
-
-    return (
-        <div>
-            <label className="text-xs text-[var(--text-muted)] block mb-1">{label}</label>
-            <div className="flex gap-2">
-                <input
-                    type="text"
-                    placeholder={`URL ${type} (ho\u1EB7c upload)`}
-                    className="flex-1 px-3 py-2 border rounded-lg text-sm"
-                    value={value}
-                    onChange={e => onChange(e.target.value)}
-                />
-                <label className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${uploading ? 'bg-[var(--surface-secondary)] text-[var(--text-muted)]' : 'bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20'}`}>
-                    {uploading ? '...' : <span>&#8593;</span>}
-                    <input type="file" accept={accept} className="hidden" onChange={handleFile} disabled={uploading} />
-                </label>
-            </div>
-            {value && type === 'image' && (
-                <img src={value.startsWith('/') ? `${API_BASE}${value}` : value} alt="preview" className="mt-2 max-h-20 rounded border border-[var(--border)] object-contain" />
-            )}
-            {value && type === 'audio' && (
-                <audio src={value.startsWith('/') ? `${API_BASE}${value}` : value} controls className="mt-2 h-8 w-full" />
-            )}
-        </div>
-    );
-}
-
-const HSK_COLORS: Record<number, string> = {
-    1: 'bg-green-500', 2: 'bg-teal-500', 3: 'bg-blue-500',
-    4: 'bg-purple-500', 5: 'bg-orange-500', 6: 'bg-red-500'
-};
-
-const EXAM_TYPES = [
-    { value: 'practice', label: 'Luyện tập' },
-    { value: 'mock', label: 'Đề mẫu' },
-    { value: 'official', label: 'Đề chính thức' }
-];
-
-const SECTION_TYPES = [
-    { value: 'listening', label: 'Nghe hiểu' },
-    { value: 'reading', label: 'Đọc hiểu' },
-    { value: 'writing', label: 'Viết' }
-];
-
-const QUESTION_TYPES = [
-    { value: 'multiple_choice', label: 'Trắc nghiệm (A/B/C/D)' },
-    { value: 'true_false', label: 'Đúng/Sai' },
-    { value: 'image_match', label: 'Ghép ảnh' },
-    { value: 'fill_blank', label: 'Điền vào chỗ trống' },
-    { value: 'sentence_order', label: 'Sắp xếp câu' },
-    { value: 'error_identify', label: 'Tìm câu sai' },
-    { value: 'short_answer', label: 'Viết ngắn' }
-];
 
 interface Exam {
     id: number;
@@ -134,8 +52,10 @@ interface Question {
     audio_end_time: number;
     audio_play_count: number;
     options: string[];
+    option_images: string[];
     correct_answer: string;
     explanation: string;
+    difficulty: number;
     points: number;
 }
 
@@ -166,12 +86,8 @@ export default function HskExamAdminPage() {
         section_type: 'listening', section_order: 1, title: '',
         instructions: '', duration_seconds: 0, audio_url: ''
     });
-    const [questionForm, setQuestionForm] = useState({
-        question_number: 1, question_type: 'multiple_choice',
-        question_text: '', question_image: '', question_audio: '',
-        audio_start_time: 0, audio_end_time: 0, audio_play_count: 2,
-        options: ['', '', '', ''], correct_answer: '', explanation: '',
-        points: 1
+    const [questionForm, setQuestionForm] = useState<QuestionFormData>({
+        ...DEFAULT_QUESTION_FORM
     });
 
     const fetchExams = useCallback(async () => {
@@ -221,7 +137,7 @@ export default function HskExamAdminPage() {
     // EXAM CRUD
     const openCreateExamModal = () => {
         setSelectedExam(null);
-        setExamForm({ title: '', hsk_level: 1, exam_type: 'practice', duration_minutes: 60, passing_score: 120, description: '' });
+        setExamForm({ title: '', hsk_level: 1, exam_type: 'practice', ...HSK_PRESETS[1], description: '' });
         setShowExamModal(true);
     };
 
@@ -328,11 +244,8 @@ export default function HskExamAdminPage() {
         setSelectedQuestion(null);
         const nextNumber = (section.questions?.length || 0) + 1;
         setQuestionForm({
-            question_number: nextNumber, question_type: 'multiple_choice',
-            question_text: '', question_image: '', question_audio: '',
-            audio_start_time: 0, audio_end_time: 0, audio_play_count: 2,
-            options: ['', '', '', ''], correct_answer: '', explanation: '',
-            points: 1
+            ...DEFAULT_QUESTION_FORM,
+            question_number: nextNumber,
         });
         setShowQuestionModal(true);
     };
@@ -349,11 +262,16 @@ export default function HskExamAdminPage() {
             audio_end_time: question.audio_end_time || 0,
             audio_play_count: question.audio_play_count || 2,
             options: question.options || ['', '', '', ''],
+            option_images: question.option_images || ['', '', '', ''],
             correct_answer: question.correct_answer || '',
             explanation: question.explanation || '',
-            points: question.points || 1
+            difficulty: question.difficulty || 1,
+            points: question.points || 1,
         });
-        setSelectedSection({ ...selectedSection!, id: question.section_id } as Section);
+        const resolvedSection = examSections.find(s => s.id === question.section_id);
+        if (resolvedSection) {
+            setSelectedSection(resolvedSection);
+        }
         setShowQuestionModal(true);
     };
 
@@ -569,7 +487,15 @@ export default function HskExamAdminPage() {
                                 <select
                                     className="px-3 py-2 border rounded-lg"
                                     value={examForm.hsk_level}
-                                    onChange={e => setExamForm({ ...examForm, hsk_level: parseInt(e.target.value) })}
+                                    onChange={e => {
+                                        const level = parseInt(e.target.value);
+                                        const preset = HSK_PRESETS[level];
+                                        if (!selectedExam && preset) {
+                                            setExamForm({ ...examForm, hsk_level: level, ...preset });
+                                        } else {
+                                            setExamForm({ ...examForm, hsk_level: level });
+                                        }
+                                    }}
                                 >
                                     {[1, 2, 3, 4, 5, 6].map(l => <option key={l} value={l}>HSK {l}</option>)}
                                 </select>
@@ -680,145 +606,92 @@ export default function HskExamAdminPage() {
                 </div>
             )}
 
-            {/* Question Modal */}
+            {/* Question Modal — 2-column layout */}
             {showQuestionModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <div className="bg-[var(--surface)] rounded-xl p-6 w-full max-w-2xl my-8">
-                        <h3 className="text-lg font-bold mb-4">{selectedQuestion ? 'Sửa câu hỏi' : 'Thêm câu hỏi'}</h3>
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-3 gap-4">
-                                <div>
-                                    <label className="text-xs text-[var(--text-muted)]">Số câu</label>
-                                    <input
-                                        type="number"
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        value={questionForm.question_number}
-                                        onChange={e => setQuestionForm({ ...questionForm, question_number: parseInt(e.target.value) })}
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="text-xs text-[var(--text-muted)]">Loại câu hỏi</label>
-                                    <select
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        value={questionForm.question_type}
-                                        onChange={e => setQuestionForm({ ...questionForm, question_type: e.target.value })}
-                                    >
-                                        {QUESTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                                    </select>
-                                </div>
+                    <div className="bg-[var(--surface)] rounded-xl p-6 w-full max-w-5xl my-8">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-5">
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-lg font-bold text-[var(--text-main)]">
+                                    {selectedQuestion ? 'Sửa câu hỏi' : 'Thêm câu hỏi'}
+                                </h3>
+                                {selectedSection && (
+                                    <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-500 font-medium">
+                                        {SECTION_TYPES.find(t => t.value === selectedSection.section_type)?.label}
+                                    </span>
+                                )}
                             </div>
-
-                            <textarea
-                                placeholder="Nội dung câu hỏi"
-                                className="w-full px-3 py-2 border rounded-lg"
-                                rows={3}
-                                value={questionForm.question_text}
-                                onChange={e => setQuestionForm({ ...questionForm, question_text: e.target.value })}
-                            />
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <UploadField
-                                    label="Ảnh câu hỏi"
-                                    value={questionForm.question_image}
-                                    onChange={v => setQuestionForm({ ...questionForm, question_image: v })}
-                                    type="image"
-                                    accept="image/jpeg,image/png,image/webp,image/gif"
-                                />
-                                <UploadField
-                                    label="Audio câu hỏi"
-                                    value={questionForm.question_audio}
-                                    onChange={v => setQuestionForm({ ...questionForm, question_audio: v })}
-                                    type="audio"
-                                    accept="audio/mpeg,audio/wav,audio/ogg,audio/webm"
-                                />
-                            </div>
-
-                            {questionForm.question_type !== 'fill_blank' && questionForm.question_type !== 'short_answer' && (
-                                <div>
-                                    <label className="text-xs text-[var(--text-muted)] block mb-2">Đáp án (A, B, C, D)</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {['A', 'B', 'C', 'D'].map((opt, idx) => (
-                                            <input
-                                                key={opt}
-                                                type="text"
-                                                placeholder={`${opt}.`}
-                                                className="px-3 py-2 border rounded-lg"
-                                                value={questionForm.options[idx] || ''}
-                                                onChange={e => {
-                                                    const newOpts = [...questionForm.options];
-                                                    newOpts[idx] = e.target.value;
-                                                    setQuestionForm({ ...questionForm, options: newOpts });
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs text-[var(--text-muted)]">Đáp án đúng</label>
-                                    <input
-                                        type="text"
-                                        placeholder="VD: A, Đúng, 好..."
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        value={questionForm.correct_answer}
-                                        onChange={e => setQuestionForm({ ...questionForm, correct_answer: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-[var(--text-muted)]">Audio timing (giây)</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="number"
-                                            placeholder="Start"
-                                            className="w-1/2 px-3 py-2 border rounded-lg"
-                                            value={questionForm.audio_start_time}
-                                            onChange={e => setQuestionForm({ ...questionForm, audio_start_time: parseInt(e.target.value) })}
-                                        />
-                                        <input
-                                            type="number"
-                                            placeholder="End"
-                                            className="w-1/2 px-3 py-2 border rounded-lg"
-                                            value={questionForm.audio_end_time}
-                                            onChange={e => setQuestionForm({ ...questionForm, audio_end_time: parseInt(e.target.value) })}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs text-[var(--text-muted)]">Điểm (points)</label>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        value={questionForm.points}
-                                        onChange={e => setQuestionForm({ ...questionForm, points: parseInt(e.target.value) || 1 })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-[var(--text-muted)]">Số lần phát audio</label>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        value={questionForm.audio_play_count}
-                                        onChange={e => setQuestionForm({ ...questionForm, audio_play_count: parseInt(e.target.value) || 2 })}
-                                    />
-                                </div>
-                            </div>
-
-                            <textarea
-                                placeholder="Giải thích đáp án"
-                                className="w-full px-3 py-2 border rounded-lg"
-                                rows={2}
-                                value={questionForm.explanation}
-                                onChange={e => setQuestionForm({ ...questionForm, explanation: e.target.value })}
-                            />
+                            <button
+                                onClick={() => setShowQuestionModal(false)}
+                                className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--surface-secondary)] rounded-lg transition-colors"
+                            >
+                                <Icon name="close" size="sm" />
+                            </button>
                         </div>
-                        <div className="flex justify-end gap-2 mt-6">
+
+                        {/* Two-column layout */}
+                        <div className="flex gap-6">
+                            {/* Left — Form */}
+                            <div className="flex-1 min-w-0 space-y-4 overflow-y-auto max-h-[70vh] pr-2">
+                                {/* Question number */}
+                                <div className="flex items-center gap-3">
+                                    <label className="text-xs text-[var(--text-muted)] whitespace-nowrap">Câu số</label>
+                                    <input
+                                        type="number" min={1}
+                                        className="w-20 px-3 py-2 border rounded-lg text-sm"
+                                        value={questionForm.question_number}
+                                        onChange={e => setQuestionForm({ ...questionForm, question_number: parseInt(e.target.value) || 1 })}
+                                    />
+                                </div>
+
+                                {/* Type picker */}
+                                <QuestionTypePicker
+                                    sectionType={selectedSection?.section_type || 'reading'}
+                                    selectedType={questionForm.question_type}
+                                    onSelect={type => {
+                                        const isListeningType = ['true_false', 'image_match', 'multiple_choice'].includes(type)
+                                            && selectedSection?.section_type === 'listening';
+                                        setQuestionForm({
+                                            ...questionForm,
+                                            question_type: type,
+                                            correct_answer: '',
+                                            options: ['', '', '', ''],
+                                            option_images: ['', '', '', ''],
+                                            // Clear audio fields when switching away from listening types
+                                            ...(!isListeningType && {
+                                                question_audio: '',
+                                                audio_start_time: 0,
+                                                audio_end_time: 0,
+                                                audio_play_count: 2,
+                                            }),
+                                            // Clear image when switching away from image-related types
+                                            ...(type !== 'image_match' && type !== 'short_answer' && {
+                                                question_image: '',
+                                            }),
+                                        });
+                                    }}
+                                />
+
+                                {/* Dynamic form */}
+                                <QuestionFormByType
+                                    form={questionForm}
+                                    onChange={setQuestionForm}
+                                    sectionType={selectedSection?.section_type || 'reading'}
+                                />
+                            </div>
+
+                            {/* Right — Preview (desktop only) */}
+                            <div className="hidden lg:block w-[300px] flex-shrink-0">
+                                <QuestionPreview
+                                    form={questionForm}
+                                    sectionType={selectedSection?.section_type || 'reading'}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Footer buttons */}
+                        <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-[var(--border)]">
                             <Button variant="outline" onClick={() => setShowQuestionModal(false)}>Hủy</Button>
                             <Button onClick={handleSaveQuestion}>Lưu câu hỏi</Button>
                         </div>
