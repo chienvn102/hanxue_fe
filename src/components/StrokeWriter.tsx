@@ -28,32 +28,35 @@ export default function StrokeWriter({
         const container = containerRef.current;
         container.innerHTML = '';
         writerRef.current = null;
-        setIsReady(false);
+        const resetAndInit = () => {
+            setIsReady(false);
 
-        try {
-            const writer = HanziWriter.create(container, character, {
-                width: size,
-                height: size,
-                padding: 5,
-                showOutline: true,
-                strokeColor: strokeColor,
-                outlineColor: '#ddd',
-                radicalColor: '#dc2626',
-                strokeAnimationSpeed: 1,
-                delayBetweenStrokes: 200,
-                showCharacter: true,
-                onLoadCharDataSuccess: () => {
-                    setIsReady(true);
-                },
-                onLoadCharDataError: () => {
-                    console.error('Failed to load character data for:', character);
-                }
-            });
+            try {
+                const writer = HanziWriter.create(container, character, {
+                    width: size,
+                    height: size,
+                    padding: 5,
+                    showOutline: true,
+                    strokeColor: strokeColor,
+                    outlineColor: '#ddd',
+                    radicalColor: '#dc2626',
+                    strokeAnimationSpeed: 1,
+                    delayBetweenStrokes: 200,
+                    showCharacter: true,
+                    onLoadCharDataSuccess: () => {
+                        setIsReady(true);
+                    },
+                    onLoadCharDataError: () => {
+                        console.error('Failed to load character data for:', character);
+                    }
+                });
 
-            writerRef.current = writer;
-        } catch (err) {
-            console.error('HanziWriter create error:', err);
-        }
+                writerRef.current = writer;
+            } catch (err) {
+                console.error('HanziWriter create error:', err);
+            }
+        };
+        resetAndInit();
 
         return () => {
             container.innerHTML = '';

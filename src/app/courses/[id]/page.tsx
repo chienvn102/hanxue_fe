@@ -8,6 +8,7 @@ import { Icon } from '@/components/ui/Icon';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/components/AuthContext';
+import { fetchCourseById, fetchLessonsByCourse } from '@/lib/api';
 
 interface Lesson {
     id: number;
@@ -29,8 +30,6 @@ interface Course {
     lesson_count: number;
     completed_lessons?: number;
 }
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
 // HSK Level colors
 const hskColors: Record<number, { badge: string; progress: string }> = {
@@ -154,7 +153,7 @@ function LessonCard({ lesson, index, isCompleted, isLocked }: {
 
 export default function CourseDetailPage() {
     const params = useParams();
-    const { token } = useAuth();
+    const { isAuthenticated } = useAuth();
     const [course, setCourse] = useState<Course | null>(null);
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
@@ -162,31 +161,27 @@ export default function CourseDetailPage() {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const headers: HeadersInit = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const [courseRes, lessonsRes] = await Promise.all([
-                fetch(`${API_BASE}/api/courses/${params.id}`, { headers }),
-                fetch(`${API_BASE}/api/lessons/course/${params.id}`, { headers })
+            const [courseData, lessonsData] = await Promise.all([
+                fetchCourseById(params.id as string),
+                fetchLessonsByCourse(params.id as string)
             ]);
 
-            const courseData = await courseRes.json();
-            const lessonsData = await lessonsRes.json();
-
-            if (courseData.success) setCourse(courseData.data);
-            if (lessonsData.success) setLessons(lessonsData.data);
+            const cd = courseData as { success: boolean; data: Course };
+            const ld = lessonsData as { success: boolean; data: Lesson[] };
+            if (cd.success) setCourse(cd.data);
+            if (ld.success) setLessons(ld.data);
         } catch (error) {
             console.error('Failed to load course data', error);
         } finally {
             setLoading(false);
         }
-    }, [params.id, token]);
+    }, [params.id]);
 
     useEffect(() => {
         if (params.id) {
             fetchData();
         }
-    }, [params.id, token, fetchData]);
+    }, [params.id, isAuthenticated, fetchData]);
 
     const progress = course && course.lesson_count > 0 && course.completed_lessons
         ? Math.round((course.completed_lessons / course.lesson_count) * 100)

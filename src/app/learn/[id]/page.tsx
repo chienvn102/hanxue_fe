@@ -1,14 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { useAuth } from '@/components/AuthContext';
-import { playAudio } from '@/lib/api';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { playAudio, fetchLessonById } from '@/lib/api';
 
 interface Content {
     id: number;
@@ -31,8 +28,6 @@ interface Lesson {
 
 export default function LearningPage() {
     const params = useParams();
-    const router = useRouter();
-    const { token } = useAuth();
 
     const [lesson, setLesson] = useState<Lesson | null>(null);
     const [loading, setLoading] = useState(true);
@@ -40,11 +35,58 @@ export default function LearningPage() {
     const [activeContentId, setActiveContentId] = useState<number | null>(null);
     const [autoScroll, setAutoScroll] = useState(true);
 
-    const playerRef = useRef<any>(null);
+    const playerRef = useRef<YTPlayer | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+    const initPlayer = useCallback(() => {
+        if (playerRef.current || !lesson) return;
+        if (!window.YT) return;
+
+        playerRef.current = new window.YT.Player('learn-player', {
+            height: '100%',
+            width: '100%',
+            videoId: lesson.youtube_id,
+            playerVars: {
+                'playsinline': 1,
+                'modestbranding': 1,
+                'rel': 0
+            },
+            events: {
+                'onStateChange': () => {
+                    // Could track play/pause state here
+                }
+            }
+        });
+    }, [lesson]);
+
+    const checkActiveContent = useCallback((time: number) => {
+        if (!lesson?.contents) return;
+
+        const active = lesson.contents.find(c => time >= c.start_time && time <= c.end_time);
+
+        if (active && active.id !== activeContentId) {
+            setActiveContentId(active.id);
+            if (autoScroll) scrollToContent(active.id);
+        }
+    }, [lesson, activeContentId, autoScroll]);
+
     useEffect(() => {
-        if (params.id) fetchLesson();
+        if (!params.id) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const data = await fetchLessonById(params.id as string);
+                const response = data as { success: boolean; data: Lesson };
+                if (!cancelled && response.success) {
+                    setLesson(response.data);
+                }
+            } catch (error) {
+                console.error('Failed to load lesson', error);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
     }, [params.id]);
 
     // Load YouTube API
@@ -54,18 +96,18 @@ export default function LearningPage() {
             tag.src = "https://www.youtube.com/iframe_api";
             const firstScriptTag = document.getElementsByTagName('script')[0];
             firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-        } else if (lesson) {
+        } else {
             initPlayer();
         }
 
         window.onYouTubeIframeAPIReady = () => {
-            if (lesson) initPlayer();
+            initPlayer();
         };
 
         return () => {
-            // Cleanup if needed
-        }
-    }, [lesson]);
+            window.onYouTubeIframeAPIReady = undefined;
+        };
+    }, [initPlayer]);
 
     // Timer loop for sync
     useEffect(() => {
@@ -75,60 +117,9 @@ export default function LearningPage() {
                 setCurrentTime(time);
                 checkActiveContent(time);
             }
-        }, 500); // Check every 0.5s
+        }, 500);
         return () => clearInterval(interval);
-    }, [lesson]);
-
-    const initPlayer = () => {
-        if (playerRef.current) return;
-
-        playerRef.current = new window.YT.Player('learn-player', {
-            height: '100%',
-            width: '100%',
-            videoId: lesson?.youtube_id,
-            playerVars: {
-                'playsinline': 1,
-                'modestbranding': 1,
-                'rel': 0
-            },
-            events: {
-                'onStateChange': (event: any) => {
-                    // Could track play/pause state here
-                }
-            }
-        });
-    };
-
-    const fetchLesson = async () => {
-        try {
-            const headers: any = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-            const res = await fetch(`${API_BASE}/api/lessons/${params.id}`, { headers });
-            const data = await res.json();
-            if (data.success) {
-                setLesson(data.data);
-            }
-        } catch (error) {
-            console.error('Failed to load lesson', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const checkActiveContent = (time: number) => {
-        if (!lesson?.contents) return;
-
-        // Find content that matches current time
-        const active = lesson.contents.find(c => time >= c.start_time && time <= c.end_time);
-
-        if (active && active.id !== activeContentId) {
-            setActiveContentId(active.id);
-            if (autoScroll) scrollToContent(active.id);
-        } else if (!active) {
-            // Optional: clear active state or keep last one? Keeping last one is usually better context
-            // setActiveContentId(null); 
-        }
-    };
+    }, [checkActiveContent]);
 
     const scrollToContent = (id: number) => {
         const el = document.getElementById(`content-${id}`);

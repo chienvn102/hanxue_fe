@@ -27,21 +27,23 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     const router = useRouter();
 
     useEffect(() => {
-        // Load admin auth data from localStorage on mount
-        const storedToken = localStorage.getItem('adminToken');
-        const storedAdmin = localStorage.getItem('adminUser');
+        const loadAdminAuth = () => {
+            const storedToken = localStorage.getItem('adminToken');
+            const storedAdmin = localStorage.getItem('adminUser');
 
-        if (storedToken && storedAdmin) {
-            try {
-                setToken(storedToken);
-                setAdmin(JSON.parse(storedAdmin));
-            } catch (e) {
-                console.error('Failed to parse admin data:', e);
-                localStorage.removeItem('adminToken');
-                localStorage.removeItem('adminUser');
+            if (storedToken && storedAdmin) {
+                try {
+                    setToken(storedToken);
+                    setAdmin(JSON.parse(storedAdmin));
+                } catch (e) {
+                    console.error('Failed to parse admin data:', e);
+                    localStorage.removeItem('adminToken');
+                    localStorage.removeItem('adminUser');
+                }
             }
-        }
-        setLoading(false);
+            setLoading(false);
+        };
+        loadAdminAuth();
     }, []);
 
     const login = (newToken: string, newAdmin: Admin) => {

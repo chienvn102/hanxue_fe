@@ -148,7 +148,7 @@ export async function playAudio(word: string): Promise<void> {
     try {
         const audio = new Audio(audioUrl);
         await audio.play();
-    } catch (error) {
+    } catch {
         // Fallback: Browser TTS
         if ('speechSynthesis' in window) {
             const utterance = new SpeechSynthesisUtterance(word);
@@ -202,6 +202,52 @@ function getAuthHeader(): HeadersInit {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
+// Centralized auth fetch wrapper: auto-refresh on 401, retry once
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+async function tryRefreshToken(): Promise<string | null> {
+    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+    if (!refreshToken) return null;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data.accessToken) {
+            localStorage.setItem('accessToken', data.accessToken);
+            return data.accessToken;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+    const headers = { ...getAuthHeader(), ...options.headers };
+    let res = await fetch(url, { ...options, headers });
+
+    if (res.status === 401) {
+        // Deduplicate concurrent refresh attempts
+        if (!isRefreshing) {
+            isRefreshing = true;
+            refreshPromise = tryRefreshToken().finally(() => { isRefreshing = false; });
+        }
+        const newToken = await refreshPromise;
+        if (newToken) {
+            const retryHeaders = { ...options.headers, 'Authorization': `Bearer ${newToken}` };
+            res = await fetch(url, { ...options, headers: retryHeaders });
+        }
+    }
+
+    return res;
+}
+
 /**
  * Get vocabulary due for review today
  */
@@ -210,9 +256,7 @@ export async function fetchDueVocabs(params?: { limit?: number; hsk?: number }):
     if (params?.limit) searchParams.set('limit', params.limit.toString());
     if (params?.hsk) searchParams.set('hsk', params.hsk.toString());
 
-    const res = await fetch(`${API_BASE_URL}/api/progress/due?${searchParams.toString()}`, {
-        headers: getAuthHeader()
-    });
+    const res = await authFetch(`${API_BASE_URL}/api/progress/due?${searchParams.toString()}`);
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to fetch due vocabulary');
@@ -228,9 +272,7 @@ export async function fetchNewVocabs(params?: { limit?: number; hsk?: number }):
     if (params?.limit) searchParams.set('limit', params.limit.toString());
     if (params?.hsk) searchParams.set('hsk', params.hsk.toString());
 
-    const res = await fetch(`${API_BASE_URL}/api/progress/new?${searchParams.toString()}`, {
-        headers: getAuthHeader()
-    });
+    const res = await authFetch(`${API_BASE_URL}/api/progress/new?${searchParams.toString()}`);
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to fetch new vocabulary');
@@ -242,9 +284,7 @@ export async function fetchNewVocabs(params?: { limit?: number; hsk?: number }):
  * Get user's learning statistics
  */
 export async function fetchLearningStats(): Promise<LearningStats> {
-    const res = await fetch(`${API_BASE_URL}/api/progress/stats`, {
-        headers: getAuthHeader()
-    });
+    const res = await authFetch(`${API_BASE_URL}/api/progress/stats`);
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to fetch statistics');
@@ -265,12 +305,9 @@ export async function fetchLearningStats(): Promise<LearningStats> {
  * @param responseMs - Optional response time in milliseconds
  */
 export async function submitReview(vocabId: number, quality: number, responseMs?: number): Promise<ReviewResult> {
-    const res = await fetch(`${API_BASE_URL}/api/progress/review`, {
+    const res = await authFetch(`${API_BASE_URL}/api/progress/review`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeader()
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vocabId, quality, responseMs })
     });
     if (!res.ok) {
@@ -285,9 +322,7 @@ export async function submitReview(vocabId: number, quality: number, responseMs?
  * Get progress for a specific vocabulary
  */
 export async function fetchVocabProgress(vocabId: number): Promise<{ learned: boolean; progress?: VocabProgress }> {
-    const res = await fetch(`${API_BASE_URL}/api/progress/${vocabId}`, {
-        headers: getAuthHeader()
-    });
+    const res = await authFetch(`${API_BASE_URL}/api/progress/${vocabId}`);
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to fetch progress');
@@ -351,9 +386,7 @@ export async function fetchGrammarById(id: number): Promise<Grammar> {
 // ============================================================
 
 export async function fetchProfile(): Promise<User> {
-    const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
-        headers: getAuthHeader()
-    });
+    const res = await authFetch(`${API_BASE_URL}/api/user/profile`);
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to fetch profile');
@@ -362,12 +395,9 @@ export async function fetchProfile(): Promise<User> {
 }
 
 export async function updateProfile(data: { displayName?: string; targetHsk?: number; nativeLanguage?: string }): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/api/user/profile`, {
+    const res = await authFetch(`${API_BASE_URL}/api/user/profile`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeader()
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -501,12 +531,9 @@ export async function fetchHskExams(params?: { hsk?: number; type?: string; page
 }
 
 export async function startHskExam(examId: number): Promise<HskExamStartResponse> {
-    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/${examId}/start`, {
+    const res = await authFetch(`${API_BASE_URL}/api/hsk-exams/${examId}/start`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeader()
-        }
+        headers: { 'Content-Type': 'application/json' }
     });
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
@@ -517,12 +544,9 @@ export async function startHskExam(examId: number): Promise<HskExamStartResponse
 }
 
 export async function submitHskAnswer(attemptId: number, questionId: number, answer: string, timeSpent?: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/attempts/${attemptId}/answer`, {
+    const res = await authFetch(`${API_BASE_URL}/api/hsk-exams/attempts/${attemptId}/answer`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeader()
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ questionId, answer, timeSpent: timeSpent || 0 })
     });
     if (!res.ok) {
@@ -532,12 +556,9 @@ export async function submitHskAnswer(attemptId: number, questionId: number, ans
 }
 
 export async function finishHskExam(attemptId: number): Promise<{ success: boolean; result: { listeningScore: number; readingScore: number; writingScore: number; totalScore: number; maxScore: number; isPassed: boolean; correctCount: number; wrongCount: number; unansweredCount: number } }> {
-    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/attempts/${attemptId}/finish`, {
+    const res = await authFetch(`${API_BASE_URL}/api/hsk-exams/attempts/${attemptId}/finish`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeader()
-        }
+        headers: { 'Content-Type': 'application/json' }
     });
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
@@ -548,9 +569,7 @@ export async function finishHskExam(attemptId: number): Promise<{ success: boole
 }
 
 export async function fetchHskExamResult(attemptId: number): Promise<HskExamResult> {
-    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/attempts/${attemptId}/result`, {
-        headers: getAuthHeader()
-    });
+    const res = await authFetch(`${API_BASE_URL}/api/hsk-exams/attempts/${attemptId}/result`);
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to fetch exam result');
@@ -559,9 +578,7 @@ export async function fetchHskExamResult(attemptId: number): Promise<HskExamResu
 }
 
 export async function fetchHskHistory(): Promise<{ data: HskExamAttempt[] }> {
-    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/history`, {
-        headers: getAuthHeader()
-    });
+    const res = await authFetch(`${API_BASE_URL}/api/hsk-exams/history`);
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to fetch history');
@@ -589,12 +606,9 @@ export async function sendChatMessage(
     mode: 'chat' | 'conversation',
     history: { role: 'user' | 'assistant'; content: string }[]
 ): Promise<ChatSendResponse> {
-    const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
+    const res = await authFetch(`${API_BASE_URL}/api/chat/send`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeader()
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, mode, history })
     });
     if (res.status === 401) throw new Error('Unauthorized');
@@ -607,13 +621,106 @@ export async function sendChatMessage(
 }
 
 export async function fetchChatUsage(): Promise<ChatUsage> {
-    const res = await fetch(`${API_BASE_URL}/api/chat/usage`, {
-        headers: getAuthHeader()
-    });
+    const res = await authFetch(`${API_BASE_URL}/api/chat/usage`);
     if (res.status === 401) throw new Error('Unauthorized');
     if (!res.ok) {
         throw new Error('Loi lay thong tin su dung');
     }
     const data = await res.json();
     return data.data;
+}
+
+// ============================================================
+// Notebook / Saved Vocab Functions
+// ============================================================
+
+export async function fetchSavedVocabIds(): Promise<number[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/notebooks/saved-ids`);
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch saved vocab IDs');
+    }
+    const data = await res.json();
+    return data.success ? data.data : [];
+}
+
+export async function toggleSaveVocab(vocabId: number, save: boolean): Promise<void> {
+    const res = await authFetch(`${API_BASE_URL}/api/vocab/${vocabId}/save`, {
+        method: save ? 'POST' : 'DELETE',
+    });
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error(save ? 'Failed to save vocab' : 'Failed to unsave vocab');
+    }
+}
+
+// ============================================================
+// Course / Lesson Functions (optional auth — pass token for progress overlay)
+// ============================================================
+
+export async function fetchCourses(): Promise<{ data: unknown[]; pagination: unknown }> {
+    const res = await authFetch(`${API_BASE_URL}/api/courses`);
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch courses');
+    }
+    return res.json();
+}
+
+export async function fetchCourseById(id: string | number): Promise<unknown> {
+    const res = await authFetch(`${API_BASE_URL}/api/courses/${id}`);
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch course');
+    }
+    return res.json();
+}
+
+export async function fetchLessonsByCourse(courseId: string | number): Promise<unknown> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/course/${courseId}`);
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch lessons');
+    }
+    return res.json();
+}
+
+export async function fetchLessonById(id: string | number): Promise<unknown> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/${id}`);
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch lesson');
+    }
+    return res.json();
+}
+
+export async function updateLessonProgress(lessonId: string | number, data: { status: string; progress?: number }): Promise<unknown> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/${lessonId}/progress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to update lesson progress');
+    }
+    return res.json();
+}
+
+export async function fetchNotebooks(): Promise<{ success: boolean; data: unknown[] }> {
+    const res = await authFetch(`${API_BASE_URL}/api/notebooks`);
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch notebooks');
+    }
+    return res.json();
+}
+
+export async function fetchNotebookItems(notebookId: number): Promise<{ success: boolean; data: unknown[] }> {
+    const res = await authFetch(`${API_BASE_URL}/api/notebooks/${notebookId}/items`);
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch notebook items');
+    }
+    return res.json();
 }

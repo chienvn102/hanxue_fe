@@ -132,9 +132,11 @@ interface Question {
     question_audio: string;
     audio_start_time: number;
     audio_end_time: number;
+    audio_play_count: number;
     options: string[];
     correct_answer: string;
     explanation: string;
+    points: number;
 }
 
 export default function HskExamAdminPage() {
@@ -167,8 +169,9 @@ export default function HskExamAdminPage() {
     const [questionForm, setQuestionForm] = useState({
         question_number: 1, question_type: 'multiple_choice',
         question_text: '', question_image: '', question_audio: '',
-        audio_start_time: 0, audio_end_time: 0,
-        options: ['', '', '', ''], correct_answer: '', explanation: ''
+        audio_start_time: 0, audio_end_time: 0, audio_play_count: 2,
+        options: ['', '', '', ''], correct_answer: '', explanation: '',
+        points: 1
     });
 
     const fetchExams = useCallback(async () => {
@@ -327,8 +330,9 @@ export default function HskExamAdminPage() {
         setQuestionForm({
             question_number: nextNumber, question_type: 'multiple_choice',
             question_text: '', question_image: '', question_audio: '',
-            audio_start_time: 0, audio_end_time: 0,
-            options: ['', '', '', ''], correct_answer: '', explanation: ''
+            audio_start_time: 0, audio_end_time: 0, audio_play_count: 2,
+            options: ['', '', '', ''], correct_answer: '', explanation: '',
+            points: 1
         });
         setShowQuestionModal(true);
     };
@@ -343,9 +347,11 @@ export default function HskExamAdminPage() {
             question_audio: question.question_audio || '',
             audio_start_time: question.audio_start_time || 0,
             audio_end_time: question.audio_end_time || 0,
+            audio_play_count: question.audio_play_count || 2,
             options: question.options || ['', '', '', ''],
             correct_answer: question.correct_answer || '',
-            explanation: question.explanation || ''
+            explanation: question.explanation || '',
+            points: question.points || 1
         });
         setSelectedSection({ ...selectedSection!, id: question.section_id } as Section);
         setShowQuestionModal(true);
@@ -522,7 +528,10 @@ export default function HskExamAdminPage() {
                                                                 {q.question_text || '(Không có nội dung)'}
                                                             </span>
                                                         </div>
-                                                        <div className="flex gap-1">
+                                                        <div className="flex gap-1 items-center">
+                                                            {q.points > 1 && (
+                                                                <span className="text-xs text-amber-500 font-mono">{q.points}đ</span>
+                                                            )}
                                                             <span className="text-xs text-green-500 font-mono">[{q.correct_answer}]</span>
                                                             <button onClick={() => openEditQuestionModal(q)} className="p-0.5 text-[var(--text-muted)] hover:text-blue-400">
                                                                 <Icon name="edit" size="sm" />
@@ -775,6 +784,29 @@ export default function HskExamAdminPage() {
                                             onChange={e => setQuestionForm({ ...questionForm, audio_end_time: parseInt(e.target.value) })}
                                         />
                                     </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs text-[var(--text-muted)]">Điểm (points)</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        className="w-full px-3 py-2 border rounded-lg"
+                                        value={questionForm.points}
+                                        onChange={e => setQuestionForm({ ...questionForm, points: parseInt(e.target.value) || 1 })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-[var(--text-muted)]">Số lần phát audio</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        className="w-full px-3 py-2 border rounded-lg"
+                                        value={questionForm.audio_play_count}
+                                        onChange={e => setQuestionForm({ ...questionForm, audio_play_count: parseInt(e.target.value) || 2 })}
+                                    />
                                 </div>
                             </div>
 

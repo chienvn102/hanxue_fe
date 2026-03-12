@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { VocabCard } from '@/components/VocabCard';
-import { playAudio, fetchProfile } from '@/lib/api';
+import { playAudio, fetchProfile, fetchSavedVocabIds, toggleSaveVocab } from '@/lib/api';
 import { useAuth } from '@/components/AuthContext';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
@@ -42,7 +42,7 @@ const colorClasses: Record<string, { text: string; border: string; bg: string }>
 
 
 export default function HomePage() {
-  const { user, isAuthenticated, updateUser, logout, token } = useAuth();
+  const { user, isAuthenticated, updateUser, logout } = useAuth();
   const [featuredVocab, setFeaturedVocab] = useState<Vocab[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,23 +64,19 @@ export default function HomePage() {
           }
         });
     }
-  }, [isAuthenticated]); // Removed updateUser dependency to avoid loop if not stable, though likely stable
+  }, [isAuthenticated, updateUser, logout]);
 
   // Fetch saved vocab IDs
   useEffect(() => {
-    if (isAuthenticated && token) {
-      fetch(`${API_BASE}/api/notebooks/saved-ids`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data) {
-            setSavedVocabIds(new Set(data.data));
-          }
-        })
-        .catch(err => console.error('Failed to fetch saved IDs', err));
+    if (isAuthenticated) {
+      fetchSavedVocabIds()
+        .then(ids => setSavedVocabIds(new Set(ids)))
+        .catch(err => {
+          if (err.message === 'Unauthorized') logout();
+          else console.error('Failed to fetch saved IDs', err);
+        });
     }
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, logout]);
 
   useEffect(() => {
     const loadVocab = async () => {
@@ -98,30 +94,24 @@ export default function HomePage() {
   }, []);
 
   const handleBookmark = async (vocabId: number) => {
-    if (!isAuthenticated || !token) return;
+    if (!isAuthenticated) return;
 
     const isSaved = savedVocabIds.has(vocabId);
-    const method = isSaved ? 'DELETE' : 'POST';
 
     try {
-      const res = await fetch(`${API_BASE}/api/vocab/${vocabId}/save`, {
-        method,
-        headers: { 'Authorization': `Bearer ${token}` }
+      await toggleSaveVocab(vocabId, !isSaved);
+      setSavedVocabIds(prev => {
+        const newSet = new Set(prev);
+        if (isSaved) {
+          newSet.delete(vocabId);
+        } else {
+          newSet.add(vocabId);
+        }
+        return newSet;
       });
-
-      if (res.ok) {
-        setSavedVocabIds(prev => {
-          const newSet = new Set(prev);
-          if (isSaved) {
-            newSet.delete(vocabId);
-          } else {
-            newSet.add(vocabId);
-          }
-          return newSet;
-        });
-      }
     } catch (error) {
-      console.error('Failed to save vocab', error);
+      if (error instanceof Error && error.message === 'Unauthorized') logout();
+      else console.error('Failed to save vocab', error);
     }
   };
 

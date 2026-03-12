@@ -57,14 +57,18 @@ function SearchResults() {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        if (query) {
+        if (!query) return;
+        let cancelled = false;
+        const doSearch = () => {
             setLoading(true);
             setError('');
             searchVocab(query)
-                .then(setResults)
-                .catch((err) => setError(err.message))
-                .finally(() => setLoading(false));
-        }
+                .then(data => { if (!cancelled) setResults(data); })
+                .catch((err) => { if (!cancelled) setError(err.message); })
+                .finally(() => { if (!cancelled) setLoading(false); });
+        };
+        doSearch();
+        return () => { cancelled = true; };
     }, [query]);
 
     if (!query) {
@@ -107,7 +111,7 @@ function SearchResults() {
         return (
             <div className="text-center py-16">
                 <Icon name="sentiment_dissatisfied" size="xl" className="text-[var(--text-muted)] mb-4" />
-                <p className="text-[var(--text-muted)]">Không tìm thấy kết quả cho "{query}"</p>
+                <p className="text-[var(--text-muted)]">Không tìm thấy kết quả cho &ldquo;{query}&rdquo;</p>
             </div>
         );
     }
@@ -115,7 +119,7 @@ function SearchResults() {
     return (
         <div className="space-y-4">
             <p className="text-sm mb-6 text-[var(--text-secondary)]">
-                Tìm thấy <strong>{results.length}</strong> kết quả cho "{query}"
+                Tìm thấy <strong>{results.length}</strong> kết quả cho &ldquo;{query}&rdquo;
             </p>
             {results.map((vocab, index) => (
                 <VocabResult key={vocab.id} vocab={vocab} index={index} />

@@ -50,10 +50,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     // Initialize theme from localStorage
     useEffect(() => {
-        const stored = localStorage.getItem('hanxue-theme') as Theme | null;
-        const initialTheme = stored || 'system';
-        setThemeState(initialTheme);
-        applyTheme(resolveTheme(initialTheme));
+        const initTheme = () => {
+            const stored = localStorage.getItem('hanxue-theme') as Theme | null;
+            const initialTheme = stored || 'system';
+            setThemeState(initialTheme);
+            applyTheme(resolveTheme(initialTheme));
+        };
+        initTheme();
 
         // Listen for system theme changes
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -64,12 +67,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         };
         mediaQuery.addEventListener('change', handleChange);
         return () => mediaQuery.removeEventListener('change', handleChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Update theme when state changes
     useEffect(() => {
-        localStorage.setItem('hanxue-theme', theme);
-        applyTheme(resolveTheme(theme));
+        const syncTheme = () => {
+            localStorage.setItem('hanxue-theme', theme);
+            applyTheme(resolveTheme(theme));
+        };
+        syncTheme();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [theme]);
 
     const setTheme = (newTheme: Theme) => {
@@ -88,7 +96,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
                 Math.max(y, window.innerHeight - y)
             );
 
-            // @ts-ignore - startViewTransition is not in TypeScript types yet
             const transition = document.startViewTransition(() => {
                 setThemeState(newTheme);
             });

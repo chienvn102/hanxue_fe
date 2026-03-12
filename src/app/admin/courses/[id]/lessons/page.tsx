@@ -131,7 +131,7 @@ export default function AdminLessonsPage() {
         const player = new window.YT.Player('temp-player-div', {
             videoId: videoId,
             events: {
-                'onReady': (event: any) => {
+                'onReady': (event: { data: number; target: YTPlayer }) => {
                     const duration = event.target.getDuration();
                     if (duration > 0) {
                         setFormData(prev => ({ ...prev, duration: Math.floor(duration) }));

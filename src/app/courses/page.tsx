@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Icon } from '@/components/ui/Icon';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { fetchCourses as apiFetchCourses } from '@/lib/api';
 import { useAuth } from '@/components/AuthContext';
 
 interface Course {
@@ -18,8 +19,6 @@ interface Course {
     prerequisite_course_id?: number | null;
     is_active?: boolean;
 }
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
 // HSK Level colors
 const hskColors: Record<number, { bg: string; text: string; badge: string }> = {
@@ -165,22 +164,17 @@ function CourseCard({ course, isLocked }: { course: Course; isLocked: boolean })
 }
 
 export default function CoursesPage() {
-    const { token } = useAuth();
+    const { isAuthenticated } = useAuth();
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
-        const fetchCourses = async () => {
+        const loadCourses = async () => {
             try {
-                const headers: HeadersInit = {};
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                const res = await fetch(`${API_BASE}/api/courses`, { headers });
-                const data = await res.json();
-
-                if (data.success) {
-                    setCourses(data.data);
+                const data = await apiFetchCourses();
+                if (data.data) {
+                    setCourses(data.data as Course[]);
                 }
             } catch (error) {
                 console.error('Failed to load courses', error);
@@ -189,8 +183,8 @@ export default function CoursesPage() {
             }
         };
 
-        fetchCourses();
-    }, [token]);
+        loadCourses();
+    }, [isAuthenticated]);
 
     // Filter courses by search
     const filteredCourses = courses.filter(course =>

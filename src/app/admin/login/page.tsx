@@ -34,8 +34,8 @@ export default function AdminLoginPage() {
 
             login(data.token, data.admin);
 
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');
         } finally {
             setLoading(false);
         }

@@ -74,7 +74,7 @@ const TUTOR = {
 } as const;
 
 export default function ChatPage() {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, logout } = useAuth();
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -118,12 +118,12 @@ export default function ChatPage() {
             .catch((err) => {
                 const msg = err instanceof Error ? err.message : '';
                 if (msg === 'Unauthorized') {
-                    setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                    logout();
                 } else {
                     setRemaining(-1);
                 }
             });
-    }, [isAuthenticated]);
+    }, [isAuthenticated, logout]);
 
     // Cleanup STT/TTS on unmount or mode change
     useEffect(() => {
@@ -207,7 +207,7 @@ export default function ChatPage() {
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Lỗi gửi tin nhắn';
             if (msg === 'Unauthorized') {
-                setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                logout();
             } else {
                 setError(msg);
             }
@@ -216,7 +216,7 @@ export default function ChatPage() {
             setIsLoading(false);
             if (mode === 'chat') inputRef.current?.focus();
         }
-    }, [input, messages, mode, speakReply]);
+    }, [input, messages, mode, speakReply, logout]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {

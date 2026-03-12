@@ -73,6 +73,11 @@ export default function ExamTakingPage() {
     const submitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const submittingRef = useRef(false);
 
+    // Audio play count tracking: key = "section:{sectionId}" or "question:{questionId}"
+    const [audioPlays, setAudioPlays] = useState<Record<string, number>>({});
+    // Track whether a play event is a fresh start (not a resume)
+    const audioFreshPlayRef = useRef<Record<string, boolean>>({});
+
     // Load exam
     useEffect(() => {
         if (!isAuthenticated) {
@@ -442,6 +447,82 @@ export default function ExamTakingPage() {
                                 />
                             </div>
                         )}
+
+                        {/* Section audio (listening sections only) */}
+                        {(() => {
+                            const section = exam.sections[currentQuestion.sectionIndex];
+                            if (section.section_type !== 'listening' || !section.audio_url) return null;
+                            const key = `section:${section.id}`;
+                            const maxPlays = 2;
+                            const played = audioPlays[key] || 0;
+                            const canPlay = played < maxPlays;
+                            return (
+                                <div className="mb-6 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
+                                    <div className="flex items-center gap-3">
+                                        <Icon name="headphones" size="sm" className="text-blue-500" />
+                                        <span className="text-sm font-medium text-blue-500">Audio phần thi</span>
+                                        <span className="text-xs text-[var(--text-muted)] ml-auto">
+                                            {played}/{maxPlays} lần phát
+                                        </span>
+                                    </div>
+                                    <audio
+                                        src={getMediaUrl(section.audio_url)}
+                                        controlsList="nodownload noplaybackrate"
+                                        controls
+                                        className="w-full mt-3"
+                                        onPlay={() => {
+                                            if (audioFreshPlayRef.current[key]) {
+                                                audioFreshPlayRef.current[key] = false;
+                                                setAudioPlays(prev => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
+                                            }
+                                        }}
+                                        onEnded={() => { audioFreshPlayRef.current[key] = true; }}
+                                        onLoadedData={() => { audioFreshPlayRef.current[key] = true; }}
+                                        style={!canPlay ? { pointerEvents: 'none', opacity: 0.5 } : undefined}
+                                    />
+                                    {!canPlay && (
+                                        <p className="text-xs text-red-500 mt-2">Đã hết lượt nghe cho phần này</p>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        {/* Question audio */}
+                        {currentQuestion.questionAudio && (() => {
+                            const key = `question:${currentQuestion.id}`;
+                            const maxPlays = currentQuestion.audioPlayCount || 2;
+                            const played = audioPlays[key] || 0;
+                            const canPlay = played < maxPlays;
+                            return (
+                                <div className="mb-6 p-4 rounded-xl bg-purple-500/5 border border-purple-500/20">
+                                    <div className="flex items-center gap-3">
+                                        <Icon name="volume_up" size="sm" className="text-purple-500" />
+                                        <span className="text-sm font-medium text-purple-500">Audio câu hỏi</span>
+                                        <span className="text-xs text-[var(--text-muted)] ml-auto">
+                                            {played}/{maxPlays} lần phát
+                                        </span>
+                                    </div>
+                                    <audio
+                                        src={getMediaUrl(currentQuestion.questionAudio)}
+                                        controlsList="nodownload noplaybackrate"
+                                        controls
+                                        className="w-full mt-3"
+                                        onPlay={() => {
+                                            if (audioFreshPlayRef.current[key]) {
+                                                audioFreshPlayRef.current[key] = false;
+                                                setAudioPlays(prev => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
+                                            }
+                                        }}
+                                        onEnded={() => { audioFreshPlayRef.current[key] = true; }}
+                                        onLoadedData={() => { audioFreshPlayRef.current[key] = true; }}
+                                        style={!canPlay ? { pointerEvents: 'none', opacity: 0.5 } : undefined}
+                                    />
+                                    {!canPlay && (
+                                        <p className="text-xs text-red-500 mt-2">Đã hết lượt nghe</p>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         {/* Answer options */}
                         <div className="space-y-3">

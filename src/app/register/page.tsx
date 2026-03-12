@@ -43,8 +43,8 @@ export default function RegisterPage() {
             setTimeout(() => {
                 router.push('/login');
             }, 2000);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Đăng ký thất bại');
             setLoading(false); // Only stop loading on error, keep loading on success until redirect
         }
     };

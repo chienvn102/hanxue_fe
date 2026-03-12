@@ -68,7 +68,7 @@ export default function LessonEditorPage() {
     const [lesson, setLesson] = useState<Lesson | null>(null);
     const [loading, setLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(0);
-    const playerRef = useRef<any>(null); // YouTube Player reference
+    const playerRef = useRef<YTPlayer | null>(null);
 
     // Form state for new content
     const [contentForm, setContentForm] = useState({
@@ -286,7 +286,7 @@ export default function LessonEditorPage() {
                                 <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1">Loại nội dung</label>
                                 <select
                                     value={contentForm.content_type}
-                                    onChange={e => setContentForm({ ...contentForm, content_type: e.target.value as any })}
+                                    onChange={e => setContentForm({ ...contentForm, content_type: e.target.value as 'vocabulary' | 'grammar' | 'sentence' })}
                                     className="w-full px-3 py-2 bg-[var(--surface)] rounded-lg border border-[var(--border)] text-sm focus:border-[var(--primary)] outline-none"
                                 >
                                     <option value="vocabulary">Từ vựng (Vocabulary)</option>

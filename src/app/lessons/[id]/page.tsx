@@ -9,9 +9,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/components/AuthContext';
 import { HSKBadge } from '@/components/ui/Badge';
-import { playAudio } from '@/lib/api';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
+import { playAudio, fetchLessonById, fetchCourseById, fetchLessonsByCourse, updateLessonProgress } from '@/lib/api';
 
 interface VocabContent {
     id: number;
@@ -121,7 +119,7 @@ function formatDuration(seconds: number): string {
 
 export default function LessonPlayerPage() {
     const params = useParams();
-    const { token } = useAuth();
+    const { isAuthenticated } = useAuth();
     const [lesson, setLesson] = useState<Lesson | null>(null);
     const [course, setCourse] = useState<Course | null>(null);
     const [courseLessons, setCourseLessons] = useState<LessonItem[]>([]);
@@ -132,19 +130,19 @@ export default function LessonPlayerPage() {
     const [lessonStatus, setLessonStatus] = useState<string | null>(null);
     const [markingComplete, setMarkingComplete] = useState(false);
 
-    const fetchCourseData = useCallback(async (courseId: number, headers: HeadersInit) => {
+    const fetchCourseData = useCallback(async (courseId: number) => {
         try {
-            const [courseRes, lessonsRes] = await Promise.all([
-                fetch(`${API_BASE}/api/courses/${courseId}`, { headers }),
-                fetch(`${API_BASE}/api/lessons/course/${courseId}`, { headers }),
+            const [courseData, lessonsData] = await Promise.all([
+                fetchCourseById(courseId),
+                fetchLessonsByCourse(courseId),
             ]);
 
-            const courseData = await courseRes.json();
-            if (courseData.success) setCourse(courseData.data);
+            const cd = courseData as { success: boolean; data: Course };
+            if (cd.success) setCourse(cd.data);
 
-            const lessonsData = await lessonsRes.json();
-            if (lessonsData.success) {
-                const lessons = lessonsData.data || [];
+            const ld = lessonsData as { success: boolean; data: LessonItem[] };
+            if (ld.success) {
+                const lessons = ld.data || [];
                 setCourseLessons(lessons);
                 // Set current lesson's progress status
                 const current = lessons.find((l: LessonItem) => l.id === Number(params.id));
@@ -155,17 +153,14 @@ export default function LessonPlayerPage() {
         }
     }, [params.id]);
 
-    const fetchLesson = useCallback(async () => {
+    const fetchLessonData = useCallback(async () => {
         try {
             setLoading(true);
-            const headers: HeadersInit = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const data = await fetchLessonById(params.id as string);
+            const response = data as { success: boolean; data: Lesson & { contents: RawContent[] } };
 
-            const res = await fetch(`${API_BASE}/api/lessons/${params.id}`, { headers });
-            const data = await res.json();
-
-            if (data.success && data.data) {
-                const lessonData = data.data;
+            if (response.success && response.data) {
+                const lessonData = response.data;
                 setLesson(lessonData);
 
                 // Parse contents - DB returns {id, type (VOCABULARY/GRAMMAR/SENTENCE), timestamp, data (JSON), order_index}
@@ -197,7 +192,7 @@ export default function LessonPlayerPage() {
 
                 // Fetch course info and lesson list
                 if (lessonData.course_id) {
-                    fetchCourseData(lessonData.course_id, headers);
+                    fetchCourseData(lessonData.course_id);
                 }
             }
         } catch (error) {
@@ -205,60 +200,54 @@ export default function LessonPlayerPage() {
         } finally {
             setLoading(false);
         }
-    }, [params.id, token, fetchCourseData]);
+    }, [params.id, fetchCourseData]);
 
-    const updateProgress = useCallback(async (status: 'in_progress' | 'completed'): Promise<boolean> => {
-        if (!token) return false;
+    const doUpdateProgress = useCallback(async (status: 'in_progress' | 'completed'): Promise<boolean> => {
+        if (!isAuthenticated) return false;
         try {
-            const res = await fetch(`${API_BASE}/api/lessons/${params.id}/progress`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ status }),
-            });
-            return res.ok;
+            await updateLessonProgress(params.id as string, { status });
+            return true;
         } catch (error) {
             console.error('Failed to update progress', error);
             return false;
         }
-    }, [params.id, token]);
+    }, [params.id, isAuthenticated]);
 
     const handleMarkComplete = useCallback(async () => {
         setMarkingComplete(true);
         try {
-            const ok = await updateProgress('completed');
+            const ok = await doUpdateProgress('completed');
             if (!ok) return;
             setLessonStatus('completed');
             // Refresh course lessons to update sidebar progress
             if (lesson?.course_id) {
-                const headers: HeadersInit = {};
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-                const res = await fetch(`${API_BASE}/api/lessons/course/${lesson.course_id}`, { headers });
-                const data = await res.json();
-                if (data.success) setCourseLessons(data.data || []);
+                const data = await fetchLessonsByCourse(lesson.course_id);
+                const ld = data as { success: boolean; data: LessonItem[] };
+                if (ld.success) setCourseLessons(ld.data || []);
             }
         } catch (error) {
             console.error('Failed to mark complete', error);
         } finally {
             setMarkingComplete(false);
         }
-    }, [updateProgress, lesson?.course_id, token]);
+    }, [doUpdateProgress, lesson?.course_id]);
 
     useEffect(() => {
         if (params.id) {
-            fetchLesson();
+            fetchLessonData();
         }
-    }, [params.id, fetchLesson]);
+    }, [params.id, fetchLessonData]);
 
     // Auto-set in_progress when user opens lesson (if not already completed)
     useEffect(() => {
-        if (lesson && token && !lessonStatus) {
+        if (lesson && isAuthenticated && !lessonStatus) {
             const setInProgress = async () => {
-                const ok = await updateProgress('in_progress');
+                const ok = await doUpdateProgress('in_progress');
                 if (ok) setLessonStatus('in_progress');
             };
             setInProgress();
         }
-    }, [lesson, token, lessonStatus, updateProgress]);
+    }, [lesson, isAuthenticated, lessonStatus, doUpdateProgress]);
 
     const tabs: { id: TabType; label: string; icon: string; count?: number }[] = [
         { id: 'vocab', label: 'Từ vựng', icon: 'translate', count: vocabulary.length },
@@ -484,7 +473,7 @@ export default function LessonPlayerPage() {
                             </Button>
 
                             {/* Mark Complete Button */}
-                            {token && lessonStatus !== 'completed' && (
+                            {isAuthenticated && lessonStatus !== 'completed' && (
                                 <Button
                                     fullWidth
                                     className="justify-center mb-4 bg-emerald-600 hover:bg-emerald-700"

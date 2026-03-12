@@ -9,10 +9,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { HSKBadge } from '@/components/ui/Badge';
-import { fetchVocab, Vocabulary, playAudio } from '@/lib/api';
+import { fetchVocab, Vocabulary, playAudio, fetchSavedVocabIds, toggleSaveVocab } from '@/lib/api';
 import { useAuth } from '@/components/AuthContext';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
 function VocabList() {
     const searchParams = useSearchParams();
@@ -25,7 +23,7 @@ function VocabList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [savedVocabIds, setSavedVocabIds] = useState<Set<number>>(new Set());
-    const { token, isAuthenticated } = useAuth();
+    const { isAuthenticated } = useAuth();
     const limit = 20;
 
     // Debounce search query (300ms)
@@ -39,35 +37,35 @@ function VocabList() {
 
     // Fetch saved vocab IDs
     useEffect(() => {
-        if (isAuthenticated && token) {
-            fetch(`${API_BASE}/api/notebooks/saved-ids`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success && data.data) {
-                        setSavedVocabIds(new Set(data.data));
-                    }
-                })
+        if (isAuthenticated) {
+            fetchSavedVocabIds()
+                .then(ids => setSavedVocabIds(new Set(ids)))
                 .catch(err => console.error('Failed to fetch saved IDs', err));
         }
-    }, [isAuthenticated, token]);
+    }, [isAuthenticated]);
 
     // Fetch vocab with search query
     useEffect(() => {
-        setLoading(true);
-        fetchVocab({
-            limit,
-            page,
-            hsk: hskLevel ? parseInt(hskLevel) : undefined,
-            q: debouncedQuery.trim() || undefined,
-        })
-            .then((res) => {
-                setVocabs(res.data);
-                setTotal(res.pagination.total);
-                setTotalPages(res.pagination.totalPages);
+        let cancelled = false;
+        const loadVocab = () => {
+            setLoading(true);
+            fetchVocab({
+                limit,
+                page,
+                hsk: hskLevel ? parseInt(hskLevel) : undefined,
+                q: debouncedQuery.trim() || undefined,
             })
-            .finally(() => setLoading(false));
+                .then((res) => {
+                    if (!cancelled) {
+                        setVocabs(res.data);
+                        setTotal(res.pagination.total);
+                        setTotalPages(res.pagination.totalPages);
+                    }
+                })
+                .finally(() => { if (!cancelled) setLoading(false); });
+        };
+        loadVocab();
+        return () => { cancelled = true; };
     }, [hskLevel, page, debouncedQuery]);
 
     const handleSaveToggle = (vocabId: number, saved: boolean) => {
@@ -204,7 +202,7 @@ function VocabCard({ vocab, index, isSavedInitial = false, onSaveToggle }: {
     isSavedInitial?: boolean;
     onSaveToggle?: (vocabId: number, saved: boolean) => void;
 }) {
-    const { token, isAuthenticated } = useAuth();
+    const { isAuthenticated } = useAuth();
     const [isSaved, setIsSaved] = useState(isSavedInitial);
     const [saving, setSaving] = useState(false);
 
@@ -217,21 +215,14 @@ function VocabCard({ vocab, index, isSavedInitial = false, onSaveToggle }: {
         e.preventDefault();
         e.stopPropagation();
 
-        if (!isAuthenticated || !token) return;
+        if (!isAuthenticated) return;
 
         setSaving(true);
         try {
-            const method = isSaved ? 'DELETE' : 'POST';
-            const res = await fetch(`${API_BASE}/api/vocab/${vocab.id}/save`, {
-                method,
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (res.ok) {
-                const newSavedState = !isSaved;
-                setIsSaved(newSavedState);
-                onSaveToggle?.(vocab.id, newSavedState);
-            }
+            await toggleSaveVocab(vocab.id, !isSaved);
+            const newSavedState = !isSaved;
+            setIsSaved(newSavedState);
+            onSaveToggle?.(vocab.id, newSavedState);
         } catch (error) {
             console.error('Failed to save vocab', error);
         } finally {

@@ -8,7 +8,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/components/AuthContext';
 import { HSKBadge } from '@/components/ui/Badge';
-import { playAudio } from '@/lib/api';
+import { playAudio, fetchNotebooks as apiFetchNotebooks, fetchNotebookItems, toggleSaveVocab } from '@/lib/api';
 
 interface SavedVocab {
     notebook_id: number;
@@ -30,8 +30,6 @@ interface Notebook {
     is_default: boolean;
     word_count: number;
 }
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
 type FilterType = 'all' | 'new' | 'learning' | 'mastered';
 
@@ -91,8 +89,8 @@ function SavedVocabCard({ vocab, onRemove }: { vocab: SavedVocab; onRemove: () =
 }
 
 export default function NotebookPage() {
-    const { token, isAuthenticated } = useAuth();
-    const [notebooks, setNotebooks] = useState<Notebook[]>([]);
+    const { isAuthenticated } = useAuth();
+    const [, setNotebooks] = useState<Notebook[]>([]);
     const [savedVocabs, setSavedVocabs] = useState<SavedVocab[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
@@ -100,31 +98,26 @@ export default function NotebookPage() {
     const [sortBy, setSortBy] = useState<'newest' | 'hsk'>('newest');
 
     useEffect(() => {
-        if (isAuthenticated && token) {
+        if (isAuthenticated) {
             fetchData();
         } else {
             setLoading(false);
         }
-    }, [isAuthenticated, token]);
+    }, [isAuthenticated]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const headers: HeadersInit = { 'Authorization': `Bearer ${token}` };
-
-            // Fetch notebooks
-            const notebooksRes = await fetch(`${API_BASE}/api/notebooks`, { headers });
-            const notebooksData = await notebooksRes.json();
+            const notebooksData = await apiFetchNotebooks();
             if (notebooksData.success) {
-                setNotebooks(notebooksData.data);
+                setNotebooks(notebooksData.data as Notebook[]);
 
                 // Fetch items from default notebook
-                const defaultNotebook = notebooksData.data.find((n: Notebook) => n.is_default);
+                const defaultNotebook = (notebooksData.data as Notebook[]).find((n) => n.is_default);
                 if (defaultNotebook) {
-                    const itemsRes = await fetch(`${API_BASE}/api/notebooks/${defaultNotebook.id}/items`, { headers });
-                    const itemsData = await itemsRes.json();
+                    const itemsData = await fetchNotebookItems(defaultNotebook.id);
                     if (itemsData.success) {
-                        setSavedVocabs(itemsData.data);
+                        setSavedVocabs(itemsData.data as SavedVocab[]);
                     }
                 }
             }
@@ -136,17 +129,9 @@ export default function NotebookPage() {
     };
 
     const handleRemoveVocab = async (vocabId: number) => {
-        if (!token) return;
-
         try {
-            const res = await fetch(`${API_BASE}/api/vocab/${vocabId}/save`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (res.ok) {
-                setSavedVocabs(prev => prev.filter(v => v.vocabulary_id !== vocabId));
-            }
+            await toggleSaveVocab(vocabId, false);
+            setSavedVocabs(prev => prev.filter(v => v.vocabulary_id !== vocabId));
         } catch (error) {
             console.error('Failed to remove vocab', error);
         }
