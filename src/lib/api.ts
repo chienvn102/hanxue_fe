@@ -631,6 +631,85 @@ export async function fetchChatUsage(): Promise<ChatUsage> {
 }
 
 // ============================================================
+// AI Speech (Azure Speech via BE)
+// ============================================================
+
+export interface TranscribeResult {
+    text: string;
+    language: string;
+    confidence: number;
+}
+
+export interface PronunciationWord {
+    word: string;
+    accuracyScore: number | null;
+    errorType: string;
+}
+
+export interface PronunciationResult {
+    recognizedText: string;
+    referenceText: string;
+    accuracyScore: number;
+    fluencyScore: number;
+    completenessScore: number;
+    pronunciationScore: number;
+    words: PronunciationWord[];
+    feedback: string;
+}
+
+/** Transcribe audio to text (STT) */
+export async function transcribeAudio(audioBlob: Blob): Promise<TranscribeResult> {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.wav');
+
+    const res = await authFetch(`${API_BASE_URL}/api/speech/transcribe`, {
+        method: 'POST',
+        body: formData,
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Lỗi nhận diện giọng nói');
+    }
+    const data = await res.json();
+    return data.data;
+}
+
+/** Assess pronunciation against reference text */
+export async function assessPronunciation(audioBlob: Blob, referenceText: string): Promise<PronunciationResult> {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.wav');
+    formData.append('referenceText', referenceText);
+
+    const res = await authFetch(`${API_BASE_URL}/api/speech/pronunciation`, {
+        method: 'POST',
+        body: formData,
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Lỗi chấm phát âm');
+    }
+    const data = await res.json();
+    return data.data;
+}
+
+/** Synthesize text to speech (returns audio blob) */
+export async function synthesizeSpeech(text: string): Promise<Blob> {
+    const res = await authFetch(`${API_BASE_URL}/api/speech/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Lỗi tổng hợp giọng nói');
+    }
+    return res.blob();
+}
+
+// ============================================================
 // Notebook / Saved Vocab Functions
 // ============================================================
 

@@ -5,47 +5,11 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
-import { sendChatMessage, fetchChatUsage, playAudio } from '@/lib/api';
+import { sendChatMessage, fetchChatUsage, playAudio, transcribeAudio, synthesizeSpeech, assessPronunciation, type PronunciationResult } from '@/lib/api';
+import { isRecordingSupported, requestMicPermission, startRecording } from '@/lib/audioRecorder';
 import Link from 'next/link';
 
-// Web Speech API type declarations (not in standard TS lib)
-interface SpeechRecognitionResult {
-    readonly isFinal: boolean;
-    readonly length: number;
-    [index: number]: { readonly transcript: string; readonly confidence: number };
-}
-interface SpeechRecognitionResultList {
-    readonly length: number;
-    [index: number]: SpeechRecognitionResult;
-}
-interface SpeechRecognitionEvent extends Event {
-    readonly results: SpeechRecognitionResultList;
-    readonly resultIndex: number;
-}
-interface SpeechRecognitionErrorEvent extends Event {
-    readonly error: string;
-}
-interface SpeechRecognitionInstance extends EventTarget {
-    lang: string;
-    continuous: boolean;
-    interimResults: boolean;
-    maxAlternatives: number;
-    onresult: ((event: SpeechRecognitionEvent) => void) | null;
-    onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-    onend: (() => void) | null;
-    start(): void;
-    stop(): void;
-    abort(): void;
-}
-interface SpeechRecognitionConstructor {
-    new(): SpeechRecognitionInstance;
-}
-declare global {
-    interface Window {
-        SpeechRecognition?: SpeechRecognitionConstructor;
-        webkitSpeechRecognition?: SpeechRecognitionConstructor;
-    }
-}
+
 
 interface Message {
     role: 'user' | 'assistant';
@@ -90,16 +54,24 @@ export default function ChatPage() {
     const [sttSupported, setSttSupported] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
+    const [isTranscribing, setIsTranscribing] = useState(false);
     const [transcript, setTranscript] = useState('');
-    const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-    const shouldAutoSendRef = useRef(true);
+    const recorderRef = useRef<{ stop: () => Promise<Blob>; cancel: () => void } | null>(null);
+    const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+
+    // --- Pronunciation practice state ---
+    const [practiceIdx, setPracticeIdx] = useState<number | null>(null);
+    const [isPracticing, setIsPracticing] = useState(false);
+    const [practiceResult, setPracticeResult] = useState<PronunciationResult | null>(null);
+    const practiceRecorderRef = useRef<{ stop: () => Promise<Blob>; cancel: () => void } | null>(null);
 
     const tutor = TUTOR[mode];
 
     // Check STT support on mount (client only)
+    // Check recording support on mount (client only)
     useEffect(() => {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        setSttSupported(!!SR);
+        setSttSupported(isRecordingSupported());
     }, []);
 
     // Scroll to bottom
@@ -125,46 +97,62 @@ export default function ChatPage() {
             });
     }, [isAuthenticated, logout]);
 
-    // Cleanup STT/TTS on unmount or mode change
-    useEffect(() => {
-        return () => {
-            recognitionRef.current?.abort();
-            window.speechSynthesis?.cancel();
-        };
-    }, [mode]);
-
-    // --- TTS (SpeechSynthesis for conversation auto-read) ---
-    const speakChinese = useCallback((text: string) => {
-        const chineseMatch = text.match(/[\u4e00-\u9fff\u3400-\u4dbf]+/g);
-        if (chineseMatch) {
-            playAudio(chineseMatch.join(''));
+    // Helper: stop TTS audio and revoke URL to prevent leak
+    const stopTtsAudio = useCallback(() => {
+        if (ttsAudioRef.current) {
+            const audio = ttsAudioRef.current;
+            audio.pause();
+            if (audio.src) URL.revokeObjectURL(audio.src);
+            ttsAudioRef.current = null;
         }
+        setIsSpeaking(false);
     }, []);
 
-    const speakReply = useCallback((text: string) => {
+    // Cleanup on unmount or mode change
+    useEffect(() => {
+        return () => {
+            recorderRef.current?.cancel();
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+            stopTtsAudio();
+        };
+    }, [mode, stopTtsAudio]);
+
+    // --- TTS via BE Azure Speech ---
+    const speakReply = useCallback(async (text: string) => {
         // Extract Chinese text for TTS
         const chineseMatch = text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uff0c\u3002\uff1f\uff01]+/g);
         if (!chineseMatch) return;
         const chineseText = chineseMatch.join('');
 
-        const synth = window.speechSynthesis;
-        if (!synth) return;
-        synth.cancel();
-
-        const utterance = new SpeechSynthesisUtterance(chineseText);
-        utterance.lang = 'zh-CN';
-        utterance.rate = 0.85;
-
-        // Try to find a Chinese voice
-        const voices = synth.getVoices();
-        const zhVoice = voices.find(v => v.lang.startsWith('zh'));
-        if (zhVoice) utterance.voice = zhVoice;
-
-        utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => setIsSpeaking(false);
-        utterance.onerror = () => setIsSpeaking(false);
-
-        synth.speak(utterance);
+        try {
+            setIsSpeaking(true);
+            const audioBlob = await synthesizeSpeech(chineseText);
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            ttsAudioRef.current = audio;
+            audio.onended = () => {
+                setIsSpeaking(false);
+                URL.revokeObjectURL(audioUrl);
+                ttsAudioRef.current = null;
+            };
+            audio.onerror = () => {
+                setIsSpeaking(false);
+                URL.revokeObjectURL(audioUrl);
+                ttsAudioRef.current = null;
+            };
+            await audio.play();
+        } catch {
+            setIsSpeaking(false);
+            // Fallback: browser TTS
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(chineseText);
+                utterance.lang = 'zh-CN';
+                utterance.rate = 0.85;
+                utterance.onend = () => setIsSpeaking(false);
+                utterance.onerror = () => setIsSpeaking(false);
+                speechSynthesis.speak(utterance);
+            }
+        }
     }, []);
 
     // --- Auto-resize textarea ---
@@ -225,94 +213,165 @@ export default function ChatPage() {
         }
     }, [sendMessage]);
 
-    // --- STT (SpeechRecognition) ---
-    const startListening = useCallback(() => {
+    // --- Recording (MediaRecorder → BE transcribe) ---
+    const processRecording = useCallback(async (audioBlob: Blob) => {
+        if (audioBlob.size === 0) return;
+        setIsTranscribing(true);
+        setTranscript('Đang nhận diện...');
+        try {
+            const result = await transcribeAudio(audioBlob);
+            if (result.text.trim()) {
+                setTranscript(result.text);
+                // 2s delay then auto-send
+                silenceTimerRef.current = setTimeout(() => {
+                    sendMessage(result.text.trim());
+                    setTranscript('');
+                    silenceTimerRef.current = null;
+                }, 2000);
+            } else {
+                setTranscript('');
+            }
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Lỗi nhận diện giọng nói';
+            if (msg === 'Unauthorized') {
+                logout();
+            } else {
+                setError(msg);
+            }
+            setTranscript('');
+        } finally {
+            setIsTranscribing(false);
+        }
+    }, [sendMessage, logout]);
+
+    const startListening = useCallback(async () => {
         if (!sttSupported || isLoading || remaining === 0) return;
 
-        window.speechSynthesis?.cancel();
-        setIsSpeaking(false);
+        // Stop any ongoing TTS (revoke URL)
+        stopTtsAudio();
         setTranscript('');
         setError(null);
-        shouldAutoSendRef.current = true;
 
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SR!();
-        recognition.lang = 'zh-CN';
-        recognition.interimResults = true;
-        recognition.continuous = false;
-        recognition.maxAlternatives = 1;
+        // Cancel pending auto-send
+        if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+        }
 
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-            let final = '';
-            let interim = '';
-            for (let i = 0; i < event.results.length; i++) {
-                const result = event.results[i];
-                if (result.isFinal) {
-                    final += result[0].transcript;
-                } else {
-                    interim += result[0].transcript;
-                }
-            }
-            setTranscript(final || interim);
-        };
+        // Check mic permission
+        const hasPermission = await requestMicPermission();
+        if (!hasPermission) {
+            setError('Trình duyệt chưa cấp quyền microphone. Vui lòng cho phép trong cài đặt.');
+            return;
+        }
 
-        recognition.onend = () => {
+        try {
+            const recorder = await startRecording();
+            recorderRef.current = recorder;
+            setIsListening(true);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Lỗi microphone';
+            setError(msg);
+        }
+    }, [sttSupported, isLoading, remaining]);
+
+    const stopListening = useCallback(async () => {
+        if (recorderRef.current) {
             setIsListening(false);
-            recognitionRef.current = null;
-            // Auto-send final transcript
-            if (shouldAutoSendRef.current) {
-                setTranscript(prev => {
-                    if (prev.trim()) {
-                        sendMessage(prev.trim());
-                    }
-                    return '';
-                });
+            try {
+                const audioBlob = await recorderRef.current.stop();
+                recorderRef.current = null;
+                processRecording(audioBlob);
+            } catch (err) {
+                recorderRef.current = null;
+                const msg = err instanceof Error ? err.message : 'Lỗi xử lý audio';
+                setError(msg);
             }
-        };
+        }
+    }, [processRecording]);
 
-        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    const cancelListening = useCallback(() => {
+        if (recorderRef.current) {
+            recorderRef.current.cancel();
+            recorderRef.current = null;
             setIsListening(false);
-            recognitionRef.current = null;
-            if (event.error === 'not-allowed') {
-                setError('Trình duyệt chưa cấp quyền microphone. Vui lòng cho phép trong cài đặt.');
-            } else if (event.error === 'no-speech') {
-                // Silence — do nothing
-            } else if (event.error !== 'aborted') {
-                setError(`Lỗi nhận diện giọng nói: ${event.error}`);
-            }
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
-        setIsListening(true);
-    }, [sttSupported, isLoading, remaining, sendMessage]);
-
-    const stopListening = useCallback(() => {
-        if (recognitionRef.current) {
-            shouldAutoSendRef.current = true;
-            recognitionRef.current.stop();
+            setTranscript('');
+        }
+        // Also cancel pending auto-send
+        if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+            setTranscript('');
         }
     }, []);
 
-    const cancelListening = useCallback(() => {
-        if (recognitionRef.current) {
-            shouldAutoSendRef.current = false;
-            recognitionRef.current.abort();
-            setTranscript('');
-            setIsListening(false);
-            recognitionRef.current = null;
+    // --- Pronunciation practice ---
+    const startPractice = useCallback(async (msgIdx: number, chineseText: string) => {
+        // If already practicing same message, stop and assess
+        if (isPracticing && practiceIdx === msgIdx && practiceRecorderRef.current) {
+            try {
+                const audioBlob = await practiceRecorderRef.current.stop();
+                practiceRecorderRef.current = null;
+                setIsPracticing(false);
+                if (audioBlob.size === 0) return;
+
+                setPracticeResult(null);
+                const result = await assessPronunciation(audioBlob, chineseText);
+                setPracticeResult(result);
+            } catch (err) {
+                practiceRecorderRef.current = null;
+                setIsPracticing(false);
+                const msg = err instanceof Error ? err.message : 'Lỗi chấm phát âm';
+                setError(msg);
+            }
+            return;
         }
+
+        // Cancel any existing practice
+        practiceRecorderRef.current?.cancel();
+        setPracticeResult(null);
+        stopTtsAudio();
+
+        // Check mic permission
+        const hasPermission = await requestMicPermission();
+        if (!hasPermission) {
+            setError('Trình duyệt chưa cấp quyền microphone.');
+            return;
+        }
+
+        try {
+            const recorder = await startRecording();
+            practiceRecorderRef.current = recorder;
+            setPracticeIdx(msgIdx);
+            setIsPracticing(true);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Lỗi microphone';
+            setError(msg);
+        }
+    }, [isPracticing, practiceIdx, stopTtsAudio]);
+
+    const cancelPractice = useCallback(() => {
+        practiceRecorderRef.current?.cancel();
+        practiceRecorderRef.current = null;
+        setIsPracticing(false);
+        setPracticeIdx(null);
+        setPracticeResult(null);
     }, []);
 
     // --- Mode switch ---
     const switchMode = useCallback((newMode: 'chat' | 'conversation') => {
         if (newMode === mode) return;
         if (newMode === 'conversation' && !sttSupported) return;
-        // Stop any ongoing STT/TTS
-        recognitionRef.current?.abort();
-        window.speechSynthesis?.cancel();
+        // Stop any ongoing recording/TTS
+        recorderRef.current?.cancel();
+        stopTtsAudio();
+        if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+        }
         setIsListening(false);
         setIsSpeaking(false);
+        setIsTranscribing(false);
         setTranscript('');
         setMode(newMode);
     }, [mode, sttSupported]);
@@ -486,16 +545,133 @@ export default function ChatPage() {
                             }`}>
                                 {msg.content}
 
-                                {/* TTS button for assistant messages */}
+                                {/* TTS + Pronunciation buttons for assistant messages with Chinese */}
                                 {msg.role === 'assistant' && /[\u4e00-\u9fff]/.test(msg.content) && (
-                                    <button
-                                        onClick={() => mode === 'conversation' ? speakReply(msg.content) : speakChinese(msg.content)}
-                                        className="mt-2 flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
-                                        title="Nghe phát âm"
-                                    >
-                                        <Icon name="volume_up" size="xs" />
-                                        Nghe
-                                    </button>
+                                    <div className="mt-2 flex items-center gap-3">
+                                        <button
+                                            onClick={() => {
+                                                const zh = msg.content.match(/[\u4e00-\u9fff\u3400-\u4dbf\uff0c\u3002\uff1f\uff01]+/g);
+                                                if (!zh) return;
+                                                if (mode === 'conversation') {
+                                                    speakReply(msg.content);
+                                                } else {
+                                                    playAudio(zh.join(''));
+                                                }
+                                            }}
+                                            className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
+                                            title="Nghe phát âm"
+                                        >
+                                            <Icon name="volume_up" size="xs" />
+                                            Nghe
+                                        </button>
+
+                                        {/* Pronunciation practice — conversation mode only */}
+                                        {mode === 'conversation' && (() => {
+                                            const zh = msg.content.match(/[\u4e00-\u9fff\u3400-\u4dbf]+/g);
+                                            if (!zh) return null;
+                                            const chineseText = zh.join('');
+                                            const isThisPracticing = isPracticing && practiceIdx === idx;
+                                            return (
+                                                <>
+                                                    <button
+                                                        onClick={() => startPractice(idx, chineseText)}
+                                                        disabled={isLoading}
+                                                        className={`flex items-center gap-1 text-[10px] transition-colors ${
+                                                            isThisPracticing
+                                                                ? 'text-red-500 animate-pulse'
+                                                                : 'text-[var(--text-muted)] hover:text-emerald-600'
+                                                        }`}
+                                                        title={isThisPracticing ? 'Nhấn để chấm điểm' : 'Luyện phát âm câu này'}
+                                                    >
+                                                        <Icon name={isThisPracticing ? 'stop_circle' : 'mic'} size="xs" />
+                                                        {isThisPracticing ? 'Chấm điểm' : 'Luyện phát âm'}
+                                                    </button>
+                                                    {isThisPracticing && (
+                                                        <button
+                                                            onClick={cancelPractice}
+                                                            className="text-[10px] text-[var(--text-muted)] hover:text-[var(--error)] transition-colors"
+                                                        >
+                                                            Hủy
+                                                        </button>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+
+                                {/* Pronunciation score card */}
+                                {practiceIdx === idx && practiceResult && (
+                                    <div className="mt-3 p-3 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs">
+                                        {/* Overall score */}
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="font-semibold text-[var(--text-main)]">
+                                                Điểm phát âm
+                                            </span>
+                                            <span className={`text-lg font-bold ${
+                                                practiceResult.pronunciationScore >= 85 ? 'text-emerald-600'
+                                                    : practiceResult.pronunciationScore >= 70 ? 'text-amber-500'
+                                                    : 'text-red-500'
+                                            }`}>
+                                                {Math.round(practiceResult.pronunciationScore)}/100
+                                            </span>
+                                        </div>
+
+                                        {/* Sub-scores */}
+                                        <div className="grid grid-cols-3 gap-2 mb-3">
+                                            {[['Chính xác', practiceResult.accuracyScore], ['Lưu loát', practiceResult.fluencyScore], ['Hoàn chỉnh', practiceResult.completenessScore]].map(([label, score]) => (
+                                                <div key={label as string} className="text-center">
+                                                    <div className="text-[var(--text-muted)]">{label as string}</div>
+                                                    <div className="font-semibold text-[var(--text-main)]">{Math.round(score as number)}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Word-level feedback */}
+                                        {practiceResult.words.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                                {practiceResult.words.map((w, wi) => (
+                                                    <span
+                                                        key={wi}
+                                                        className={`px-2 py-0.5 rounded-md font-medium ${
+                                                            w.errorType === 'None' && (w.accuracyScore ?? 0) >= 80
+                                                                ? 'bg-emerald-100 text-emerald-700'
+                                                                : w.errorType === 'None' && (w.accuracyScore ?? 0) >= 60
+                                                                ? 'bg-amber-100 text-amber-700'
+                                                                : 'bg-red-100 text-red-700'
+                                                        }`}
+                                                        title={`${w.word}: ${w.accuracyScore ?? '?'}/100 (${w.errorType})`}
+                                                    >
+                                                        {w.word}
+                                                        {w.accuracyScore != null && (
+                                                            <span className="ml-1 opacity-60">{Math.round(w.accuracyScore)}</span>
+                                                        )}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Feedback */}
+                                        <p className={`text-center font-medium ${
+                                            practiceResult.pronunciationScore >= 85 ? 'text-emerald-600'
+                                                : practiceResult.pronunciationScore >= 70 ? 'text-amber-500'
+                                                : 'text-red-500'
+                                        }`}>
+                                            {practiceResult.feedback}
+                                        </p>
+
+                                        {/* Retry button */}
+                                        <button
+                                            onClick={() => {
+                                                setPracticeResult(null);
+                                                const zh = msg.content.match(/[\u4e00-\u9fff\u3400-\u4dbf]+/g);
+                                                if (zh) startPractice(idx, zh.join(''));
+                                            }}
+                                            className="mt-2 w-full py-1.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors text-center"
+                                        >
+                                            🎤 Thử lại
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -560,10 +736,10 @@ export default function ChatPage() {
                 {/* Input Area — Conversation Mode */}
                 {mode === 'conversation' && (
                     <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
-                        {/* Live transcript */}
-                        {transcript && (
-                            <div className="w-full px-4 py-2 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border)] text-sm text-[var(--text-main)] text-center min-h-[36px]">
-                                {transcript}
+                        {/* Live transcript / transcribing indicator */}
+                        {(transcript || isTranscribing) && (
+                            <div className={`w-full px-4 py-2 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border)] text-sm text-center min-h-[36px] ${isTranscribing ? 'text-[var(--text-muted)] animate-pulse' : 'text-[var(--text-main)]'}`}>
+                                {transcript || 'Đang nhận diện...'}
                             </div>
                         )}
 
