@@ -5,8 +5,9 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
-import { sendChatMessage, fetchChatUsage, playAudio, transcribeAudio, synthesizeSpeech, assessPronunciation, type PronunciationResult } from '@/lib/api';
+import { sendChatMessage, fetchChatUsage, playAudio, transcribeAudio, synthesizeSpeech } from '@/lib/api';
 import { isRecordingSupported, requestMicPermission, startRecording } from '@/lib/audioRecorder';
+import PracticePanel from '@/components/PracticePanel';
 import Link from 'next/link';
 
 
@@ -35,6 +36,7 @@ const CONVERSATION_CHIPS = [
 const TUTOR = {
     chat: { name: '小明', pinyin: 'Xiǎo Míng', avatar: '明', color: 'bg-emerald-500/10 text-emerald-600' },
     conversation: { name: '小红', pinyin: 'Xiǎo Hóng', avatar: '红', color: 'bg-rose-500/10 text-rose-600' },
+    practice: { name: '老师', pinyin: 'Lǎo shī', avatar: '师', color: 'bg-blue-500/10 text-blue-600' },
 } as const;
 
 export default function ChatPage() {
@@ -45,7 +47,7 @@ export default function ChatPage() {
     const [remaining, setRemaining] = useState<number | null>(null);
     const [usageLimit, setUsageLimit] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [mode, setMode] = useState<'chat' | 'conversation'>('chat');
+    const [mode, setMode] = useState<'chat' | 'conversation' | 'practice'>('chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const sendingRef = useRef(false);
@@ -60,16 +62,9 @@ export default function ChatPage() {
     const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
 
-    // --- Pronunciation practice state ---
-    const [practiceIdx, setPracticeIdx] = useState<number | null>(null);
-    const [isPracticing, setIsPracticing] = useState(false);
-    const [practiceResult, setPracticeResult] = useState<PronunciationResult | null>(null);
-    const practiceRecorderRef = useRef<{ stop: () => Promise<Blob>; cancel: () => void } | null>(null);
-
     const tutor = TUTOR[mode];
 
     // Check STT support on mount (client only)
-    // Check recording support on mount (client only)
     useEffect(() => {
         setSttSupported(isRecordingSupported());
     }, []);
@@ -119,8 +114,7 @@ export default function ChatPage() {
 
     // --- TTS via BE Azure Speech ---
     const speakReply = useCallback(async (text: string) => {
-        // Extract Chinese text for TTS
-        const chineseMatch = text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uff0c\u3002\uff1f\uff01]+/g);
+        const chineseMatch = text.match(/[一-鿿㐀-䶿，。？！]+/g);
         if (!chineseMatch) return;
         const chineseText = chineseMatch.join('');
 
@@ -167,6 +161,10 @@ export default function ChatPage() {
     const sendMessage = useCallback(async (text?: string) => {
         const messageText = (text || input).trim();
         if (!messageText || sendingRef.current) return;
+
+        // Practice mode doesn't use sendChatMessage
+        if (mode === 'practice') return;
+
         sendingRef.current = true;
 
         setError(null);
@@ -247,18 +245,15 @@ export default function ChatPage() {
     const startListening = useCallback(async () => {
         if (!sttSupported || isLoading || remaining === 0) return;
 
-        // Stop any ongoing TTS (revoke URL)
         stopTtsAudio();
         setTranscript('');
         setError(null);
 
-        // Cancel pending auto-send
         if (silenceTimerRef.current) {
             clearTimeout(silenceTimerRef.current);
             silenceTimerRef.current = null;
         }
 
-        // Check mic permission
         const hasPermission = await requestMicPermission();
         if (!hasPermission) {
             setError('Trình duyệt chưa cấp quyền microphone. Vui lòng cho phép trong cài đặt.');
@@ -273,7 +268,7 @@ export default function ChatPage() {
             const msg = err instanceof Error ? err.message : 'Lỗi microphone';
             setError(msg);
         }
-    }, [sttSupported, isLoading, remaining]);
+    }, [sttSupported, isLoading, remaining, stopTtsAudio]);
 
     const stopListening = useCallback(async () => {
         if (recorderRef.current) {
@@ -297,7 +292,6 @@ export default function ChatPage() {
             setIsListening(false);
             setTranscript('');
         }
-        // Also cancel pending auto-send
         if (silenceTimerRef.current) {
             clearTimeout(silenceTimerRef.current);
             silenceTimerRef.current = null;
@@ -305,64 +299,10 @@ export default function ChatPage() {
         }
     }, []);
 
-    // --- Pronunciation practice ---
-    const startPractice = useCallback(async (msgIdx: number, chineseText: string) => {
-        // If already practicing same message, stop and assess
-        if (isPracticing && practiceIdx === msgIdx && practiceRecorderRef.current) {
-            try {
-                const audioBlob = await practiceRecorderRef.current.stop();
-                practiceRecorderRef.current = null;
-                setIsPracticing(false);
-                if (audioBlob.size === 0) return;
-
-                setPracticeResult(null);
-                const result = await assessPronunciation(audioBlob, chineseText);
-                setPracticeResult(result);
-            } catch (err) {
-                practiceRecorderRef.current = null;
-                setIsPracticing(false);
-                const msg = err instanceof Error ? err.message : 'Lỗi chấm phát âm';
-                setError(msg);
-            }
-            return;
-        }
-
-        // Cancel any existing practice
-        practiceRecorderRef.current?.cancel();
-        setPracticeResult(null);
-        stopTtsAudio();
-
-        // Check mic permission
-        const hasPermission = await requestMicPermission();
-        if (!hasPermission) {
-            setError('Trình duyệt chưa cấp quyền microphone.');
-            return;
-        }
-
-        try {
-            const recorder = await startRecording();
-            practiceRecorderRef.current = recorder;
-            setPracticeIdx(msgIdx);
-            setIsPracticing(true);
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Lỗi microphone';
-            setError(msg);
-        }
-    }, [isPracticing, practiceIdx, stopTtsAudio]);
-
-    const cancelPractice = useCallback(() => {
-        practiceRecorderRef.current?.cancel();
-        practiceRecorderRef.current = null;
-        setIsPracticing(false);
-        setPracticeIdx(null);
-        setPracticeResult(null);
-    }, []);
-
     // --- Mode switch ---
-    const switchMode = useCallback((newMode: 'chat' | 'conversation') => {
+    const switchMode = useCallback((newMode: 'chat' | 'conversation' | 'practice') => {
         if (newMode === mode) return;
         if (newMode === 'conversation' && !sttSupported) return;
-        // Stop any ongoing recording/TTS
         recorderRef.current?.cancel();
         stopTtsAudio();
         if (silenceTimerRef.current) {
@@ -374,7 +314,7 @@ export default function ChatPage() {
         setIsTranscribing(false);
         setTranscript('');
         setMode(newMode);
-    }, [mode, sttSupported]);
+    }, [mode, sttSupported, stopTtsAudio]);
 
     // --- Guest view ---
     if (!isAuthenticated) {
@@ -423,7 +363,12 @@ export default function ChatPage() {
                                 Học cùng AI
                             </h1>
                             <p className="text-xs text-[var(--text-secondary)]">
-                                {mode === 'chat' ? 'Gia sư' : 'Bạn trò chuyện'} {tutor.name} ({tutor.pinyin}) &middot; HSK {user?.targetHsk || 1}
+                                {mode === 'chat'
+                                    ? `Gia sư ${tutor.name} (${tutor.pinyin})`
+                                    : mode === 'conversation'
+                                        ? `Bạn trò chuyện ${tutor.name} (${tutor.pinyin})`
+                                        : `Giáo viên ${tutor.name} (${tutor.pinyin})`
+                                } &middot; HSK {user?.targetHsk || 1}
                             </p>
                         </div>
                     </div>
@@ -456,11 +401,22 @@ export default function ChatPage() {
                             <Icon name="mic" size="xs" className="mr-1 align-middle" />
                             Hội thoại
                         </button>
+                        <button
+                            onClick={() => switchMode('practice')}
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                mode === 'practice'
+                                    ? 'bg-[var(--primary)] text-white'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--surface)]'
+                            }`}
+                        >
+                            <Icon name="record_voice_over" size="xs" className="mr-1 align-middle" />
+                            Luyện phát âm
+                        </button>
                     </div>
                 </div>
 
-                {/* Usage Counter */}
-                {remaining !== null && usageLimit !== null && (
+                {/* Usage Counter — only for chat/conversation; practice has its own quota display */}
+                {mode !== 'practice' && remaining !== null && usageLimit !== null && (
                     <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs">
                         <Icon name="bolt" size="xs" className="text-amber-500" />
                         <span className="text-[var(--text-secondary)]">
@@ -475,336 +431,227 @@ export default function ChatPage() {
                     </div>
                 )}
 
-                {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-4 mb-4 min-h-[300px] max-h-[calc(100vh-320px)]">
-                    {/* Empty State */}
-                    {messages.length === 0 && !isLoading && (
-                        <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                            <div className={`w-16 h-16 mb-4 rounded-full ${tutor.color} flex items-center justify-center`}>
-                                {mode === 'chat'
-                                    ? <Icon name="waving_hand" size="lg" className="text-[var(--primary)]" />
-                                    : <Icon name="record_voice_over" size="lg" className="text-rose-500" />
-                                }
-                            </div>
-                            <h2 className="text-lg font-bold text-[var(--text-main)] mb-2">
-                                {mode === 'chat'
-                                    ? `Xin chào! Mình là ${tutor.name}`
-                                    : `Xin chào! Mình là ${tutor.name}`
-                                }
-                            </h2>
-                            <p className="text-sm text-[var(--text-secondary)] mb-6 max-w-sm">
-                                {mode === 'chat'
-                                    ? 'Hỏi mình bất cứ điều gì về tiếng Trung nhé! Ngữ pháp, từ vựng, cách phát âm...'
-                                    : 'Nhấn mic và nói tiếng Trung để luyện hội thoại. Mình sẽ trả lời và sửa lỗi cho bạn!'
-                                }
-                            </p>
-
-                            {/* Suggestion Chips */}
-                            <div className="flex flex-wrap justify-center gap-2 max-w-lg">
-                                {chips.map((chip) => (
-                                    <button
-                                        key={chip}
-                                        onClick={() => sendMessage(chip)}
-                                        className="px-3 py-2 text-xs font-medium rounded-xl bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary)]/5 transition-all"
-                                    >
-                                        {chip}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <p className="mt-6 text-[10px] text-[var(--text-muted)] flex items-center gap-1">
-                                <Icon name="info" size="xs" />
-                                Lịch sử chat sẽ mất khi tải lại trang
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Message List */}
-                    {messages.map((msg, idx) => (
-                        <div
-                            key={idx}
-                            className={`flex gap-3 mb-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
-                        >
-                            {/* Avatar */}
-                            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                msg.role === 'user'
-                                    ? 'bg-[var(--primary)] text-white'
-                                    : tutor.color
-                            }`}>
-                                {msg.role === 'user'
-                                    ? (user?.displayName || '?').charAt(0).toUpperCase()
-                                    : tutor.avatar
-                                }
-                            </div>
-
-                            {/* Bubble */}
-                            <div className={`relative max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                                msg.role === 'user'
-                                    ? 'bg-[var(--primary)] text-white rounded-br-md'
-                                    : 'bg-[var(--surface-secondary)] text-[var(--text-main)] border border-[var(--border)] rounded-bl-md'
-                            }`}>
-                                {msg.content}
-
-                                {/* TTS + Pronunciation buttons for assistant messages with Chinese */}
-                                {msg.role === 'assistant' && /[\u4e00-\u9fff]/.test(msg.content) && (
-                                    <div className="mt-2 flex items-center gap-3">
-                                        <button
-                                            onClick={() => {
-                                                const zh = msg.content.match(/[\u4e00-\u9fff\u3400-\u4dbf\uff0c\u3002\uff1f\uff01]+/g);
-                                                if (!zh) return;
-                                                if (mode === 'conversation') {
-                                                    speakReply(msg.content);
-                                                } else {
-                                                    playAudio(zh.join(''));
-                                                }
-                                            }}
-                                            className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
-                                            title="Nghe phát âm"
-                                        >
-                                            <Icon name="volume_up" size="xs" />
-                                            Nghe
-                                        </button>
-
-                                        {/* Pronunciation practice — conversation mode only */}
-                                        {mode === 'conversation' && (() => {
-                                            const zh = msg.content.match(/[\u4e00-\u9fff\u3400-\u4dbf]+/g);
-                                            if (!zh) return null;
-                                            const chineseText = zh.join('');
-                                            const isThisPracticing = isPracticing && practiceIdx === idx;
-                                            return (
-                                                <>
-                                                    <button
-                                                        onClick={() => startPractice(idx, chineseText)}
-                                                        disabled={isLoading}
-                                                        className={`flex items-center gap-1 text-[10px] transition-colors ${
-                                                            isThisPracticing
-                                                                ? 'text-red-500 animate-pulse'
-                                                                : 'text-[var(--text-muted)] hover:text-emerald-600'
-                                                        }`}
-                                                        title={isThisPracticing ? 'Nhấn để chấm điểm' : 'Luyện phát âm câu này'}
-                                                    >
-                                                        <Icon name={isThisPracticing ? 'stop_circle' : 'mic'} size="xs" />
-                                                        {isThisPracticing ? 'Chấm điểm' : 'Luyện phát âm'}
-                                                    </button>
-                                                    {isThisPracticing && (
-                                                        <button
-                                                            onClick={cancelPractice}
-                                                            className="text-[10px] text-[var(--text-muted)] hover:text-[var(--error)] transition-colors"
-                                                        >
-                                                            Hủy
-                                                        </button>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
+                {/* Practice Mode — full panel, no chat shell */}
+                {mode === 'practice' ? (
+                    <div className="flex-1 rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-4 mb-4 min-h-[300px]">
+                        <PracticePanel
+                            hskLevel={user?.targetHsk || 1}
+                            onPracticeComplete={(result) => {
+                                // eslint-disable-next-line no-console
+                                console.log('Practice completed:', result);
+                            }}
+                        />
+                    </div>
+                ) : (
+                    <>
+                        {/* Messages Area — chat & conversation only */}
+                        <div className="flex-1 overflow-y-auto rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-4 mb-4 min-h-[300px] max-h-[calc(100vh-320px)]">
+                            {messages.length === 0 && !isLoading && (
+                                <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                                    <div className={`w-16 h-16 mb-4 rounded-full ${tutor.color} flex items-center justify-center`}>
+                                        {mode === 'chat'
+                                            ? <Icon name="waving_hand" size="lg" className="text-[var(--primary)]" />
+                                            : <Icon name="record_voice_over" size="lg" className="text-rose-500" />
+                                        }
                                     </div>
-                                )}
+                                    <h2 className="text-lg font-bold text-[var(--text-main)] mb-2">
+                                        Xin chào! Mình là {tutor.name}
+                                    </h2>
+                                    <p className="text-sm text-[var(--text-secondary)] mb-6 max-w-sm">
+                                        {mode === 'chat'
+                                            ? 'Hỏi mình bất cứ điều gì về tiếng Trung nhé! Ngữ pháp, từ vựng, cách phát âm...'
+                                            : 'Nhấn mic và nói tiếng Trung để luyện hội thoại. Mình sẽ trả lời và sửa lỗi cho bạn!'
+                                        }
+                                    </p>
 
-                                {/* Pronunciation score card */}
-                                {practiceIdx === idx && practiceResult && (
-                                    <div className="mt-3 p-3 rounded-xl bg-[var(--background)] border border-[var(--border)] text-xs">
-                                        {/* Overall score */}
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="font-semibold text-[var(--text-main)]">
-                                                Điểm phát âm
-                                            </span>
-                                            <span className={`text-lg font-bold ${
-                                                practiceResult.pronunciationScore >= 85 ? 'text-emerald-600'
-                                                    : practiceResult.pronunciationScore >= 70 ? 'text-amber-500'
-                                                    : 'text-red-500'
-                                            }`}>
-                                                {Math.round(practiceResult.pronunciationScore)}/100
-                                            </span>
-                                        </div>
+                                    <div className="flex flex-wrap justify-center gap-2 max-w-lg">
+                                        {chips.map((chip) => (
+                                            <button
+                                                key={chip}
+                                                onClick={() => sendMessage(chip)}
+                                                className="px-3 py-2 text-xs font-medium rounded-xl bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary)]/5 transition-all"
+                                            >
+                                                {chip}
+                                            </button>
+                                        ))}
+                                    </div>
 
-                                        {/* Sub-scores */}
-                                        <div className="grid grid-cols-3 gap-2 mb-3">
-                                            {[['Chính xác', practiceResult.accuracyScore], ['Lưu loát', practiceResult.fluencyScore], ['Hoàn chỉnh', practiceResult.completenessScore]].map(([label, score]) => (
-                                                <div key={label as string} className="text-center">
-                                                    <div className="text-[var(--text-muted)]">{label as string}</div>
-                                                    <div className="font-semibold text-[var(--text-main)]">{Math.round(score as number)}</div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                    <p className="mt-6 text-[10px] text-[var(--text-muted)] flex items-center gap-1">
+                                        <Icon name="info" size="xs" />
+                                        Lịch sử chat sẽ mất khi tải lại trang
+                                    </p>
+                                </div>
+                            )}
 
-                                        {/* Word-level feedback */}
-                                        {practiceResult.words.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5 mb-2">
-                                                {practiceResult.words.map((w, wi) => (
-                                                    <span
-                                                        key={wi}
-                                                        className={`px-2 py-0.5 rounded-md font-medium ${
-                                                            w.errorType === 'None' && (w.accuracyScore ?? 0) >= 80
-                                                                ? 'bg-emerald-100 text-emerald-700'
-                                                                : w.errorType === 'None' && (w.accuracyScore ?? 0) >= 60
-                                                                ? 'bg-amber-100 text-amber-700'
-                                                                : 'bg-red-100 text-red-700'
-                                                        }`}
-                                                        title={`${w.word}: ${w.accuracyScore ?? '?'}/100 (${w.errorType})`}
-                                                    >
-                                                        {w.word}
-                                                        {w.accuracyScore != null && (
-                                                            <span className="ml-1 opacity-60">{Math.round(w.accuracyScore)}</span>
-                                                        )}
-                                                    </span>
-                                                ))}
+                            {messages.map((msg, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`flex gap-3 mb-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+                                >
+                                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                        msg.role === 'user'
+                                            ? 'bg-[var(--primary)] text-white'
+                                            : tutor.color
+                                    }`}>
+                                        {msg.role === 'user'
+                                            ? (user?.displayName || '?').charAt(0).toUpperCase()
+                                            : tutor.avatar
+                                        }
+                                    </div>
+
+                                    <div className={`relative max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                                        msg.role === 'user'
+                                            ? 'bg-[var(--primary)] text-white rounded-br-md'
+                                            : 'bg-[var(--surface-secondary)] text-[var(--text-main)] border border-[var(--border)] rounded-bl-md'
+                                    }`}>
+                                        {msg.content}
+
+                                        {/* TTS only — pronunciation practice now lives in Practice tab */}
+                                        {msg.role === 'assistant' && /[一-鿿]/.test(msg.content) && (
+                                            <div className="mt-2 flex items-center gap-3">
+                                                <button
+                                                    onClick={() => {
+                                                        const zh = msg.content.match(/[一-鿿㐀-䶿，。？！]+/g);
+                                                        if (!zh) return;
+                                                        if (mode === 'conversation') {
+                                                            speakReply(msg.content);
+                                                        } else {
+                                                            playAudio(zh.join(''));
+                                                        }
+                                                    }}
+                                                    className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
+                                                    title="Nghe phát âm"
+                                                >
+                                                    <Icon name="volume_up" size="xs" />
+                                                    Nghe
+                                                </button>
                                             </div>
                                         )}
-
-                                        {/* Feedback */}
-                                        <p className={`text-center font-medium ${
-                                            practiceResult.pronunciationScore >= 85 ? 'text-emerald-600'
-                                                : practiceResult.pronunciationScore >= 70 ? 'text-amber-500'
-                                                : 'text-red-500'
-                                        }`}>
-                                            {practiceResult.feedback}
-                                        </p>
-
-                                        {/* Retry button */}
-                                        <button
-                                            onClick={() => {
-                                                setPracticeResult(null);
-                                                const zh = msg.content.match(/[\u4e00-\u9fff\u3400-\u4dbf]+/g);
-                                                if (zh) startPractice(idx, zh.join(''));
-                                            }}
-                                            className="mt-2 w-full py-1.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors text-center"
-                                        >
-                                            🎤 Thử lại
-                                        </button>
                                     </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-
-                    {/* Typing Indicator */}
-                    {isLoading && (
-                        <div className="flex gap-3 mb-4">
-                            <div className={`flex-shrink-0 w-8 h-8 rounded-full ${tutor.color} flex items-center justify-center text-sm font-bold`}>
-                                {tutor.avatar}
-                            </div>
-                            <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-[var(--surface-secondary)] border border-[var(--border)]">
-                                <div className="flex gap-1.5 items-center h-5">
-                                    <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                                    <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                                    <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }}></span>
                                 </div>
-                            </div>
+                            ))}
+
+                            {isLoading && (
+                                <div className="flex gap-3 mb-4">
+                                    <div className={`flex-shrink-0 w-8 h-8 rounded-full ${tutor.color} flex items-center justify-center text-sm font-bold`}>
+                                        {tutor.avatar}
+                                    </div>
+                                    <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-[var(--surface-secondary)] border border-[var(--border)]">
+                                        <div className="flex gap-1.5 items-center h-5">
+                                            <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                            <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                            <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {error && (
+                                <div className="flex items-center gap-2 px-4 py-3 mb-4 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/20 text-sm text-[var(--error)]">
+                                    <Icon name="error" size="sm" />
+                                    {error}
+                                </div>
+                            )}
+
+                            <div ref={messagesEndRef} />
                         </div>
-                    )}
 
-                    {/* Error */}
-                    {error && (
-                        <div className="flex items-center gap-2 px-4 py-3 mb-4 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/20 text-sm text-[var(--error)]">
-                            <Icon name="error" size="sm" />
-                            {error}
-                        </div>
-                    )}
-
-                    <div ref={messagesEndRef} />
-                </div>
-
-                {/* Input Area — Chat Mode */}
-                {mode === 'chat' && (
-                    <>
-                        <div className="flex items-end gap-2 p-3 rounded-2xl bg-[var(--surface)] border border-[var(--border)] focus-within:border-[var(--primary)]/50 transition-colors">
-                            <textarea
-                                ref={inputRef}
-                                value={input}
-                                onChange={handleInputChange}
-                                onKeyDown={handleKeyDown}
-                                placeholder={remaining === 0 ? 'Đã hết lượt chat hôm nay...' : 'Hỏi về tiếng Trung...'}
-                                disabled={isInputDisabled}
-                                rows={1}
-                                className="flex-1 resize-none bg-transparent text-sm text-[var(--text-main)] placeholder-[var(--text-muted)] outline-none max-h-[120px] py-1.5 disabled:opacity-50"
-                            />
-                            <button
-                                onClick={() => sendMessage()}
-                                disabled={!input.trim() || isInputDisabled}
-                                className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
-                                title="Gửi (Enter)"
-                            >
-                                <Icon name={isLoading ? 'hourglass_top' : 'send'} size="sm" />
-                            </button>
-                        </div>
-                        <p className="text-center mt-2 text-[10px] text-[var(--text-muted)]">
-                            Enter để gửi &middot; Shift+Enter xuống dòng
-                        </p>
-                    </>
-                )}
-
-                {/* Input Area — Conversation Mode */}
-                {mode === 'conversation' && (
-                    <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
-                        {/* Live transcript / transcribing indicator */}
-                        {(transcript || isTranscribing) && (
-                            <div className={`w-full px-4 py-2 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border)] text-sm text-center min-h-[36px] ${isTranscribing ? 'text-[var(--text-muted)] animate-pulse' : 'text-[var(--text-main)]'}`}>
-                                {transcript || 'Đang nhận diện...'}
-                            </div>
+                        {/* Input Area — Chat Mode */}
+                        {mode === 'chat' && (
+                            <>
+                                <div className="flex items-end gap-2 p-3 rounded-2xl bg-[var(--surface)] border border-[var(--border)] focus-within:border-[var(--primary)]/50 transition-colors">
+                                    <textarea
+                                        ref={inputRef}
+                                        value={input}
+                                        onChange={handleInputChange}
+                                        onKeyDown={handleKeyDown}
+                                        placeholder={remaining === 0 ? 'Đã hết lượt chat hôm nay...' : 'Hỏi về tiếng Trung...'}
+                                        disabled={isInputDisabled}
+                                        rows={1}
+                                        className="flex-1 resize-none bg-transparent text-sm text-[var(--text-main)] placeholder-[var(--text-muted)] outline-none max-h-[120px] py-1.5 disabled:opacity-50"
+                                    />
+                                    <button
+                                        onClick={() => sendMessage()}
+                                        disabled={!input.trim() || isInputDisabled}
+                                        className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                        title="Gửi (Enter)"
+                                    >
+                                        <Icon name={isLoading ? 'hourglass_top' : 'send'} size="sm" />
+                                    </button>
+                                </div>
+                                <p className="text-center mt-2 text-[10px] text-[var(--text-muted)]">
+                                    Enter để gửi &middot; Shift+Enter xuống dòng
+                                </p>
+                            </>
                         )}
 
-                        {/* Mic button + controls */}
-                        <div className="flex items-center gap-4">
-                            {/* Cancel button (only while listening) */}
-                            {isListening && (
-                                <button
-                                    onClick={cancelListening}
-                                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--error)] hover:border-[var(--error)]/30 transition-colors"
-                                    title="Hủy"
-                                >
-                                    <Icon name="close" size="sm" />
-                                </button>
-                            )}
-
-                            {/* Main mic button */}
-                            <button
-                                onClick={isListening ? stopListening : startListening}
-                                disabled={isInputDisabled}
-                                className={`relative w-16 h-16 flex items-center justify-center rounded-full transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
-                                    isListening
-                                        ? 'bg-[var(--error)] text-white shadow-lg shadow-[var(--error)]/30'
-                                        : isSpeaking
-                                            ? 'bg-emerald-500 text-white'
-                                            : 'bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] shadow-md'
-                                }`}
-                                title={isListening ? 'Nhấn để gửi' : isSpeaking ? '小红 đang nói...' : 'Nhấn để nói'}
-                            >
-                                <Icon
-                                    name={isListening ? 'stop' : isSpeaking ? 'volume_up' : isLoading ? 'hourglass_top' : 'mic'}
-                                    size="lg"
-                                />
-                                {/* Pulse ring while listening */}
-                                {isListening && (
-                                    <span className="absolute inset-0 rounded-full border-2 border-[var(--error)] animate-ping opacity-50" />
+                        {/* Input Area — Conversation Mode */}
+                        {mode === 'conversation' && (
+                            <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
+                                {(transcript || isTranscribing) && (
+                                    <div className={`w-full px-4 py-2 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border)] text-sm text-center min-h-[36px] ${isTranscribing ? 'text-[var(--text-muted)] animate-pulse' : 'text-[var(--text-main)]'}`}>
+                                        {transcript || 'Đang nhận diện...'}
+                                    </div>
                                 )}
-                            </button>
 
-                            {/* Send button (only while listening with transcript) */}
-                            {isListening && transcript && (
-                                <button
-                                    onClick={stopListening}
-                                    className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors"
-                                    title="Gửi"
-                                >
-                                    <Icon name="send" size="sm" />
-                                </button>
-                            )}
-                        </div>
+                                <div className="flex items-center gap-4">
+                                    {isListening && (
+                                        <button
+                                            onClick={cancelListening}
+                                            className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--error)] hover:border-[var(--error)]/30 transition-colors"
+                                            title="Hủy"
+                                        >
+                                            <Icon name="close" size="sm" />
+                                        </button>
+                                    )}
 
-                        {/* Status text */}
-                        <p className="text-xs text-[var(--text-muted)]">
-                            {isListening
-                                ? 'Đang nghe... nhấn để gửi'
-                                : isSpeaking
-                                    ? `${tutor.name} đang trả lời...`
-                                    : isLoading
-                                        ? 'Đang xử lý...'
-                                        : remaining === 0
-                                            ? 'Đã hết lượt hôm nay'
-                                            : 'Nhấn mic và nói tiếng Trung'
-                            }
-                        </p>
-                    </div>
+                                    <button
+                                        onClick={isListening ? stopListening : startListening}
+                                        disabled={isInputDisabled}
+                                        className={`relative w-16 h-16 flex items-center justify-center rounded-full transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                                            isListening
+                                                ? 'bg-[var(--error)] text-white shadow-lg shadow-[var(--error)]/30'
+                                                : isSpeaking
+                                                    ? 'bg-emerald-500 text-white'
+                                                    : 'bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] shadow-md'
+                                        }`}
+                                        title={isListening ? 'Nhấn để gửi' : isSpeaking ? `${tutor.name} đang nói...` : 'Nhấn để nói'}
+                                    >
+                                        <Icon
+                                            name={isListening ? 'stop' : isSpeaking ? 'volume_up' : isLoading ? 'hourglass_top' : 'mic'}
+                                            size="lg"
+                                        />
+                                        {isListening && (
+                                            <span className="absolute inset-0 rounded-full border-2 border-[var(--error)] animate-ping opacity-50" />
+                                        )}
+                                    </button>
+
+                                    {isListening && transcript && (
+                                        <button
+                                            onClick={stopListening}
+                                            className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors"
+                                            title="Gửi"
+                                        >
+                                            <Icon name="send" size="sm" />
+                                        </button>
+                                    )}
+                                </div>
+
+                                <p className="text-xs text-[var(--text-muted)]">
+                                    {isListening
+                                        ? 'Đang nghe... nhấn để gửi'
+                                        : isSpeaking
+                                            ? `${tutor.name} đang trả lời...`
+                                            : isLoading
+                                                ? 'Đang xử lý...'
+                                                : remaining === 0
+                                                    ? 'Đã hết lượt hôm nay'
+                                                    : 'Nhấn mic và nói tiếng Trung'
+                                    }
+                                </p>
+                            </div>
+                        )}
+                    </>
                 )}
             </main>
 

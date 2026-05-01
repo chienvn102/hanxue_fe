@@ -3,52 +3,30 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/components/AuthContext';
 import { HSKBadge } from '@/components/ui/Badge';
-import { playAudio, fetchLessonById, fetchCourseById, fetchLessonsByCourse, updateLessonProgress } from '@/lib/api';
-
-interface VocabContent {
-    id: number;
-    simplified: string;
-    pinyin: string;
-    meaning_vi: string;
-    timestamp?: number;
-}
-
-interface GrammarContent {
-    id: number;
-    pattern: string;
-    explanation: string;
-    examples: { zh: string; vi: string }[];
-}
+import TextbookLesson from '@/components/lesson/TextbookLesson';
+import {
+    fetchLessonById,
+    fetchCourseById,
+    fetchLessonsByCourse,
+    updateLessonProgress,
+} from '@/lib/api';
 
 interface LessonItem {
     id: number;
     title: string;
-    duration: number;
     order_index: number;
-    youtube_id?: string;
     progress_status?: 'not_started' | 'in_progress' | 'completed' | null;
 }
 
-interface RawContent {
-    id: number;
-    type: 'VOCABULARY' | 'GRAMMAR' | 'SENTENCE';
-    timestamp: number;
-    data: string | Record<string, unknown>;
-    order_index: number;
-}
-
-interface Lesson {
+interface LessonShell {
     id: number;
     title: string;
     description?: string;
-    youtube_id: string;
-    duration: number;
     course_id: number;
     order_index: number;
 }
@@ -59,76 +37,13 @@ interface Course {
     hsk_level: number;
 }
 
-type TabType = 'vocab' | 'content' | 'grammar' | 'quiz';
-
-function YouTubePlayer({ videoId }: { videoId: string }) {
-    return (
-        <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden">
-            <iframe
-                src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
-                title="Video bài giảng"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="absolute inset-0 w-full h-full"
-            />
-        </div>
-    );
-}
-
-function VocabItem({ vocab, onSave, isSaved }: { vocab: VocabContent; onSave?: () => void; isSaved?: boolean }) {
-    return (
-        <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--primary)]/30 transition-all group">
-            <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => playAudio(vocab.simplified)}
-                        className="w-10 h-10 rounded-full bg-[var(--surface-secondary)] text-[var(--text-muted)] flex items-center justify-center hover:bg-[var(--primary)] hover:text-white transition-colors"
-                    >
-                        <Icon name="volume_up" size="sm" />
-                    </button>
-                    <div>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-medium text-[var(--text-main)] hanzi">{vocab.simplified}</span>
-                            <span className="text-sm text-[var(--text-secondary)]">({vocab.pinyin})</span>
-                        </div>
-                        <p className="text-sm text-[var(--text-muted)] mt-1">{vocab.meaning_vi}</p>
-                    </div>
-                </div>
-                {onSave && (
-                    <button
-                        onClick={onSave}
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isSaved
-                            ? 'bg-[var(--primary)] text-white'
-                            : 'bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:bg-[var(--primary)]/20 hover:text-[var(--primary)]'
-                            }`}
-                        title={isSaved ? 'Đã lưu vào sổ tay' : 'Lưu vào sổ tay'}
-                    >
-                        <Icon name={isSaved ? 'check' : 'add'} size="sm" />
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-}
-
-function formatDuration(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-export default function LessonPlayerPage() {
+export default function LessonPage() {
     const params = useParams();
     const { isAuthenticated } = useAuth();
-    const [lesson, setLesson] = useState<Lesson | null>(null);
+    const [lesson, setLesson] = useState<LessonShell | null>(null);
     const [course, setCourse] = useState<Course | null>(null);
     const [courseLessons, setCourseLessons] = useState<LessonItem[]>([]);
-    const [vocabulary, setVocabulary] = useState<VocabContent[]>([]);
-    const [grammarItems, setGrammarItems] = useState<GrammarContent[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<TabType>('vocab');
-    const [lessonStatus, setLessonStatus] = useState<string | null>(null);
-    const [markingComplete, setMarkingComplete] = useState(false);
 
     const fetchCourseData = useCallback(async (courseId: number) => {
         try {
@@ -136,127 +51,46 @@ export default function LessonPlayerPage() {
                 fetchCourseById(courseId),
                 fetchLessonsByCourse(courseId),
             ]);
-
             const cd = courseData as { success: boolean; data: Course };
             if (cd.success) setCourse(cd.data);
-
             const ld = lessonsData as { success: boolean; data: LessonItem[] };
-            if (ld.success) {
-                const lessons = ld.data || [];
-                setCourseLessons(lessons);
-                // Set current lesson's progress status
-                const current = lessons.find((l: LessonItem) => l.id === Number(params.id));
-                setLessonStatus(current?.progress_status ?? null);
-            }
-        } catch (error) {
-            console.error('Failed to load course data', error);
+            if (ld.success) setCourseLessons(ld.data || []);
+        } catch (err) {
+            console.error('Failed to load course data', err);
         }
-    }, [params.id]);
+    }, []);
 
-    const fetchLessonData = useCallback(async () => {
+    const fetchLessonShell = useCallback(async () => {
         try {
             setLoading(true);
             const data = await fetchLessonById(params.id as string);
-            const response = data as { success: boolean; data: Lesson & { contents: RawContent[] } };
-
+            const response = data as { success: boolean; data: LessonShell };
             if (response.success && response.data) {
-                const lessonData = response.data;
-                setLesson(lessonData);
-
-                // Parse contents - DB returns {id, type (VOCABULARY/GRAMMAR/SENTENCE), timestamp, data (JSON), order_index}
-                const vocabContents = (lessonData.contents || [])
-                    .filter((c: RawContent) => c.type === 'VOCABULARY')
-                    .map((c: RawContent) => {
-                        const d = typeof c.data === 'string' ? JSON.parse(c.data) : (c.data || {});
-                        return {
-                            id: c.id,
-                            simplified: d.text_content || '',
-                            pinyin: d.pinyin || '',
-                            meaning_vi: d.meaning || '',
-                            timestamp: c.timestamp || 0,
-                        };
-                    });
-                const grammarContents = (lessonData.contents || [])
-                    .filter((c: RawContent) => c.type === 'GRAMMAR')
-                    .map((c: RawContent) => {
-                        const d = typeof c.data === 'string' ? JSON.parse(c.data) : (c.data || {});
-                        return {
-                            id: c.id,
-                            pattern: d.text_content || '',
-                            explanation: d.meaning || d.explanation || '',
-                            examples: d.examples || [],
-                        };
-                    });
-                setVocabulary(vocabContents);
-                setGrammarItems(grammarContents);
-
-                // Fetch course info and lesson list
-                if (lessonData.course_id) {
-                    fetchCourseData(lessonData.course_id);
+                setLesson(response.data);
+                if (response.data.course_id) {
+                    await fetchCourseData(response.data.course_id);
                 }
             }
-        } catch (error) {
-            console.error('Failed to load lesson', error);
+        } catch (err) {
+            console.error('Failed to load lesson', err);
         } finally {
             setLoading(false);
         }
     }, [params.id, fetchCourseData]);
 
-    const doUpdateProgress = useCallback(async (status: 'in_progress' | 'completed'): Promise<boolean> => {
-        if (!isAuthenticated) return false;
-        try {
-            await updateLessonProgress(params.id as string, { status });
-            return true;
-        } catch (error) {
-            console.error('Failed to update progress', error);
-            return false;
-        }
-    }, [params.id, isAuthenticated]);
-
-    const handleMarkComplete = useCallback(async () => {
-        setMarkingComplete(true);
-        try {
-            const ok = await doUpdateProgress('completed');
-            if (!ok) return;
-            setLessonStatus('completed');
-            // Refresh course lessons to update sidebar progress
-            if (lesson?.course_id) {
-                const data = await fetchLessonsByCourse(lesson.course_id);
-                const ld = data as { success: boolean; data: LessonItem[] };
-                if (ld.success) setCourseLessons(ld.data || []);
-            }
-        } catch (error) {
-            console.error('Failed to mark complete', error);
-        } finally {
-            setMarkingComplete(false);
-        }
-    }, [doUpdateProgress, lesson?.course_id]);
-
     useEffect(() => {
-        if (params.id) {
-            fetchLessonData();
-        }
-    }, [params.id, fetchLessonData]);
+        if (params.id) fetchLessonShell();
+    }, [params.id, fetchLessonShell]);
 
-    // Auto-set in_progress when user opens lesson (if not already completed)
+    // Auto-mark in_progress when authenticated user opens the lesson.
+    // Section-level mark-done lives inside <TextbookLesson/>.
     useEffect(() => {
-        if (lesson && isAuthenticated && !lessonStatus) {
-            const setInProgress = async () => {
-                const ok = await doUpdateProgress('in_progress');
-                if (ok) setLessonStatus('in_progress');
-            };
-            setInProgress();
+        if (lesson && isAuthenticated) {
+            updateLessonProgress(params.id as string, { status: 'in_progress' }).catch(err =>
+                console.error('Failed to set in_progress', err),
+            );
         }
-    }, [lesson, isAuthenticated, lessonStatus, doUpdateProgress]);
-
-    const tabs: { id: TabType; label: string; icon: string; count?: number }[] = [
-        { id: 'vocab', label: 'Từ vựng', icon: 'translate', count: vocabulary.length },
-        { id: 'content', label: 'Nội dung', icon: 'description' },
-        { id: 'grammar', label: 'Ngữ pháp', icon: 'auto_stories', count: grammarItems.length },
-        { id: 'quiz', label: 'Bài tập', icon: 'quiz' },
-    ];
-
-    const completedCount = courseLessons.filter(l => l.progress_status === 'completed').length;
+    }, [lesson, isAuthenticated, params.id]);
 
     if (loading) {
         return (
@@ -284,6 +118,8 @@ export default function LessonPlayerPage() {
         );
     }
 
+    const completedCount = courseLessons.filter(l => l.progress_status === 'completed').length;
+
     return (
         <div className="min-h-screen flex flex-col bg-[var(--background)]">
             <Header />
@@ -307,21 +143,8 @@ export default function LessonPlayerPage() {
                 </nav>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Main: Video + Tabs */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Video Player */}
-                        {lesson.youtube_id ? (
-                            <YouTubePlayer videoId={lesson.youtube_id} />
-                        ) : (
-                            <div className="w-full aspect-video bg-[var(--surface)] rounded-xl flex items-center justify-center">
-                                <div className="text-center">
-                                    <Icon name="videocam_off" size="xl" className="text-[var(--text-muted)] mb-2" />
-                                    <p className="text-[var(--text-secondary)]">Video chưa sẵn sàng</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Lesson Title */}
+                    {/* Main: Lesson title + textbook content */}
+                    <div className="lg:col-span-2 space-y-4">
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-main)]">{lesson.title}</h1>
@@ -330,123 +153,14 @@ export default function LessonPlayerPage() {
                                 )}
                             </div>
                             {course && (
-                                <HSKBadge level={course.hsk_level as 1|2|3|4|5|6} />
+                                <HSKBadge level={course.hsk_level as 1 | 2 | 3 | 4 | 5 | 6} />
                             )}
                         </div>
 
-                        {/* Tabs */}
-                        <div className="border-b border-[var(--border)]">
-                            <div className="flex gap-1 overflow-x-auto">
-                                {tabs.map(tab => (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => setActiveTab(tab.id)}
-                                        className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
-                                            ? 'border-[var(--primary)] text-[var(--primary)]'
-                                            : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
-                                            }`}
-                                    >
-                                        <Icon name={tab.icon} size="sm" />
-                                        {tab.label}
-                                        {tab.count !== undefined && tab.count > 0 && (
-                                            <span className="ml-1 px-1.5 py-0.5 text-xs bg-[var(--surface-secondary)] rounded-full">
-                                                {tab.count}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Tab Content */}
-                        <div className="min-h-[300px]">
-                            {activeTab === 'vocab' && (
-                                <div className="space-y-3">
-                                    {vocabulary.length === 0 ? (
-                                        <div className="text-center py-12 text-[var(--text-muted)]">
-                                            <Icon name="translate" size="lg" className="mb-2" />
-                                            <p>Chưa có từ vựng cho bài học này</p>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h3 className="text-sm font-semibold text-[var(--text-main)]">
-                                                    Từ vựng chính ({vocabulary.length})
-                                                </h3>
-                                            </div>
-                                            {vocabulary.map(vocab => (
-                                                <VocabItem
-                                                    key={vocab.id}
-                                                    vocab={vocab}
-                                                />
-                                            ))}
-                                        </>
-                                    )}
-                                </div>
-                            )}
-
-                            {activeTab === 'content' && (
-                                <div className="text-center py-12 text-[var(--text-muted)]">
-                                    <Icon name="description" size="lg" className="mb-2" />
-                                    <p>Nội dung bài học sẽ được cập nhật</p>
-                                </div>
-                            )}
-
-                            {activeTab === 'grammar' && (
-                                <div className="space-y-4">
-                                    {grammarItems.length === 0 ? (
-                                        <div className="text-center py-12 text-[var(--text-muted)]">
-                                            <Icon name="auto_stories" size="lg" className="mb-2" />
-                                            <p>Chưa có ngữ pháp cho bài học này</p>
-                                        </div>
-                                    ) : (
-                                        grammarItems.map(grammar => (
-                                            <div key={grammar.id} className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--primary)]/30 transition-colors">
-                                                <h3 className="font-bold text-[var(--text-main)] mb-2">{grammar.pattern}</h3>
-                                                <p className="text-sm text-[var(--text-secondary)] mb-3">{grammar.explanation}</p>
-                                                {grammar.examples && grammar.examples.length > 0 && (
-                                                    <div className="space-y-2 pt-3 border-t border-[var(--border)]">
-                                                        {grammar.examples.map((ex, i) => (
-                                                            <div key={i} className="flex items-start gap-3">
-                                                                <button
-                                                                    onClick={() => playAudio(ex.zh)}
-                                                                    className="mt-0.5 w-7 h-7 rounded-full bg-[var(--surface-secondary)] text-[var(--text-muted)] flex items-center justify-center hover:bg-[var(--primary)] hover:text-white transition-colors shrink-0"
-                                                                >
-                                                                    <Icon name="volume_up" size="xs" />
-                                                                </button>
-                                                                <div>
-                                                                    <p className="text-sm text-[var(--text-main)] hanzi">{ex.zh}</p>
-                                                                    <p className="text-xs text-[var(--text-muted)]">{ex.vi}</p>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            )}
-
-                            {activeTab === 'quiz' && (
-                                <div className="text-center py-12">
-                                    <div className="w-16 h-16 rounded-full bg-[var(--primary)]/10 flex items-center justify-center mx-auto mb-4">
-                                        <Icon name="quiz" size="lg" className="text-[var(--primary)]" />
-                                    </div>
-                                    <h3 className="text-lg font-bold text-[var(--text-main)] mb-2">Làm bài tập</h3>
-                                    <p className="text-[var(--text-secondary)] mb-4">
-                                        Hoàn thành bài tập để kiểm tra kiến thức đã học
-                                    </p>
-                                    <Button>
-                                        <Icon name="play_arrow" size="sm" />
-                                        Bắt đầu làm bài
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
+                        <TextbookLesson lessonId={params.id as string} />
                     </div>
 
-                    {/* Sidebar: Course Curriculum */}
+                    {/* Sidebar: course curriculum */}
                     <div className="space-y-4">
                         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4">
                             <div className="flex items-center justify-between mb-3">
@@ -458,7 +172,6 @@ export default function LessonPlayerPage() {
                                 </span>
                             </div>
 
-                            {/* Progress bar */}
                             <div className="h-1.5 bg-[var(--background)] rounded-full mb-4 overflow-hidden">
                                 <div
                                     className="h-full bg-[var(--primary)] rounded-full transition-all"
@@ -466,38 +179,11 @@ export default function LessonPlayerPage() {
                                 ></div>
                             </div>
 
-                            {/* Quiz CTA */}
-                            <Button fullWidth className="justify-center mb-2" onClick={() => setActiveTab('quiz')}>
-                                <Icon name="quiz" size="sm" />
-                                Làm bài tập
-                            </Button>
-
-                            {/* Mark Complete Button */}
-                            {isAuthenticated && lessonStatus !== 'completed' && (
-                                <Button
-                                    fullWidth
-                                    className="justify-center mb-4 bg-emerald-600 hover:bg-emerald-700"
-                                    onClick={handleMarkComplete}
-                                    disabled={markingComplete}
-                                >
-                                    <Icon name={markingComplete ? 'hourglass_empty' : 'check_circle'} size="sm" />
-                                    {markingComplete ? 'Đang xử lý...' : 'Hoàn thành bài học'}
-                                </Button>
-                            )}
-                            {lessonStatus === 'completed' && (
-                                <div className="flex items-center gap-2 justify-center mb-4 py-2 px-3 rounded-lg bg-emerald-500/10 text-emerald-500 text-sm font-medium">
-                                    <Icon name="check_circle" size="sm" />
-                                    Đã hoàn thành
-                                </div>
-                            )}
-
-                            {/* Lesson List */}
-                            <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                            <div className="space-y-1.5 max-h-[500px] overflow-y-auto">
                                 {courseLessons.length > 0 ? (
                                     courseLessons.map((item, idx) => {
                                         const isCurrent = item.id === Number(params.id);
                                         const isCompleted = item.progress_status === 'completed';
-
                                         return (
                                             <Link
                                                 key={item.id}
@@ -529,11 +215,6 @@ export default function LessonPlayerPage() {
                                                     }`}>
                                                         {item.title}
                                                     </p>
-                                                    {item.duration > 0 && (
-                                                        <p className="text-xs text-[var(--text-muted)]">
-                                                            {formatDuration(item.duration)}
-                                                        </p>
-                                                    )}
                                                 </div>
                                             </Link>
                                         );

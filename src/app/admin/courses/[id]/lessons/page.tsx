@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { useAdminAuth } from '@/components/AdminAuthContext';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
@@ -12,60 +12,53 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 interface Lesson {
     id: number;
     title: string;
-    youtube_id: string;
-    duration: number;
+    description: string | null;
+    hsk_level: number | null;
     order_index: number;
     is_active: number;
-    content_count: number;
-    question_count: number;
+    passage_audio_url: string | null;
 }
 
 interface Course {
     id: number;
     title: string;
+    hsk_level: number;
 }
 
 export default function AdminLessonsPage() {
     const { token } = useAdminAuth();
     const params = useParams();
-    const router = useRouter();
     const courseId = params.id;
 
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [course, setCourse] = useState<Course | null>(null);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
-    // Form data for creating a new lesson
     const [formData, setFormData] = useState({
         title: '',
-        youtube_id: '',
-        duration: 0,
-        order_index: 0
+        description: '',
+        hskLevel: 1,
+        orderIndex: 0,
     });
 
-    useEffect(() => {
-        if (courseId && token) {
-            fetchData();
-        }
-    }, [courseId, token]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            // Fetch course details
-            const courseRes = await fetch(`${API_BASE}/api/courses/${courseId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const [courseRes, lessonsRes] = await Promise.all([
+                fetch(`${API_BASE}/api/courses/${courseId}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                fetch(`${API_BASE}/api/lessons/course/${courseId}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+            ]);
             const courseData = await courseRes.json();
             if (courseData.success) {
                 setCourse(courseData.data);
+                setFormData(prev => ({ ...prev, hskLevel: courseData.data.hsk_level || 1 }));
             }
-
-            // Fetch lessons
-            const lessonsRes = await fetch(`${API_BASE}/api/lessons/course/${courseId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
             const lessonsData = await lessonsRes.json();
             if (lessonsData.success) {
                 setLessons(lessonsData.data);
@@ -75,84 +68,73 @@ export default function AdminLessonsPage() {
         } finally {
             setLoading(false);
         }
+    }, [courseId, token]);
+
+    useEffect(() => {
+        if (courseId && token) fetchData();
+    }, [courseId, token, fetchData]);
+
+    const openCreateModal = () => {
+        setFormData({
+            title: '',
+            description: '',
+            hskLevel: course?.hsk_level || 1,
+            orderIndex: lessons.length + 1,
+        });
+        setIsModalOpen(true);
     };
 
     const handleCreateLesson = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (submitting) return;
         try {
-            const res = await fetch(`${API_BASE}/api/lessons`, {
+            setSubmitting(true);
+            const res = await fetch(`${API_BASE}/api/lessons/textbook`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                    ...formData,
-                    course_id: courseId
-                })
+                    courseId: Number(courseId),
+                    title: formData.title.trim(),
+                    description: formData.description.trim() || null,
+                    hskLevel: formData.hskLevel,
+                    orderIndex: formData.orderIndex,
+                }),
             });
-
             const data = await res.json();
             if (data.success) {
                 setIsModalOpen(false);
-                setFormData({ title: '', youtube_id: '', duration: 0, order_index: lessons.length + 1 });
-                fetchData(); // Refresh list
+                await fetchData();
             } else {
-                alert(data.message || 'Failed to create lesson');
+                alert(data.message || 'Tạo bài học thất bại');
             }
         } catch (error) {
             console.error('Failed to create lesson:', error);
+            alert('Lỗi mạng khi tạo bài học');
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    // YouTube Duration Fetcher Logic
-    useEffect(() => {
-        if (!window.YT) {
-            const tag = document.createElement('script');
-            tag.src = "https://www.youtube.com/iframe_api";
-            const firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-        }
-    }, []);
-
-    const fetchVideoDuration = (videoId: string) => {
-        if (!videoId || videoId.length !== 11) return;
-
-        // Create a hidden div for the player if it doesn't exist
-        let playerDiv = document.getElementById('temp-player-div');
-        if (!playerDiv) {
-            playerDiv = document.createElement('div');
-            playerDiv.id = 'temp-player-div';
-            playerDiv.style.display = 'none';
-            document.body.appendChild(playerDiv);
-        }
-
-        // Initialize player
-        const player = new window.YT.Player('temp-player-div', {
-            videoId: videoId,
-            events: {
-                'onReady': (event: { data: number; target: YTPlayer }) => {
-                    const duration = event.target.getDuration();
-                    if (duration > 0) {
-                        setFormData(prev => ({ ...prev, duration: Math.floor(duration) }));
-                    }
-                    event.target.destroy();
-                }
-            }
-        });
-    };
-
-    // Watch for youtube_id changes to fetch duration
-    useEffect(() => {
-        if (formData.youtube_id && formData.youtube_id.length === 11) {
-            if (window.YT && window.YT.Player) {
-                fetchVideoDuration(formData.youtube_id);
+    const handleDeleteLesson = async (lesson: Lesson) => {
+        if (!confirm(`Xoá bài "${lesson.title}"?\n(Soft delete — set is_active=FALSE)`)) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/lessons/${lesson.id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (data.success) {
+                await fetchData();
             } else {
-                // Wait for API to be ready
-                window.onYouTubeIframeAPIReady = () => fetchVideoDuration(formData.youtube_id);
+                alert(data.message || 'Xoá thất bại');
             }
+        } catch (error) {
+            console.error('Failed to delete lesson:', error);
         }
-    }, [formData.youtube_id]);
+    };
 
     return (
         <div>
@@ -164,9 +146,11 @@ export default function AdminLessonsPage() {
                     <h1 className="text-2xl font-bold text-[var(--text-main)]">
                         {course ? `Bài học: ${course.title}` : 'Quản lý Bài học'}
                     </h1>
-                    <p className="text-[var(--text-muted)] mt-1">Danh sách bài học video trong khóa</p>
+                    <p className="text-[var(--text-muted)] mt-1">
+                        Bài học textbook (passage + vocab + ngữ pháp + bài viết).
+                    </p>
                 </div>
-                <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
+                <Button onClick={openCreateModal} className="flex items-center gap-2">
                     <Icon name="add" />
                     Thêm Bài học
                 </Button>
@@ -185,31 +169,42 @@ export default function AdminLessonsPage() {
                             <tr className="bg-[var(--background)] border-b border-[var(--border)] text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                                 <th className="px-6 py-4">STT</th>
                                 <th className="px-6 py-4">Tiêu đề</th>
-                                <th className="px-6 py-4">Video ID</th>
-                                <th className="px-6 py-4">Thời lượng</th>
-                                <th className="px-6 py-4 text-center">Nội dung</th>
-                                <th className="px-6 py-4 text-center">Câu hỏi</th>
+                                <th className="px-6 py-4 text-center">HSK</th>
+                                <th className="px-6 py-4 text-center">Audio</th>
+                                <th className="px-6 py-4 text-center">Trạng thái</th>
                                 <th className="px-6 py-4 text-right">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
-                            {lessons.map((lesson) => (
+                            {lessons.map(lesson => (
                                 <tr key={lesson.id} className="hover:bg-[var(--background)] transition-colors">
                                     <td className="px-6 py-4 text-[var(--text-muted)]">#{lesson.order_index}</td>
-                                    <td className="px-6 py-4 font-medium text-[var(--text-main)]">{lesson.title}</td>
-                                    <td className="px-6 py-4 font-mono text-xs text-blue-400 bg-blue-500/10 py-1 px-2 rounded w-fit">
-                                        {lesson.youtube_id}
+                                    <td className="px-6 py-4">
+                                        <div className="font-medium text-[var(--text-main)]">{lesson.title}</div>
+                                        {lesson.description && (
+                                            <div className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-1">{lesson.description}</div>
+                                        )}
                                     </td>
-                                    <td className="px-6 py-4 text-[var(--text-muted)]">{Math.floor(lesson.duration / 60)} phút</td>
                                     <td className="px-6 py-4 text-center">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-500">
-                                            {lesson.content_count || 0}
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-500">
+                                            HSK {lesson.hsk_level || '?'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/10 text-purple-500">
-                                            {lesson.question_count || 0}
-                                        </span>
+                                        {lesson.passage_audio_url ? (
+                                            <span className="inline-flex items-center gap-1 text-xs text-emerald-500">
+                                                <Icon name="check_circle" size="xs" /> Có
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-[var(--text-muted)]">—</span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        {lesson.is_active ? (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-500">Active</span>
+                                        ) : (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--surface-secondary)] text-[var(--text-muted)]">Inactive</span>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-2">
@@ -219,7 +214,11 @@ export default function AdminLessonsPage() {
                                                     Soạn thảo
                                                 </Button>
                                             </Link>
-                                            <button className="p-2 text-[var(--text-muted)] hover:text-red-500 transition-colors">
+                                            <button
+                                                onClick={() => handleDeleteLesson(lesson)}
+                                                className="p-2 text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                                                title="Xoá bài học"
+                                            >
                                                 <Icon name="delete" size="sm" />
                                             </button>
                                         </div>
@@ -231,7 +230,6 @@ export default function AdminLessonsPage() {
                 </div>
             )}
 
-            {/* Create Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-[var(--surface)] rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
@@ -243,10 +241,11 @@ export default function AdminLessonsPage() {
                         </div>
                         <form onSubmit={handleCreateLesson} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Tiêu đề bài học</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Tiêu đề</label>
                                 <input
                                     type="text"
                                     required
+                                    placeholder="Ví dụ: HSK1 — Bài 2: Gia đình"
                                     className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
                                     value={formData.title}
                                     onChange={e => setFormData({ ...formData, title: e.target.value })}
@@ -254,62 +253,51 @@ export default function AdminLessonsPage() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">YouTube Video URL / ID</label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        required
-                                        placeholder="Paste YouTube Link or ID"
-                                        className="flex-1 px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] font-mono focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
-                                        value={formData.youtube_id}
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            let id = val;
-                                            try {
-                                                if (val.includes('youtube.com/watch')) {
-                                                    const urlParams = new URLSearchParams(val.split('?')[1]);
-                                                    id = urlParams.get('v') || val;
-                                                } else if (val.includes('youtu.be/')) {
-                                                    id = val.split('youtu.be/')[1].split('?')[0];
-                                                }
-                                            } catch (err) {
-                                                console.log('Error parsing URL', err);
-                                            }
-                                            setFormData({ ...formData, youtube_id: id });
-                                        }}
-                                    />
-                                </div>
-                                <p className="text-xs text-[var(--text-muted)] mt-1">Hỗ trợ link đầy đủ (ví dụ: https://www.youtube.com/watch?v=...) hoặc ID</p>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Mô tả ngắn (optional)</label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="Mô tả nội dung chính / chủ đề bài học"
+                                    className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
+                                    value={formData.description}
+                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Thời lượng (giây)</label>
-                                    <input
-                                        type="number"
-                                        className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
-                                        value={formData.duration}
-                                        onChange={e => setFormData({ ...formData, duration: parseInt(e.target.value) })}
-                                    />
-                                    <p className="text-[10px] text-[var(--text-muted)] mt-1">Tự động lấy khi nhập đúng YouTube ID</p>
+                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">HSK Level</label>
+                                    <select
+                                        className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
+                                        value={formData.hskLevel}
+                                        onChange={e => setFormData({ ...formData, hskLevel: parseInt(e.target.value) })}
+                                    >
+                                        {[1, 2, 3, 4, 5, 6].map(lv => (
+                                            <option key={lv} value={lv}>HSK {lv}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Thứ tự</label>
                                     <input
                                         type="number"
+                                        min={0}
                                         className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
-                                        value={formData.order_index}
-                                        onChange={e => setFormData({ ...formData, order_index: parseInt(e.target.value) })}
+                                        value={formData.orderIndex}
+                                        onChange={e => setFormData({ ...formData, orderIndex: parseInt(e.target.value) || 0 })}
                                     />
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 pt-4">
+                            <p className="text-xs text-[var(--text-muted)] bg-[var(--background)] p-3 rounded-lg">
+                                Sau khi tạo, bấm <strong>Soạn thảo</strong> để thêm passage / từ vựng / ngữ pháp / bài tập viết.
+                            </p>
+
+                            <div className="flex gap-3 pt-2">
                                 <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="flex-1">
                                     Hủy
                                 </Button>
-                                <Button type="submit" className="flex-1">
-                                    Tạo Bài học
+                                <Button type="submit" disabled={submitting || !formData.title.trim()} className="flex-1">
+                                    {submitting ? 'Đang tạo...' : 'Tạo Bài học'}
                                 </Button>
                             </div>
                         </form>

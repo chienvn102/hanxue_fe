@@ -434,6 +434,7 @@ export interface HskQuestion {
     options: string[];
     optionImages?: string[];
     points: number;
+    meta?: Record<string, unknown> | null;
 }
 
 export interface HskSection {
@@ -603,7 +604,7 @@ export interface ChatUsage {
 
 export async function sendChatMessage(
     message: string,
-    mode: 'chat' | 'conversation',
+    mode: 'chat' | 'conversation' | 'practice',
     history: { role: 'user' | 'assistant'; content: string }[]
 ): Promise<ChatSendResponse> {
     const res = await authFetch(`${API_BASE_URL}/api/chat/send`, {
@@ -644,6 +645,20 @@ export interface PronunciationWord {
     word: string;
     accuracyScore: number | null;
     errorType: string;
+    phonemes?: PronunciationPhoneme[];
+}
+
+export interface PronunciationPhoneme {
+    phoneme: string;
+    accuracyScore: number;
+    errorType: string;
+}
+
+export interface WeakPhoneme {
+    word: string;
+    phoneme: string;
+    accuracyScore: number;
+    errorType: string;
 }
 
 export interface PronunciationResult {
@@ -654,7 +669,20 @@ export interface PronunciationResult {
     completenessScore: number;
     pronunciationScore: number;
     words: PronunciationWord[];
+    weakPhonemes?: WeakPhoneme[];
+    /** Chinese feedback — used by TTS (sample/feedback playback) */
     feedback: string;
+    /** Vietnamese feedback — shown to the learner */
+    feedbackVi?: string;
+}
+
+export interface PracticeText {
+    id: number;
+    text: string;
+    pinyin: string;
+    meaning: string;
+    source?: 'groq' | 'corpus';
+    example?: string;
 }
 
 /** Transcribe audio to text (STT) */
@@ -786,6 +814,148 @@ export async function updateLessonProgress(lessonId: string | number, data: { st
     return res.json();
 }
 
+// ============================================================================
+// Textbook lesson (post-migration 004) — passage + vocab + grammar + writing
+// ============================================================================
+
+export interface TextbookLessonMeta {
+    id: number;
+    course_id: number;
+    title: string;
+    description: string | null;
+    passage_zh: string | null;
+    passage_pinyin: string | null;
+    passage_vi: string | null;
+    passage_audio_url: string | null;
+    objectives_vi: string | null;
+    hsk_level: number;
+    order_index: number;
+    is_active: boolean | number;
+}
+
+export interface TextbookVocab {
+    id: number;
+    link_id: number;
+    order_index: number;
+    note_vi: string | null;
+    simplified: string;
+    traditional: string | null;
+    pinyin: string;
+    meaning_vi: string;
+    meaning_en: string | null;
+    hsk_level: number | null;
+    word_type: string | null;
+    audio_url: string | null;
+}
+
+export interface TextbookGrammar {
+    id: number;
+    pattern: string[] | string | null;
+    pattern_pinyin: string[] | string | null;
+    pattern_formula: string | null;
+    grammar_point: string;
+    explanation: string;
+    examples: { chinese: string; pinyin?: string; vietnamese: string }[];
+    hsk_level: number | null;
+    audio_url: string | null;
+    order_index: number;
+}
+
+export interface TextbookWritingExercise {
+    id: number;
+    prompt_vi: string;
+    prompt_zh: string | null;
+    expected_keywords: string[];
+    sample_answer_zh: string | null;
+    sample_answer_pinyin: string | null;
+    sample_answer_vi: string | null;
+    min_chars: number;
+    max_chars: number;
+    order_index: number;
+}
+
+export interface TextbookHskExamLink {
+    exam_id: number;
+    title: string;
+    hsk_level: number;
+    unlock_after_complete: boolean | number;
+}
+
+export interface TextbookLessonProgress {
+    status: 'in_progress' | 'completed' | 'not_started';
+    vocab_done: boolean;
+    passage_done: boolean;
+    grammar_done: boolean;
+    exercise_done: boolean;
+    completed_at: string | null;
+}
+
+export interface TextbookLessonPayload {
+    lesson: TextbookLessonMeta;
+    vocabulary: TextbookVocab[];
+    grammar: TextbookGrammar[];
+    writingExercises: TextbookWritingExercise[];
+    hskExams: TextbookHskExamLink[];
+    progress: TextbookLessonProgress | null;
+}
+
+export async function fetchTextbookLesson(lessonId: string | number): Promise<TextbookLessonPayload> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/${lessonId}/textbook`);
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to fetch textbook lesson');
+    }
+    const json = await res.json();
+    return json.data;
+}
+
+export type LessonSection = 'vocab' | 'passage' | 'grammar' | 'exercise';
+
+export interface MarkSectionDoneResult {
+    sectionDone: LessonSection;
+    allDone: boolean;
+    justCompleted: boolean;
+}
+
+export async function markLessonSectionDone(lessonId: string | number, section: LessonSection): Promise<MarkSectionDoneResult> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/${lessonId}/section-done`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section }),
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) throw new Error('Failed to mark section done');
+    const json = await res.json();
+    return json.data;
+}
+
+export interface WritingSubmissionResult {
+    submissionId: number;
+    exerciseId: number;
+    lessonId: number;
+    score: number;
+    keywordHits: string[];
+    keywordMissed: string[];
+    feedback: string;
+    charCount: number;
+}
+
+export async function submitWritingExercise(exerciseId: number, answerZh: string): Promise<WritingSubmissionResult> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/writing/${exerciseId}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answerZh }),
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to submit writing');
+    }
+    const json = await res.json();
+    return json.data;
+}
+
 export async function fetchNotebooks(): Promise<{ success: boolean; data: unknown[] }> {
     const res = await authFetch(`${API_BASE_URL}/api/notebooks`);
     if (!res.ok) {
@@ -802,4 +972,24 @@ export async function fetchNotebookItems(notebookId: number): Promise<{ success:
         throw new Error('Failed to fetch notebook items');
     }
     return res.json();
+}
+
+/**
+ * Fetch a practice text for the given HSK level.
+ * Defaults to Groq-generated diverse text. Pass `forceCorpus=true` to force
+ * the static fallback corpus (e.g. when network/Groq is unreliable).
+ */
+export async function fetchPracticeText(level: number, forceCorpus = false): Promise<PracticeText> {
+    const params = new URLSearchParams();
+    params.set('level', level.toString());
+    if (forceCorpus) params.set('corpus', '1');
+
+    const res = await authFetch(`${API_BASE_URL}/api/practice/text?${params.toString()}`);
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Lỗi lấy văn bản luyện tập');
+    }
+    const data = await res.json();
+    return data.data;
 }

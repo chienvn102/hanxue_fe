@@ -57,6 +57,7 @@ interface Question {
     explanation: string;
     difficulty: number;
     points: number;
+    meta?: Record<string, unknown> | null;
 }
 
 export default function HskExamAdminPage() {
@@ -267,6 +268,7 @@ export default function HskExamAdminPage() {
             explanation: question.explanation || '',
             difficulty: question.difficulty || 1,
             points: question.points || 1,
+            meta: question.meta || null,
         });
         const resolvedSection = examSections.find(s => s.id === question.section_id);
         if (resolvedSection) {

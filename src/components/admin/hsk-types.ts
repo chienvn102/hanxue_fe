@@ -77,6 +77,7 @@ export interface QuestionFormData {
     explanation: string;
     difficulty: number;
     points: number;
+    meta: Record<string, unknown> | null;
 }
 
 export const DEFAULT_QUESTION_FORM: QuestionFormData = {
@@ -94,6 +95,7 @@ export const DEFAULT_QUESTION_FORM: QuestionFormData = {
     explanation: '',
     difficulty: 1,
     points: 1,
+    meta: null,
 };
 
 export const SECTION_COLORS: Record<string, { bg: string; text: string; label: string }> = {
