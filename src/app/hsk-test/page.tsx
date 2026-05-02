@@ -138,10 +138,18 @@ export default function HskTestPage() {
                             const colors = HSK_COLORS[exam.hskLevel] || HSK_COLORS[1];
 
                             return (
-                                <button
+                                <div
                                     key={exam.id}
                                     onClick={() => handleExamClick(exam)}
-                                    className="text-left bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6 hover:border-[var(--primary)]/50 hover:shadow-lg transition-all duration-300 group"
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            handleExamClick(exam);
+                                        }
+                                    }}
+                                    className="cursor-pointer text-left bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6 hover:border-[var(--primary)]/50 hover:shadow-lg transition-all duration-300 group"
                                 >
                                     {/* Header row */}
                                     <div className="flex items-start justify-between mb-4">
@@ -185,6 +193,20 @@ export default function HskTestPage() {
                                         </span>
                                     </div>
 
+                                    {/* "Đáp án / Transcript" — public, không cần đã làm bài */}
+                                    <div className="mb-3">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.push(`/hsk-test/${exam.id}/answers`);
+                                            }}
+                                            className="text-xs text-[var(--primary)] hover:underline inline-flex items-center gap-1"
+                                        >
+                                            <Icon name="menu_book" size="xs" />
+                                            Đáp án &amp; Transcript
+                                        </button>
+                                    </div>
+
                                     {/* Status badge */}
                                     {status ? (
                                         <div className={`flex items-center justify-between pt-4 border-t border-[var(--border)]`}>
@@ -215,7 +237,7 @@ export default function HskTestPage() {
                                             <span className="text-sm text-[var(--text-muted)]">Chưa thi</span>
                                         </div>
                                     )}
-                                </button>
+                                </div>
                             );
                         })}
                     </div>

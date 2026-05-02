@@ -74,29 +74,55 @@ export function QuestionPreview({ form, sectionType }: QuestionPreviewProps) {
                         </div>
                     )}
 
+                    {/* Passage (paragraph) */}
+                    {form.passage && (
+                        <div className="bg-[var(--surface-secondary)] rounded-lg p-2 text-[11px] hanzi border-l-2 border-[var(--primary)] mb-2 max-h-24 overflow-auto">
+                            {form.passage}
+                        </div>
+                    )}
+
+                    {/* Statement ★ (T/F judge) */}
+                    {form.statement && (
+                        <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-2 text-xs hanzi mb-2">
+                            <span className="text-[10px] text-blue-500 mr-1">★</span>
+                            {form.statement}
+                        </div>
+                    )}
+
                     {/* Question text */}
-                    <p className="text-sm text-[var(--text-main)] mb-3 leading-relaxed">
-                        {form.question_text || (
-                            <span className="text-[var(--text-muted)] italic">Nội dung câu hỏi...</span>
-                        )}
-                    </p>
+                    {(form.question_text || (!form.passage && !form.statement)) && (
+                        <p className="text-sm text-[var(--text-main)] mb-3 leading-relaxed hanzi">
+                            {form.question_text || (
+                                <span className="text-[var(--text-muted)] italic">Nội dung câu hỏi...</span>
+                            )}
+                        </p>
+                    )}
 
                     {/* ── MCQ preview ── */}
                     {(type === 'multiple_choice' || type === 'error_identify') && (
                         <div className="space-y-1.5 flex-1">
-                            {['A', 'B', 'C', 'D'].map((opt, idx) => (
-                                <div
-                                    key={opt}
-                                    className={`p-2 rounded-lg border text-xs transition-colors ${
-                                        form.correct_answer === opt
-                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/10'
-                                            : 'border-[var(--border)]'
-                                    }`}
-                                >
-                                    <span className="font-bold mr-1.5">{opt}.</span>
-                                    {form.options[idx] || '...'}
-                                </div>
-                            ))}
+                            {form.options.map((optText, idx) => {
+                                const opt = String.fromCharCode(65 + idx);
+                                const py = (form.options_pinyin || [])[idx];
+                                return (
+                                    <div
+                                        key={opt}
+                                        className={`p-2 rounded-lg border text-xs transition-colors ${
+                                            form.correct_answer === opt
+                                                ? 'border-green-500 bg-green-50 dark:bg-green-900/10'
+                                                : 'border-[var(--border)]'
+                                        }`}
+                                    >
+                                        {py && type === 'multiple_choice' && (
+                                            <div className="text-[9px] italic text-[var(--text-muted)] ml-4">{py}</div>
+                                        )}
+                                        <div className="hanzi">
+                                            <span className="font-bold mr-1.5">{opt}.</span>
+                                            {optText || '...'}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
 
@@ -197,6 +223,75 @@ export function QuestionPreview({ form, sectionType }: QuestionPreviewProps) {
                             {form.correct_answer && (
                                 <p className="text-[10px] text-green-600 mt-2">
                                     Mẫu: {form.correct_answer}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Group-based: image_grid_match / word_bank_fill / reply_match ── */}
+                    {(type === 'image_grid_match' || type === 'word_bank_fill' || type === 'reply_match') && (
+                        <div className="flex-1 space-y-2">
+                            <div className="text-[10px] text-purple-500 italic">
+                                🔗 Group #{form.group_id ?? '—'} (xem bên trên)
+                            </div>
+                            <div className="grid grid-cols-3 gap-1.5">
+                                {['A', 'B', 'C', 'D', 'E', 'F'].map(letter => (
+                                    <div
+                                        key={letter}
+                                        className={`aspect-square rounded-lg border-2 flex items-center justify-center font-bold text-sm ${
+                                            form.correct_answer === letter
+                                                ? 'border-green-500 bg-green-50 dark:bg-green-900/10 text-green-600'
+                                                : 'border-[var(--border)] text-[var(--text-muted)]'
+                                        }`}
+                                    >
+                                        {letter}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Sentence assembly preview ── */}
+                    {type === 'sentence_assembly' && (
+                        <div className="flex-1 space-y-2">
+                            <div className="flex flex-wrap gap-1">
+                                {(((form.meta as { chunks?: { text: string }[] } | null)?.chunks) || []).map((c, i) => (
+                                    <span
+                                        key={i}
+                                        className="px-2 py-0.5 bg-[var(--surface-secondary)] rounded text-[11px] hanzi border border-[var(--border)]"
+                                    >
+                                        {c.text || '...'}
+                                    </span>
+                                ))}
+                                {!((form.meta as { chunks?: { text: string }[] } | null)?.chunks?.length) && (
+                                    <span className="text-[10px] text-[var(--text-muted)] italic">Chưa có mẩu nào</span>
+                                )}
+                            </div>
+                            <div className="border border-dashed border-[var(--border)] rounded-lg p-2 text-xs text-[var(--text-muted)] min-h-[40px] hanzi">
+                                {form.correct_answer || 'Câu hoàn chỉnh...'}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Fill hanzi preview ── */}
+                    {type === 'fill_hanzi' && (
+                        <div className="flex-1 space-y-2">
+                            <div className="text-xs hanzi p-2 bg-[var(--surface-secondary)] rounded-lg">
+                                {(() => {
+                                    const meta = (form.meta || {}) as { context_zh_with_blank?: string; pinyin_hint?: string };
+                                    const ctx = meta.context_zh_with_blank || '我喜欢吃( )果。';
+                                    const py = meta.pinyin_hint;
+                                    return (
+                                        <span>
+                                            {ctx}
+                                            {py && <span className="ml-1 italic text-[10px] text-[var(--text-muted)]">({py})</span>}
+                                        </span>
+                                    );
+                                })()}
+                            </div>
+                            {form.correct_answer && (
+                                <p className="text-[10px] text-green-600">
+                                    ✓ {form.correct_answer}
                                 </p>
                             )}
                         </div>

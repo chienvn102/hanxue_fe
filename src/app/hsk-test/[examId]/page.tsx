@@ -5,6 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
 import { startHskExam, submitHskAnswer, finishHskExam, getMediaUrl, type HskExamStartResponse, type HskQuestion, type HskSection } from '@/lib/api';
+import { HskTestProvider, useHskTest } from '@/components/hsk-test/HskTestContext';
+import { QuestionRenderer } from '@/components/hsk-test/QuestionRenderer';
+import { GroupHeader } from '@/components/hsk-test/GroupHeader';
+import { FullTestAudio } from '@/components/hsk-test/FullTestAudio';
 
 // Flatten all questions across sections into a single ordered list
 interface FlatQuestion extends HskQuestion {
@@ -250,7 +254,15 @@ export default function ExamTakingPage() {
     const totalQuestions = questions.length;
     const isWarning = timeLeft > 0 && timeLeft <= 300; // 5 minutes warning
 
+    const testMode: 'practice' | 'full' = exam.exam_type === 'practice' ? 'practice' : 'full';
+    const currentSection = exam.sections[currentQuestion.sectionIndex];
+    const showSectionAudio =
+        testMode === 'full' &&
+        currentSection?.section_type === 'listening' &&
+        Boolean(currentSection.audio_url);
+
     return (
+        <HskTestProvider testMode={testMode}>
         <div className="min-h-screen flex flex-col bg-[var(--background)]">
             {/* Sticky Header */}
             <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md">
@@ -269,6 +281,7 @@ export default function ExamTakingPage() {
                         <span className="text-xs text-[var(--text-muted)] hidden sm:block">
                             {answeredCount}/{totalQuestions} đã trả lời
                         </span>
+                        <PinyinToggle />
                     </div>
 
                     {/* Center - Timer */}
@@ -320,38 +333,77 @@ export default function ExamTakingPage() {
                         {/* Section groups */}
                         {exam.sections.map((section, sIdx) => {
                             const sectionQuestions = questions.filter(q => q.sectionIndex === sIdx);
+
+                            // Cluster contiguous questions sharing same groupId
+                            const clusters: { groupId: number | null | undefined; items: typeof sectionQuestions }[] = [];
+                            for (const q of sectionQuestions) {
+                                const last = clusters[clusters.length - 1];
+                                if (last && last.groupId && last.groupId === q.groupId) {
+                                    last.items.push(q);
+                                } else {
+                                    clusters.push({ groupId: q.groupId, items: [q] });
+                                }
+                            }
+
+                            const renderQ = (q: typeof sectionQuestions[number]) => {
+                                const isAnswered = answers[q.id] !== undefined;
+                                const isCurrent = q.globalIndex === currentIndex;
+                                const isFlagged = flagged.has(q.id);
+                                return (
+                                    <button
+                                        key={q.id}
+                                        onClick={() => { setCurrentIndex(q.globalIndex); setShowGrid(false); }}
+                                        className={`relative w-full aspect-square rounded-lg text-xs font-medium transition-all duration-150 ${
+                                            isCurrent
+                                                ? 'bg-[var(--primary)] text-white ring-2 ring-[var(--primary)] ring-offset-1 ring-offset-[var(--surface)]'
+                                                : isAnswered
+                                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                                    : 'bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:bg-[var(--border)]'
+                                        }`}
+                                    >
+                                        {q.questionNumber}
+                                        {isFlagged && (
+                                            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500" />
+                                        )}
+                                    </button>
+                                );
+                            };
+
                             return (
                                 <div key={section.id} className="mb-4">
                                     <p className="text-xs font-medium text-[var(--text-secondary)] mb-2">
                                         {SECTION_TYPE_LABELS[section.section_type] || section.section_type}
                                         {section.title ? `: ${section.title}` : ''}
                                     </p>
-                                    <div className="grid grid-cols-5 gap-1.5">
-                                        {sectionQuestions.map(q => {
-                                            const isAnswered = answers[q.id] !== undefined;
-                                            const isCurrent = q.globalIndex === currentIndex;
-                                            const isFlagged = flagged.has(q.id);
-
+                                    {clusters.map((cluster, cIdx) => {
+                                        const group = cluster.groupId
+                                            ? section.groups.find(g => g.id === cluster.groupId)
+                                            : null;
+                                        if (group) {
                                             return (
-                                                <button
-                                                    key={q.id}
-                                                    onClick={() => { setCurrentIndex(q.globalIndex); setShowGrid(false); }}
-                                                    className={`relative w-full aspect-square rounded-lg text-xs font-medium transition-all duration-150 ${
-                                                        isCurrent
-                                                            ? 'bg-[var(--primary)] text-white ring-2 ring-[var(--primary)] ring-offset-1 ring-offset-[var(--surface)]'
-                                                            : isAnswered
-                                                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                                                                : 'bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:bg-[var(--border)]'
-                                                    }`}
+                                                <div
+                                                    key={cIdx}
+                                                    className="mb-2 border-l-2 border-purple-400 pl-2 py-1 rounded-r bg-purple-500/5"
                                                 >
-                                                    {q.questionNumber}
-                                                    {isFlagged && (
-                                                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500" />
-                                                    )}
-                                                </button>
+                                                    <p
+                                                        className="text-[10px] text-purple-600 dark:text-purple-400 italic mb-1 truncate"
+                                                        title={group.title_vi || group.group_type}
+                                                    >
+                                                        🔗 {group.title_vi || group.group_type}
+                                                    </p>
+                                                    <div className="grid grid-cols-5 gap-1.5">
+                                                        {cluster.items.map(renderQ)}
+                                                    </div>
+                                                </div>
                                             );
-                                        })}
-                                    </div>
+                                        }
+                                        // Standalone questions (no group): merge into one grid block
+                                        return (
+                                            <div key={cIdx} className="grid grid-cols-5 gap-1.5 mb-2">
+                                                {cluster.items.map(renderQ)}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             );
                         })}
@@ -381,6 +433,15 @@ export default function ExamTakingPage() {
 
                 {/* Question Area */}
                 <div className="flex-1 flex flex-col">
+                    {/* Section-level merged audio cho full test mode (mock/official) */}
+                    {showSectionAudio && currentSection && (
+                        <FullTestAudio
+                            audioUrl={currentSection.audio_url!}
+                            questions={currentSection.questions}
+                            sectionTitle={currentSection.title || `Phần ${currentSection.section_order}`}
+                        />
+                    )}
+
                     {/* Submit error banner (inline, not full-page) */}
                     {submitError && (
                         <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 flex items-center gap-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30">
@@ -428,185 +489,30 @@ export default function ExamTakingPage() {
                             </button>
                         </div>
 
-                        {/* Question text */}
-                        {currentQuestion.questionText && (
-                            <div className="mb-6">
-                                <p className="text-lg text-[var(--text-main)] leading-relaxed">
-                                    {currentQuestion.questionText}
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Question image */}
-                        {currentQuestion.questionImage && (
-                            <div className="mb-6">
-                                <img
-                                    src={getMediaUrl(currentQuestion.questionImage)}
-                                    alt={`Câu ${currentQuestion.questionNumber}`}
-                                    className="max-w-full max-h-64 rounded-xl border border-[var(--border)] object-contain"
-                                />
-                            </div>
-                        )}
-
-                        {/* Section audio (listening sections only) */}
+                        {/* Group header (image grid / word bank / reply bank / passage) — chỉ render trước câu đầu của cụm cùng group */}
                         {(() => {
                             const section = exam.sections[currentQuestion.sectionIndex];
-                            if (section.section_type !== 'listening' || !section.audio_url) return null;
-                            const key = `section:${section.id}`;
-                            const maxPlays = 2;
-                            const played = audioPlays[key] || 0;
-                            const canPlay = played < maxPlays;
-                            return (
-                                <div className="mb-6 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
-                                    <div className="flex items-center gap-3">
-                                        <Icon name="headphones" size="sm" className="text-blue-500" />
-                                        <span className="text-sm font-medium text-blue-500">Audio phần thi</span>
-                                        <span className="text-xs text-[var(--text-muted)] ml-auto">
-                                            {played}/{maxPlays} lần phát
-                                        </span>
-                                    </div>
-                                    <audio
-                                        src={getMediaUrl(section.audio_url)}
-                                        controlsList="nodownload noplaybackrate"
-                                        controls
-                                        className="w-full mt-3"
-                                        onPlay={() => {
-                                            if (audioFreshPlayRef.current[key]) {
-                                                audioFreshPlayRef.current[key] = false;
-                                                setAudioPlays(prev => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
-                                            }
-                                        }}
-                                        onEnded={() => { audioFreshPlayRef.current[key] = true; }}
-                                        onLoadedData={() => { audioFreshPlayRef.current[key] = true; }}
-                                        style={!canPlay ? { pointerEvents: 'none', opacity: 0.5 } : undefined}
-                                    />
-                                    {!canPlay && (
-                                        <p className="text-xs text-red-500 mt-2">Đã hết lượt nghe cho phần này</p>
-                                    )}
-                                </div>
-                            );
+                            const groupId = currentQuestion.groupId;
+                            if (!groupId || !section.groups) return null;
+                            // Chỉ hiện group header nếu câu hiện tại là câu ĐẦU TIÊN trong section có group_id này
+                            const firstOfGroup = section.questions.find(q => q.groupId === groupId);
+                            if (!firstOfGroup || firstOfGroup.id !== currentQuestion.id) return null;
+                            const group = section.groups.find(g => g.id === groupId);
+                            if (!group) return null;
+                            return <GroupHeader group={group} />;
                         })()}
 
-                        {/* Question audio */}
-                        {currentQuestion.questionAudio && (() => {
-                            const key = `question:${currentQuestion.id}`;
-                            const maxPlays = currentQuestion.audioPlayCount || 2;
-                            const played = audioPlays[key] || 0;
-                            const canPlay = played < maxPlays;
-                            return (
-                                <div className="mb-6 p-4 rounded-xl bg-purple-500/5 border border-purple-500/20">
-                                    <div className="flex items-center gap-3">
-                                        <Icon name="volume_up" size="sm" className="text-purple-500" />
-                                        <span className="text-sm font-medium text-purple-500">Audio câu hỏi</span>
-                                        <span className="text-xs text-[var(--text-muted)] ml-auto">
-                                            {played}/{maxPlays} lần phát
-                                        </span>
-                                    </div>
-                                    <audio
-                                        src={getMediaUrl(currentQuestion.questionAudio)}
-                                        controlsList="nodownload noplaybackrate"
-                                        controls
-                                        className="w-full mt-3"
-                                        onPlay={() => {
-                                            if (audioFreshPlayRef.current[key]) {
-                                                audioFreshPlayRef.current[key] = false;
-                                                setAudioPlays(prev => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
-                                            }
-                                        }}
-                                        onEnded={() => { audioFreshPlayRef.current[key] = true; }}
-                                        onLoadedData={() => { audioFreshPlayRef.current[key] = true; }}
-                                        style={!canPlay ? { pointerEvents: 'none', opacity: 0.5 } : undefined}
-                                    />
-                                    {!canPlay && (
-                                        <p className="text-xs text-red-500 mt-2">Đã hết lượt nghe</p>
-                                    )}
-                                </div>
-                            );
-                        })()}
-
-                        {/* Answer options */}
-                        <div className="space-y-3">
-                            {currentQuestion.questionType === 'true_false' ? (
-                                /* True/False */
-                                <div className="grid grid-cols-2 gap-3">
-                                    {['Đúng', 'Sai'].map(option => {
-                                        const isSelected = answers[currentQuestion.id] === option;
-                                        return (
-                                            <button
-                                                key={option}
-                                                onClick={() => handleSelectAnswer(currentQuestion.id, option)}
-                                                className={`p-4 rounded-xl border-2 text-center font-medium transition-all duration-200 ${
-                                                    isSelected
-                                                        ? 'border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary)]'
-                                                        : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] hover:border-[var(--border-hover)]'
-                                                }`}
-                                            >
-                                                {option === 'Đúng' ? (
-                                                    <Icon name="check_circle" size="md" className="mx-auto mb-1" />
-                                                ) : (
-                                                    <Icon name="cancel" size="md" className="mx-auto mb-1" />
-                                                )}
-                                                {option}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ) : currentQuestion.questionType === 'fill_blank' || currentQuestion.questionType === 'short_answer' ? (
-                                /* Fill in blank / Short answer */
-                                <div>
-                                    <input
-                                        type="text"
-                                        value={answers[currentQuestion.id] || ''}
-                                        onChange={e => handleSelectAnswer(currentQuestion.id, e.target.value)}
-                                        placeholder={currentQuestion.questionType === 'fill_blank' ? 'Điền vào chỗ trống...' : 'Nhập câu trả lời...'}
-                                        className="w-full px-4 py-3 rounded-xl border-2 border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] placeholder-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none text-lg"
-                                        autoComplete="off"
-                                    />
-                                </div>
-                            ) : (
-                                /* Multiple choice (default) + image_match, error_identify, sentence_order */
-                                currentQuestion.options.map((option, oIdx) => {
-                                    const label = String.fromCharCode(65 + oIdx); // A, B, C, D
-                                    const isSelected = answers[currentQuestion.id] === label;
-                                    const hasImage = currentQuestion.optionImages && currentQuestion.optionImages[oIdx];
-
-                                    return (
-                                        <button
-                                            key={oIdx}
-                                            onClick={() => handleSelectAnswer(currentQuestion.id, label)}
-                                            className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                                                isSelected
-                                                    ? 'border-[var(--primary)] bg-[var(--primary-light)]'
-                                                    : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-hover)]'
-                                            }`}
-                                        >
-                                            <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                                isSelected
-                                                    ? 'bg-[var(--primary)] text-white'
-                                                    : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'
-                                            }`}>
-                                                {label}
-                                            </span>
-                                            <div className="flex-1 min-w-0">
-                                                {hasImage && (
-                                                    <img
-                                                        src={getMediaUrl(currentQuestion.optionImages![oIdx])}
-                                                        alt={`Option ${label}`}
-                                                        className="max-h-24 rounded-lg mb-2 object-contain"
-                                                    />
-                                                )}
-                                                <span className={`text-base ${isSelected ? 'text-[var(--primary)] font-medium' : 'text-[var(--text-main)]'}`}>
-                                                    {option}
-                                                </span>
-                                            </div>
-                                            {isSelected && (
-                                                <Icon name="check_circle" size="sm" className="text-[var(--primary)] flex-shrink-0" filled />
-                                            )}
-                                        </button>
-                                    );
-                                })
-                            )}
-                        </div>
+                        {/* Question content + answer (rendered by per-type component) */}
+                        <QuestionRenderer
+                            question={currentQuestion}
+                            group={(() => {
+                                const section = exam.sections[currentQuestion.sectionIndex];
+                                if (!currentQuestion.groupId || !section.groups) return undefined;
+                                return section.groups.find(g => g.id === currentQuestion.groupId);
+                            })()}
+                            value={answers[currentQuestion.id] || ''}
+                            onChange={v => handleSelectAnswer(currentQuestion.id, v)}
+                        />
                     </div>
 
                     {/* Bottom Navigation */}
@@ -695,5 +601,29 @@ export default function ExamTakingPage() {
                 </div>
             )}
         </div>
+        </HskTestProvider>
+    );
+}
+
+/**
+ * Toggle "Highlight nội dung" — bật/tắt hiện pinyin trên đầu chữ Hán.
+ * Phải nằm INSIDE HskTestProvider để dùng useHskTest().
+ */
+function PinyinToggle() {
+    const { showPinyin, setShowPinyin } = useHskTest();
+    return (
+        <button
+            onClick={() => setShowPinyin(!showPinyin)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                showPinyin
+                    ? 'bg-[var(--primary-light)] text-[var(--primary)]'
+                    : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+            }`}
+            title="Hiện/ẩn pinyin"
+            type="button"
+        >
+            <Icon name={showPinyin ? 'visibility' : 'visibility_off'} size="xs" />
+            <span className="hidden md:inline">Pinyin</span>
+        </button>
     );
 }

@@ -421,17 +421,61 @@ export interface HskExam {
     description?: string;
 }
 
+// Question type ENUM mở rộng sau migration 006
+export type HskQuestionType =
+    // Legacy:
+    | 'image_match'
+    | 'true_false'
+    | 'multiple_choice'
+    | 'fill_blank'
+    | 'sentence_order'
+    | 'error_identify'
+    | 'short_answer'
+    // Mới cho HSK 1-3:
+    | 'image_grid_match'
+    | 'word_bank_fill'
+    | 'reply_match'
+    | 'sentence_assembly'
+    | 'fill_hanzi';
+
+// Option dạng object có pinyin (Cách A — tách Hán/pinyin)
+export interface HskOption {
+    label: string;            // "A" / "B" / "C" / "D"
+    text: string;             // Hán
+    pinyin?: string;          // Pinyin tương ứng (optional)
+}
+
+// Group resource (image grid / word bank / reply bank / passage) dùng chung cho cụm câu
+export interface HskQuestionGroup {
+    id: number;
+    section_id: number;
+    group_type: 'image_grid' | 'word_bank' | 'reply_bank' | 'passage';
+    title_vi?: string;
+    instructions_vi?: string;
+    content: HskGroupContent | null;
+    order_index: number;
+}
+
+export type HskGroupContent =
+    | { items: { label: string; image_url: string; alt_vi?: string }[]; example?: { label: string; content: { zh: string; pinyin?: string } } }
+    | { items: { label: string; word: string; pinyin?: string }[]; example?: { label: string; sentence_zh: string; sentence_pinyin?: string } }
+    | { items: { label: string; sentence_zh: string; sentence_pinyin?: string }[]; example?: { label: string; prompt_zh: string; prompt_pinyin?: string } }
+    | { passage_zh: string; passage_pinyin?: string; passage_vi?: string };
+
 export interface HskQuestion {
     id: number;
+    groupId?: number | null;
     questionNumber: number;
-    questionType: 'image_match' | 'true_false' | 'multiple_choice' | 'fill_blank' | 'sentence_order' | 'error_identify' | 'short_answer';
+    questionType: HskQuestionType;
     questionText?: string;
+    passage?: string;          // Đoạn văn (paragraph judge / paragraph MCQ)
+    statement?: string;         // Câu khẳng định ★ để judge T/F
     questionImage?: string;
     questionAudio?: string;
     audioStartTime?: number;
     audioEndTime?: number;
     audioPlayCount?: number;
-    options: string[];
+    options: string[] | HskOption[];   // Legacy có thể là string[]; mới = HskOption[]
     optionImages?: string[];
     points: number;
     meta?: Record<string, unknown> | null;
@@ -446,6 +490,7 @@ export interface HskSection {
     total_questions: number;
     duration_seconds: number;
     audio_url?: string;
+    groups: HskQuestionGroup[];   // shared resources cho cụm câu trong section
     questions: HskQuestion[];
 }
 
@@ -565,6 +610,35 @@ export async function finishHskExam(attemptId: number): Promise<{ success: boole
         if (res.status === 401) throw new Error('Unauthorized');
         const error = await res.json();
         throw new Error(error.error || 'Failed to finish exam');
+    }
+    return res.json();
+}
+
+// Public answer/transcript view — không cần auth, không cần attempt completed
+export interface HskAnswerQuestion extends HskQuestion {
+    transcript?: string;
+    correctAnswer: string;
+    explanation?: string;
+}
+
+export interface HskAnswerSection extends Omit<HskSection, 'questions'> {
+    questions: HskAnswerQuestion[];
+}
+
+export interface HskExamAnswersResponse {
+    id: number;
+    title: string;
+    hsk_level: number;
+    exam_type: string;
+    duration_minutes: number;
+    sections: HskAnswerSection[];
+}
+
+export async function fetchHskExamAnswers(examId: number): Promise<HskExamAnswersResponse> {
+    const res = await fetch(`${API_BASE_URL}/api/hsk-exams/${examId}/answers`);
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: 'Failed' }));
+        throw new Error(error.error || 'Failed to fetch exam answers');
     }
     return res.json();
 }

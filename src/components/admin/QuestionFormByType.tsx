@@ -1,17 +1,53 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import type { QuestionFormData } from './hsk-types';
 import { UploadField } from './UploadField';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 interface QuestionFormByTypeProps {
     form: QuestionFormData;
     onChange: (form: QuestionFormData) => void;
     sectionType: string;
+    sectionId?: number;   // để fetch groups khi cần group_id
 }
 
-export function QuestionFormByType({ form, onChange, sectionType }: QuestionFormByTypeProps) {
+interface GroupOption {
+    id: number;
+    group_type: string;
+    title_vi: string | null;
+    order_index: number;
+}
+
+const GROUP_TYPE_REQUIRED: Record<string, 'image_grid' | 'word_bank' | 'reply_bank' | undefined> = {
+    image_grid_match: 'image_grid',
+    word_bank_fill: 'word_bank',
+    reply_match: 'reply_bank',
+};
+
+export function QuestionFormByType({ form, onChange, sectionType, sectionId }: QuestionFormByTypeProps) {
     const isListening = sectionType === 'listening';
     const type = form.question_type;
+    const requiredGroupType = GROUP_TYPE_REQUIRED[type];
+
+    const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
+
+    // Fetch groups khi cần (image_grid_match / word_bank_fill / reply_match)
+    useEffect(() => {
+        if (!requiredGroupType || !sectionId) return;
+        const token = localStorage.getItem('adminToken');
+        if (!token) return;
+        fetch(`${API_BASE}/api/hsk-exams/sections/${sectionId}/groups`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(r => r.json())
+            .then(d => {
+                const all: GroupOption[] = d.data || [];
+                setGroupOptions(all.filter(g => g.group_type === requiredGroupType));
+            })
+            .catch(() => setGroupOptions([]));
+    }, [requiredGroupType, sectionId]);
 
     const set = <K extends keyof QuestionFormData>(key: K, value: QuestionFormData[K]) => {
         onChange({ ...form, [key]: value });
@@ -23,10 +59,50 @@ export function QuestionFormByType({ form, onChange, sectionType }: QuestionForm
         onChange({ ...form, options: next });
     };
 
+    const updateOptionPinyin = (idx: number, value: string) => {
+        const next = [...(form.options_pinyin || ['', '', '', ''])];
+        next[idx] = value;
+        onChange({ ...form, options_pinyin: next });
+    };
+
     const updateOptionImage = (idx: number, value: string) => {
         const next = [...form.option_images];
         next[idx] = value;
         onChange({ ...form, option_images: next });
+    };
+
+    const addOption = () => {
+        if (form.options.length >= 4) return;
+        onChange({
+            ...form,
+            options: [...form.options, ''],
+            options_pinyin: [...(form.options_pinyin || []), ''],
+            option_images: [...form.option_images, ''],
+        });
+    };
+
+    const removeOption = (idx: number) => {
+        if (form.options.length <= 3) { alert('Tối thiểu 3 đáp án'); return; }
+        onChange({
+            ...form,
+            options: form.options.filter((_, i) => i !== idx),
+            options_pinyin: (form.options_pinyin || []).filter((_, i) => i !== idx),
+            option_images: form.option_images.filter((_, i) => i !== idx),
+        });
+    };
+
+    // Sentence_assembly chunks helpers
+    const chunks = (form.meta as { chunks?: { text: string }[] } | null)?.chunks || [];
+    const updateChunks = (next: { text: string }[]) => {
+        const meta = { ...(form.meta || {}), chunks: next };
+        onChange({ ...form, meta });
+    };
+
+    // Fill_hanzi helpers
+    const fillHanziMeta = (form.meta || {}) as { context_zh_with_blank?: string; pinyin_hint?: string };
+    const updateFillHanzi = (patch: Partial<{ context_zh_with_blank: string; pinyin_hint: string }>) => {
+        const meta = { ...(form.meta || {}), ...patch };
+        onChange({ ...form, meta });
     };
 
     return (
@@ -84,7 +160,7 @@ export function QuestionFormByType({ form, onChange, sectionType }: QuestionForm
                             />
                         </div>
                         <div>
-                            <label className="text-xs text-[var(--text-muted)]">Số lần phát</label>
+                            <label className="text-xs text-[var(--text-muted)]">Số lần phát (full test)</label>
                             <select
                                 className="w-full px-2 py-1.5 border rounded-lg text-sm"
                                 value={form.audio_play_count}
@@ -96,6 +172,78 @@ export function QuestionFormByType({ form, onChange, sectionType }: QuestionForm
                             </select>
                         </div>
                     </div>
+                    {/* Transcript — văn bản gốc, hiện trong tab "Đáp án/transcript" */}
+                    <div>
+                        <label className="text-xs text-[var(--text-muted)] block mb-1">
+                            Transcript (văn bản gốc của audio)
+                        </label>
+                        <textarea
+                            className="w-full px-2 py-1.5 border rounded-lg text-sm hanzi"
+                            rows={3}
+                            placeholder="VD: 男：你好，李丽！很久不见。&#10;女：你好，最近怎么样？"
+                            value={form.transcript}
+                            onChange={e => set('transcript', e.target.value)}
+                        />
+                        <p className="text-[10px] text-[var(--text-muted)] mt-1 italic">
+                            Sẽ hiện trong tab Đáp án/transcript. Cũng dùng để gen audio bằng edge-tts (Phase F).
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Group selector — chỉ hiện khi type cần shared resource ── */}
+            {requiredGroupType && (
+                <div className="bg-purple-50/50 dark:bg-purple-950/20 rounded-lg p-3 border border-purple-200/50 dark:border-purple-800/30">
+                    <label className="text-xs font-semibold text-purple-600 dark:text-purple-400 block mb-2">
+                        🔗 Group ({requiredGroupType}) dùng chung cho cụm câu *
+                    </label>
+                    <select
+                        className="w-full px-3 py-2 border rounded-lg text-sm"
+                        value={form.group_id ?? ''}
+                        onChange={e => set('group_id', e.target.value ? parseInt(e.target.value) : null)}
+                    >
+                        <option value="">— Chọn group —</option>
+                        {groupOptions.map(g => (
+                            <option key={g.id} value={g.id}>
+                                #{g.order_index} — {g.title_vi || `Group ${g.id}`}
+                            </option>
+                        ))}
+                    </select>
+                    {groupOptions.length === 0 && (
+                        <p className="text-xs text-amber-600 mt-1">
+                            ⚠️ Section này chưa có group nào loại <code>{requiredGroupType}</code>. Tạo group trong panel Groups trước.
+                        </p>
+                    )}
+                </div>
+            )}
+
+            {/* ── Passage / Statement — cho paragraph + ★ types ── */}
+            {(type === 'true_false' || type === 'multiple_choice') && (
+                <div className="space-y-2 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-lg p-3 border border-emerald-200/50 dark:border-emerald-800/30">
+                    <div>
+                        <label className="text-xs text-[var(--text-muted)] block mb-1">
+                            📄 Đoạn văn (passage) — dùng cho HSK 2/3 reading paragraph
+                        </label>
+                        <textarea
+                            className="w-full px-2 py-1.5 border rounded-lg text-sm hanzi"
+                            rows={3}
+                            placeholder="(Tuỳ chọn) Nhập đoạn văn dài; câu ★ ở field Statement bên dưới."
+                            value={form.passage}
+                            onChange={e => set('passage', e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-[var(--text-muted)] block mb-1">
+                            ★ Câu khẳng định (statement) — judge T/F hoặc trả lời MCQ
+                        </label>
+                        <input
+                            type="text"
+                            className="w-full px-2 py-1.5 border rounded-lg text-sm hanzi"
+                            placeholder="(Tuỳ chọn) VD: 他是老师"
+                            value={form.statement}
+                            onChange={e => set('statement', e.target.value)}
+                        />
+                    </div>
                 </div>
             )}
 
@@ -103,36 +251,72 @@ export function QuestionFormByType({ form, onChange, sectionType }: QuestionForm
             {(type === 'multiple_choice' || type === 'error_identify') && (
                 <div>
                     <label className="text-xs text-[var(--text-muted)] block mb-2">
-                        {type === 'error_identify' ? 'Các câu (chọn câu sai)' : 'Đáp án A, B, C, D'}
+                        {type === 'error_identify'
+                            ? 'Các câu (chọn câu sai)'
+                            : `Đáp án (${form.options.length} options) — Hán + Pinyin`}
                     </label>
                     <div className="space-y-2">
-                        {['A', 'B', 'C', 'D'].map((opt, idx) => (
-                            <div key={opt} className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
-                                form.correct_answer === opt
-                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/10'
-                                    : 'border-[var(--border)]'
-                            }`}>
-                                <button
-                                    type="button"
-                                    onClick={() => set('correct_answer', opt)}
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
-                                        form.correct_answer === opt
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:bg-[var(--border)]'
-                                    }`}
-                                >
-                                    {opt}
-                                </button>
-                                <input
-                                    type="text"
-                                    placeholder={type === 'error_identify' ? `Câu ${opt}` : `Đáp án ${opt}`}
-                                    className="flex-1 px-3 py-1.5 border rounded-lg text-sm"
-                                    value={form.options[idx] || ''}
-                                    onChange={e => updateOption(idx, e.target.value)}
-                                />
-                            </div>
-                        ))}
+                        {form.options.map((optText, idx) => {
+                            const label = String.fromCharCode(65 + idx);
+                            const selected = form.correct_answer === label;
+                            return (
+                                <div key={idx} className={`p-2 rounded-lg border transition-colors ${
+                                    selected ? 'border-green-500 bg-green-50 dark:bg-green-900/10' : 'border-[var(--border)]'
+                                }`}>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => set('correct_answer', label)}
+                                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors ${
+                                                selected
+                                                    ? 'bg-green-500 text-white'
+                                                    : 'bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:bg-[var(--border)]'
+                                            }`}
+                                        >
+                                            {label}
+                                        </button>
+                                        <input
+                                            type="text"
+                                            placeholder={type === 'error_identify' ? `Câu ${label}` : `Hán ${label}`}
+                                            className="flex-1 px-3 py-1.5 border rounded-lg text-sm hanzi"
+                                            value={optText}
+                                            onChange={e => updateOption(idx, e.target.value)}
+                                        />
+                                        {form.options.length > 3 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeOption(idx)}
+                                                className="text-red-500 hover:text-red-700 text-xs"
+                                                title="Xoá option"
+                                            >
+                                                ✕
+                                            </button>
+                                        )}
+                                    </div>
+                                    {/* Pinyin per option (chỉ MCQ, không error_identify) */}
+                                    {type === 'multiple_choice' && (
+                                        <input
+                                            type="text"
+                                            placeholder={`Pinyin ${label} (tuỳ chọn)`}
+                                            className="w-full mt-1 px-3 py-1 border rounded text-xs italic ml-10"
+                                            style={{ width: 'calc(100% - 40px)' }}
+                                            value={(form.options_pinyin || [])[idx] || ''}
+                                            onChange={e => updateOptionPinyin(idx, e.target.value)}
+                                        />
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
+                    {form.options.length < 4 && (
+                        <button
+                            type="button"
+                            onClick={addOption}
+                            className="text-xs text-[var(--primary)] hover:underline mt-2"
+                        >
+                            + Thêm option {String.fromCharCode(65 + form.options.length)}
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -259,6 +443,144 @@ export function QuestionFormByType({ form, onChange, sectionType }: QuestionForm
                                 />
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Group-based types: image_grid_match / word_bank_fill / reply_match ── */}
+            {(type === 'image_grid_match' || type === 'word_bank_fill' || type === 'reply_match') && (
+                <div className="space-y-2">
+                    <label className="text-xs text-[var(--text-muted)] block">
+                        Đáp án đúng — chọn 1 chữ cái trong group
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                        {['A', 'B', 'C', 'D', 'E', 'F'].map(letter => {
+                            const selected = form.correct_answer === letter;
+                            return (
+                                <button
+                                    key={letter}
+                                    type="button"
+                                    onClick={() => set('correct_answer', letter)}
+                                    className={`w-12 h-12 rounded-lg border-2 font-bold text-base transition-all ${
+                                        selected
+                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                                            : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--text-muted)]'
+                                    }`}
+                                >
+                                    {letter}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <p className="text-[10px] text-[var(--text-muted)] italic">
+                        Chỉ A-F, tương ứng với item trong group đã chọn ở trên.
+                    </p>
+                </div>
+            )}
+
+            {/* ── Sentence assembly — chunks ── */}
+            {type === 'sentence_assembly' && (
+                <div className="space-y-3">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 p-2 rounded-lg">
+                        💡 Mỗi mẩu (chunk) là 1 từ/cụm từ để người làm bài lắp ghép thành câu hoàn chỉnh.
+                    </p>
+                    <div>
+                        <label className="text-xs text-[var(--text-muted)] block mb-2">
+                            Các mẩu (chunks) — sẽ hiện ngẫu nhiên
+                        </label>
+                        <div className="space-y-2">
+                            {chunks.map((chunk, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                    <span className="text-xs text-[var(--text-muted)] w-6 text-center">{idx + 1}</span>
+                                    <input
+                                        type="text"
+                                        placeholder={`Mẩu ${idx + 1} (VD: 我 / 是 / 学生)`}
+                                        className="flex-1 px-3 py-1.5 border rounded-lg text-sm hanzi"
+                                        value={chunk.text}
+                                        onChange={e => {
+                                            const next = [...chunks];
+                                            next[idx] = { text: e.target.value };
+                                            updateChunks(next);
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => updateChunks(chunks.filter((_, i) => i !== idx))}
+                                        className="text-red-500 hover:text-red-700 text-xs px-1"
+                                        title="Xoá"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => updateChunks([...chunks, { text: '' }])}
+                            className="text-xs text-[var(--primary)] hover:underline mt-2"
+                        >
+                            + Thêm mẩu
+                        </button>
+                    </div>
+                    <div>
+                        <label className="text-xs text-[var(--text-muted)] block mb-1">
+                            Câu hoàn chỉnh (đáp án đúng — chấm loose: bỏ qua dấu câu, khoảng trắng)
+                        </label>
+                        <textarea
+                            className="w-full px-3 py-2 border rounded-lg text-sm hanzi"
+                            rows={2}
+                            placeholder="VD: 我是学生。"
+                            value={form.correct_answer}
+                            onChange={e => set('correct_answer', e.target.value)}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* ── Fill hanzi — viết chữ Hán theo pinyin gợi ý ── */}
+            {type === 'fill_hanzi' && (
+                <div className="space-y-3">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 p-2 rounded-lg">
+                        💡 Người làm bài viết 1 chữ Hán theo pinyin gợi ý, điền vào chỗ <code>( )</code> trong câu.
+                    </p>
+                    <div>
+                        <label className="text-xs text-[var(--text-muted)] block mb-1">
+                            Câu chứa chỗ trống — dùng <code>( )</code> để đánh dấu vị trí điền
+                        </label>
+                        <textarea
+                            className="w-full px-3 py-2 border rounded-lg text-sm hanzi"
+                            rows={2}
+                            placeholder="VD: 我喜欢吃( )果。"
+                            value={fillHanziMeta.context_zh_with_blank || ''}
+                            onChange={e => updateFillHanzi({ context_zh_with_blank: e.target.value })}
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs text-[var(--text-muted)] block mb-1">
+                                Pinyin gợi ý
+                            </label>
+                            <input
+                                type="text"
+                                className="w-full px-3 py-2 border rounded-lg text-sm italic"
+                                placeholder="VD: shuǐ"
+                                value={fillHanziMeta.pinyin_hint || ''}
+                                onChange={e => updateFillHanzi({ pinyin_hint: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-[var(--text-muted)] block mb-1">
+                                Chữ Hán đúng (1 ký tự)
+                            </label>
+                            <input
+                                type="text"
+                                maxLength={3}
+                                className="w-full px-3 py-2 border rounded-lg text-sm hanzi text-center text-lg"
+                                placeholder="水"
+                                value={form.correct_answer}
+                                onChange={e => set('correct_answer', e.target.value)}
+                            />
+                        </div>
                     </div>
                 </div>
             )}

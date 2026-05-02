@@ -7,6 +7,7 @@ import { UploadField } from '@/components/admin/UploadField';
 import { QuestionTypePicker } from '@/components/admin/QuestionTypePicker';
 import { QuestionFormByType } from '@/components/admin/QuestionFormByType';
 import { QuestionPreview } from '@/components/admin/QuestionPreview';
+import { GroupManager } from '@/components/admin/GroupManager';
 import {
     HSK_COLORS, EXAM_TYPES, SECTION_TYPES, QUESTION_TYPES, HSK_PRESETS,
     DEFAULT_QUESTION_FORM,
@@ -43,15 +44,20 @@ interface Section {
 interface Question {
     id: number;
     section_id: number;
+    group_id?: number | null;
     question_number: number;
     question_type: string;
     question_text: string;
+    passage?: string;
+    statement?: string;
     question_image: string;
     question_audio: string;
+    transcript?: string;
     audio_start_time: number;
     audio_end_time: number;
     audio_play_count: number;
     options: string[];
+    options_pinyin?: string[];
     option_images: string[];
     correct_answer: string;
     explanation: string;
@@ -257,17 +263,22 @@ export default function HskExamAdminPage() {
             question_number: question.question_number,
             question_type: question.question_type,
             question_text: question.question_text || '',
+            passage: question.passage || '',
+            statement: question.statement || '',
             question_image: question.question_image || '',
             question_audio: question.question_audio || '',
+            transcript: question.transcript || '',
             audio_start_time: question.audio_start_time || 0,
             audio_end_time: question.audio_end_time || 0,
             audio_play_count: question.audio_play_count || 2,
             options: question.options || ['', '', '', ''],
+            options_pinyin: question.options_pinyin || ['', '', '', ''],
             option_images: question.option_images || ['', '', '', ''],
             correct_answer: question.correct_answer || '',
             explanation: question.explanation || '',
             difficulty: question.difficulty || 1,
             points: question.points || 1,
+            group_id: question.group_id ?? null,
             meta: question.meta || null,
         });
         const resolvedSection = examSections.find(s => s.id === question.section_id);
@@ -433,6 +444,12 @@ export default function HskExamAdminPage() {
                                                 </button>
                                             </div>
                                         </div>
+
+                                        {/* Group manager (shared resources) */}
+                                        <GroupManager
+                                            sectionId={section.id}
+                                            token={typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null}
+                                        />
 
                                         {/* Questions in section */}
                                         {section.questions && section.questions.length > 0 && (
