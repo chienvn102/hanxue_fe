@@ -201,7 +201,8 @@ function FlashcardSessionContent() {
         setUserAnswer('');
     };
 
-    const restart = () => router.push('/flashcard');
+    // /flashcard giờ redirect → /practice. Đẩy thẳng tới hub mới.
+    const restart = () => router.push('/practice');
 
     if (loading) {
         return (

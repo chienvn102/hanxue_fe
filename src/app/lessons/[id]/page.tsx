@@ -152,9 +152,7 @@ export default function LessonPage() {
                                     <p className="text-[var(--text-secondary)] mt-2">{lesson.description}</p>
                                 )}
                             </div>
-                            {course && (
-                                <HSKBadge level={course.hsk_level as 1 | 2 | 3 | 4 | 5 | 6} />
-                            )}
+                            {course && <HSKBadge level={course.hsk_level} />}
                         </div>
 
                         <TextbookLesson lessonId={params.id as string} />

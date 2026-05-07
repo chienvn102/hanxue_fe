@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { UploadField } from '@/components/admin/UploadField';
@@ -67,6 +69,9 @@ interface Question {
 }
 
 export default function HskExamAdminPage() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const expandParam = searchParams.get('expand');
     const [exams, setExams] = useState<Exam[]>([]);
     const [loading, setLoading] = useState(true);
     const [hskFilter, setHskFilter] = useState<number | null>(null);
@@ -118,6 +123,62 @@ export default function HskExamAdminPage() {
 
     useEffect(() => { fetchExams(); }, [fetchExams]);
 
+    // Auto-expand đề vừa tạo (?expand=N redirect từ /admin/hsk-test/new).
+    //
+    // Vấn đề: list dùng `?limit=100` + BE sort `hsk_level ASC, created_at DESC`,
+    // nên đề vừa tạo có thể không nằm trong batch đầu (vd: HSK 6 mới sau hàng loạt
+    // HSK 1). Nếu vậy ta fetch trực tiếp đề đó rồi prepend vào list để admin thấy.
+    useEffect(() => {
+        if (!expandParam || loading) return;
+        const id = Number(expandParam);
+        if (Number.isNaN(id)) return;
+
+        const inList = exams.some(e => e.id === id);
+        if (inList) {
+            setExpandedExam(id);
+            fetchExamDetail(id);
+            router.replace('/admin/hsk-test');
+            return;
+        }
+
+        // Không thấy trong list hiện tại — fetch riêng + prepend.
+        (async () => {
+            try {
+                const token = localStorage.getItem('adminToken');
+                const res = await fetch(`${API_BASE}/api/hsk-exams/${id}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!res.ok) return;
+                const exam = await res.json();
+                if (!exam || typeof exam.id !== 'number') return;
+                setExams(prev => [
+                    {
+                        id: exam.id,
+                        title: exam.title,
+                        hsk_level: exam.hsk_level,
+                        exam_type: exam.exam_type,
+                        total_questions: exam.total_questions || 0,
+                        duration_minutes: exam.duration_minutes,
+                        passing_score: exam.passing_score,
+                        description: exam.description || '',
+                        is_active: exam.is_active,
+                    },
+                    ...prev.filter(e => e.id !== id),
+                ]);
+                setExpandedExam(id);
+                if (Array.isArray(exam.sections)) {
+                    setExamSections(exam.sections);
+                } else {
+                    fetchExamDetail(id);
+                }
+                router.replace('/admin/hsk-test');
+            } catch (err) {
+                console.error('Auto-expand fetch failed:', err);
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [expandParam, loading, exams.length]);
+
     const fetchExamDetail = async (examId: number) => {
         try {
             const token = localStorage.getItem('adminToken');
@@ -141,13 +202,8 @@ export default function HskExamAdminPage() {
         }
     };
 
-    // EXAM CRUD
-    const openCreateExamModal = () => {
-        setSelectedExam(null);
-        setExamForm({ title: '', hsk_level: 1, exam_type: 'practice', ...HSK_PRESETS[1], description: '' });
-        setShowExamModal(true);
-    };
-
+    // EXAM CRUD — create flow đã chuyển sang /admin/hsk-test/new (level-first).
+    // Modal này chỉ còn dùng cho edit đề đã có.
     const openEditExamModal = (exam: Exam) => {
         setSelectedExam(exam);
         setExamForm({
@@ -158,22 +214,29 @@ export default function HskExamAdminPage() {
         setShowExamModal(true);
     };
 
+    // Edit-only — create flow đã chuyển sang /admin/hsk-test/new (level-first).
     const handleSaveExam = async () => {
+        if (!selectedExam) {
+            console.warn('handleSaveExam called without selectedExam — should never happen');
+            return;
+        }
         try {
             const token = localStorage.getItem('adminToken');
-            const method = selectedExam ? 'PUT' : 'POST';
-            const url = selectedExam ? `${API_BASE}/api/hsk-exams/${selectedExam.id}` : `${API_BASE}/api/hsk-exams`;
-
-            await fetch(url, {
-                method,
+            const res = await fetch(`${API_BASE}/api/hsk-exams/${selectedExam.id}`, {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(examForm)
+                body: JSON.stringify(examForm),
             });
+            if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                alert(`Lỗi: ${d.message || 'Không thể lưu đề thi'}`);
+                return;
+            }
             setShowExamModal(false);
             fetchExams();
         } catch (err) {
             console.error('Failed to save exam:', err);
-            alert('Lỗi khi lưu đề thi');
+            alert('Lỗi kết nối server');
         }
     };
 
@@ -335,9 +398,11 @@ export default function HskExamAdminPage() {
                     <h1 className="text-2xl font-bold text-[var(--text-main)]">Quản lý Đề thi HSK</h1>
                     <p className="text-sm text-[var(--text-muted)] mt-1">Tổng cộng {exams.length} đề thi</p>
                 </div>
-                <Button onClick={openCreateExamModal}>
-                    <Icon name="add" size="sm" className="mr-1" /> Tạo Đề thi
-                </Button>
+                <Link href="/admin/hsk-test/new">
+                    <Button>
+                        <Icon name="add" size="sm" className="mr-1" /> Tạo Đề thi
+                    </Button>
+                </Link>
             </div>
 
             {/* Filters */}
@@ -489,11 +554,11 @@ export default function HskExamAdminPage() {
                 ))}
             </div>
 
-            {/* Exam Modal */}
-            {showExamModal && (
+            {/* Exam edit modal (create flow đã ở /admin/hsk-test/new) */}
+            {showExamModal && selectedExam && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-[var(--surface)] rounded-xl p-6 w-full max-w-lg">
-                        <h3 className="text-lg font-bold mb-4">{selectedExam ? 'Sửa đề thi' : 'Tạo đề thi mới'}</h3>
+                        <h3 className="text-lg font-bold mb-4">Sửa đề thi</h3>
                         <div className="space-y-4">
                             <input
                                 type="text"

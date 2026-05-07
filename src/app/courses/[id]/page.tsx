@@ -332,16 +332,24 @@ export default function CourseDetailPage() {
                                 </div>
                             </div>
 
-                            {/* CTA Button */}
+                            {/* CTA Button — priority: in_progress > not_started > first lesson.
+                                Logic cũ (`!== 'completed'`) chỉ phân biệt completed/non-completed,
+                                bỏ qua việc user đang học dở bài nào → click có thể nhảy lùi về bài 1. */}
                             <div className="mt-6">
-                                {lessons.length > 0 ? (
-                                    <Link href={`/lessons/${(lessons.find(l => l.progress_status !== 'completed') || lessons[0]).id}`} className="block">
-                                        <Button fullWidth size="lg" className="justify-center">
-                                            <Icon name="play_arrow" size="sm" className="mr-2" />
-                                            {progress > 0 ? 'Tiếp tục học' : 'Bắt đầu học'}
-                                        </Button>
-                                    </Link>
-                                ) : (
+                                {lessons.length > 0 ? (() => {
+                                    const next =
+                                        lessons.find(l => l.progress_status === 'in_progress')
+                                        ?? lessons.find(l => !l.progress_status || l.progress_status === 'not_started')
+                                        ?? lessons[0];
+                                    return (
+                                        <Link href={`/lessons/${next.id}`} className="block">
+                                            <Button fullWidth size="lg" className="justify-center">
+                                                <Icon name="play_arrow" size="sm" className="mr-2" />
+                                                {progress > 0 ? 'Tiếp tục học' : 'Bắt đầu học'}
+                                            </Button>
+                                        </Link>
+                                    );
+                                })() : (
                                     <Button fullWidth size="lg" disabled variant="secondary" className="justify-center">
                                         Chưa có bài học
                                     </Button>

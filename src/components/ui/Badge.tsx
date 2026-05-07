@@ -1,7 +1,8 @@
 type HSKLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
 interface BadgeProps {
-    level: HSKLevel;
+    // Accept any number/null defensively — bad seed data should not crash render.
+    level: HSKLevel | number | null | undefined;
     className?: string;
 }
 
@@ -14,17 +15,12 @@ const levelColors: Record<HSKLevel, { bg: string; text: string }> = {
     6: { bg: 'bg-indigo-500/10', text: 'text-indigo-500' },
 };
 
-const levelLabels: Record<HSKLevel, string> = {
-    1: 'HSK 1',
-    2: 'HSK 2',
-    3: 'HSK 3',
-    4: 'HSK 4',
-    5: 'HSK 5',
-    6: 'HSK 6',
-};
+const FALLBACK_COLORS = { bg: 'bg-[var(--surface-secondary)]', text: 'text-[var(--text-muted)]' };
 
 export function HSKBadge({ level, className = '' }: BadgeProps) {
-    const colors = levelColors[level];
+    const isKnown = typeof level === 'number' && level >= 1 && level <= 6;
+    const colors = isKnown ? levelColors[level as HSKLevel] : FALLBACK_COLORS;
+    const label = isKnown ? `HSK ${level}` : 'HSK ?';
 
     return (
         <span className={`
@@ -33,7 +29,7 @@ export function HSKBadge({ level, className = '' }: BadgeProps) {
             ${colors.bg} ${colors.text}
             ${className}
         `}>
-            {levelLabels[level]}
+            {label}
         </span>
     );
 }

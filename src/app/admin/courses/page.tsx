@@ -162,15 +162,15 @@ export default function AdminCoursesPage() {
                                         {course.lesson_count} Bài học
                                     </span>
                                     <div className="flex gap-2">
-                                        <Link href={`/admin/courses/${course.id}/lessons`}>
-                                            <button className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors" title="Quản lý bài học">
-                                                <Icon name="list" size="sm" />
+                                        <Link href={`/admin/courses/${course.id}`}>
+                                            <button className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors" title="Mở chi tiết & quản lý bài học">
+                                                <Icon name="open_in_new" size="sm" />
                                             </button>
                                         </Link>
                                         <button
                                             onClick={() => openEditModal(course)}
                                             className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
-                                            title="Chỉnh sửa"
+                                            title="Chỉnh sửa nhanh"
                                         >
                                             <Icon name="edit" size="sm" />
                                         </button>

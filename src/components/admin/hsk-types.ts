@@ -74,6 +74,35 @@ export const HSK_PRESETS: Record<number, { duration_minutes: number; passing_sco
     6: { duration_minutes: 140, passing_score: 180 },
 };
 
+export interface SectionPreset {
+    section_type: 'listening' | 'reading' | 'writing';
+    section_order: number;
+    title: string;
+    instructions: string;
+    total_questions: number;
+    duration_seconds: number;
+}
+
+// Cấu trúc đề thi cố định theo level. HSK 4-6 chưa có spec chính thức từ user
+// (đặt placeholder ở UI). Khi cập nhật, sửa cả `HSK_AVAILABLE_LEVELS`.
+export const HSK_SECTION_PRESETS: Record<number, SectionPreset[]> = {
+    1: [
+        { section_type: 'listening', section_order: 1, title: 'Nghe (听力)', instructions: 'Nghe và chọn đáp án', total_questions: 20, duration_seconds: 900 },
+        { section_type: 'reading',   section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 20, duration_seconds: 1020 },
+    ],
+    2: [
+        { section_type: 'listening', section_order: 1, title: 'Nghe (听力)', instructions: 'Nghe và chọn đáp án', total_questions: 35, duration_seconds: 1500 },
+        { section_type: 'reading',   section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 25, duration_seconds: 1320 },
+    ],
+    3: [
+        { section_type: 'listening', section_order: 1, title: 'Nghe (听力)', instructions: 'Nghe và chọn đáp án', total_questions: 40, duration_seconds: 2100 },
+        { section_type: 'reading',   section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 30, duration_seconds: 1800 },
+        { section_type: 'writing',   section_order: 3, title: 'Viết (书写)', instructions: 'Hoàn thành câu / viết Hán', total_questions: 10, duration_seconds: 900 },
+    ],
+};
+
+export const HSK_AVAILABLE_LEVELS: number[] = [1, 2, 3];
+
 export interface QuestionFormData {
     question_number: number;
     question_type: string;

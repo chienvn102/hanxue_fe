@@ -1,8 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import { HSKBadge } from '@/components/ui/Badge';
 import {
     fetchHskExamAnswers,
     getMediaUrl,
@@ -21,15 +25,6 @@ const SECTION_LABEL: Record<string, string> = {
     listening: 'Nghe (听力)',
     reading: 'Đọc (阅读)',
     writing: 'Viết (书写)',
-};
-
-const HSK_COLORS: Record<number, string> = {
-    1: 'bg-green-500',
-    2: 'bg-teal-500',
-    3: 'bg-blue-500',
-    4: 'bg-purple-500',
-    5: 'bg-orange-500',
-    6: 'bg-red-500',
 };
 
 function PinyinToggle() {
@@ -98,12 +93,12 @@ function AnswerCard({ question, questionNumber }: AnswerCardProps) {
                             onClick={() => setShowTranscript(!showTranscript)}
                             className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1"
                         >
-                            <Icon name={showTranscript ? 'chevron-up' : 'chevron-down'} size="xs" />
+                            <Icon name={showTranscript ? 'expand_less' : 'expand_more'} size="xs" />
                             {showTranscript ? 'Ẩn' : 'Hiện'} transcript
                         </button>
                     )}
                     {showTranscript && question.transcript && (
-                        <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-3 text-sm hanzi whitespace-pre-wrap border border-amber-200 dark:border-amber-800/30">
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm hanzi whitespace-pre-wrap">
                             {question.transcript}
                         </div>
                     )}
@@ -126,14 +121,14 @@ function AnswerCard({ question, questionNumber }: AnswerCardProps) {
                 <img
                     src={getMediaUrl(question.questionImage)}
                     alt=""
-                    className="max-w-full md:max-w-sm rounded-lg bg-white"
+                    className="max-w-full md:max-w-sm rounded-lg bg-[var(--surface)] border border-[var(--border)]"
                 />
             )}
 
             {/* Statement */}
             {question.statement && (
-                <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-3 text-base hanzi">
-                    <span className="text-xs text-blue-600 dark:text-blue-400 mr-2">★</span>
+                <div className="bg-sky-500/10 border border-sky-500/30 rounded-lg p-3 text-base hanzi">
+                    <span className="text-xs text-sky-500 mr-2">★</span>
                     <PinyinRuby
                         zh={question.statement}
                         pinyin={typeof pinyinMeta.statement === 'string' ? pinyinMeta.statement : undefined}
@@ -193,14 +188,14 @@ function AnswerCard({ question, questionNumber }: AnswerCardProps) {
                                     key={idx}
                                     className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                                         isCorrect
-                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/10'
+                                            ? 'border-emerald-500/60 bg-emerald-500/10'
                                             : 'border-[var(--border)]'
                                     }`}
                                 >
                                     <span
                                         className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
                                             isCorrect
-                                                ? 'bg-green-500 text-white'
+                                                ? 'bg-emerald-500 text-white'
                                                 : 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'
                                         }`}
                                     >
@@ -223,7 +218,7 @@ function AnswerCard({ question, questionNumber }: AnswerCardProps) {
                                         </div>
                                     </div>
                                     {isCorrect && (
-                                        <span className="text-green-600 text-xs font-semibold shrink-0">
+                                        <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold shrink-0">
                                             ✓ Đáp án đúng
                                         </span>
                                     )}
@@ -237,8 +232,8 @@ function AnswerCard({ question, questionNumber }: AnswerCardProps) {
             {['true_false', 'image_grid_match', 'word_bank_fill', 'reply_match', 'fill_blank', 'fill_hanzi', 'sentence_assembly', 'short_answer'].includes(
                 question.questionType
             ) && (
-                <div className="bg-green-50 dark:bg-green-900/10 border border-green-500 rounded-lg p-3">
-                    <span className="text-xs text-green-700 dark:text-green-400 font-semibold mr-2">
+                <div className="bg-emerald-500/10 border border-emerald-500/60 rounded-lg p-3">
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mr-2">
                         ✓ Đáp án đúng:
                     </span>
                     <span className="hanzi font-semibold">{correct}</span>
@@ -271,7 +266,7 @@ function SectionView({ section }: SectionViewProps) {
     return (
         <div className="space-y-4">
             {section.title && (
-                <h2 className="text-lg font-semibold text-[var(--text)]">{section.title}</h2>
+                <h2 className="text-lg font-semibold text-[var(--text-main)]">{section.title}</h2>
             )}
             {section.instructions && (
                 <p className="text-sm text-[var(--text-secondary)] italic">{section.instructions}</p>
@@ -324,22 +319,31 @@ function ExamAnswersInner() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-[var(--text-muted)]">Đang tải đáp án...</div>
+            <div className="min-h-screen flex flex-col bg-[var(--background)]">
+                <Header />
+                <div className="flex-1 flex items-center justify-center" role="status" aria-busy="true">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary)]"></div>
+                    <span className="sr-only">Đang tải đáp án...</span>
+                </div>
             </div>
         );
     }
 
     if (error || !exam) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-3">
-                <p className="text-red-500">{error || 'Không tìm thấy đề thi'}</p>
-                <button
-                    onClick={() => router.push('/hsk-test')}
-                    className="px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm"
-                >
-                    ← Về trang đề thi
-                </button>
+            <div className="min-h-screen flex flex-col bg-[var(--background)]">
+                <Header />
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
+                    <Icon name="error" size="xl" className="text-red-500 mb-2" />
+                    <p className="text-[var(--text-secondary)]">{error || 'Không tìm thấy đề thi'}</p>
+                    <button
+                        onClick={() => router.push('/hsk-test')}
+                        className="px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm hover:bg-[var(--primary-hover)] transition-colors"
+                    >
+                        ← Về trang đề thi
+                    </button>
+                </div>
+                <Footer />
             </div>
         );
     }
@@ -347,60 +351,62 @@ function ExamAnswersInner() {
     const section = exam.sections[activeSection];
 
     return (
-        <div className="min-h-screen bg-[var(--background)]">
-            {/* Header */}
-            <header className="sticky top-0 z-10 bg-[var(--surface)] border-b border-[var(--border)] px-4 py-3">
-                <div className="max-w-4xl mx-auto flex items-center gap-3">
-                    <button
-                        onClick={() => router.push('/hsk-test')}
-                        className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
-                        title="Về danh sách đề"
-                    >
-                        <Icon name="arrow-left" size="md" />
-                    </button>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                            <span
-                                className={`text-[10px] font-bold text-white px-2 py-0.5 rounded ${
-                                    HSK_COLORS[exam.hsk_level] || 'bg-gray-500'
+        <div className="min-h-screen flex flex-col bg-[var(--background)]">
+            <Header />
+
+            {/* Sticky sub-header: meta + section tabs + pinyin toggle.
+                Pinned under global Header (h-16 sm:h-20) so user can switch
+                section / toggle pinyin without scrolling back to top. */}
+            <div className="sticky top-16 sm:top-20 z-30 bg-[var(--surface)]/95 backdrop-blur-md border-b border-[var(--border)]">
+                <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <HSKBadge level={exam.hsk_level} />
+                            <h1 className="text-sm sm:text-base font-semibold text-[var(--text-main)] truncate">
+                                {exam.title}
+                            </h1>
+                            <span className="text-xs text-[var(--text-muted)] hidden sm:inline">· Đáp án &amp; Transcript</span>
+                        </div>
+                        <PinyinToggle />
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2 -mb-px">
+                        {exam.sections.map((s, idx) => (
+                            <button
+                                key={s.id}
+                                onClick={() => setActiveSection(idx)}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                    activeSection === idx
+                                        ? 'border-[var(--primary)] text-[var(--primary)]'
+                                        : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                                 }`}
                             >
-                                HSK {exam.hsk_level}
-                            </span>
-                            <span className="text-xs text-[var(--text-muted)]">Đáp án &amp; Transcript</span>
-                        </div>
-                        <h1 className="text-base font-semibold text-[var(--text)] truncate">{exam.title}</h1>
+                                {SECTION_LABEL[s.section_type] || s.section_type}{' '}
+                                <span className="text-xs text-[var(--text-muted)]">
+                                    ({s.questions.length})
+                                </span>
+                            </button>
+                        ))}
                     </div>
-                    <PinyinToggle />
-                </div>
-            </header>
-
-            {/* Section tabs */}
-            <div className="max-w-4xl mx-auto px-4 pt-4">
-                <div className="flex flex-wrap gap-2 border-b border-[var(--border)]">
-                    {exam.sections.map((s, idx) => (
-                        <button
-                            key={s.id}
-                            onClick={() => setActiveSection(idx)}
-                            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                                activeSection === idx
-                                    ? 'border-[var(--primary)] text-[var(--primary)]'
-                                    : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                            }`}
-                        >
-                            {SECTION_LABEL[s.section_type] || s.section_type}{' '}
-                            <span className="text-xs text-[var(--text-muted)]">
-                                ({s.questions.length})
-                            </span>
-                        </button>
-                    ))}
                 </div>
             </div>
 
-            {/* Section content */}
-            <main className="max-w-4xl mx-auto px-4 py-6">
+            <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                {/* Breadcrumb (normal flow — only relevant once at top) */}
+                <nav className="flex items-center gap-2 text-sm text-[var(--text-muted)] mb-6">
+                    <Link href="/" className="hover:text-[var(--primary)] transition-colors">Trang chủ</Link>
+                    <Icon name="chevron_right" size="xs" />
+                    <Link href="/hsk-test" className="hover:text-[var(--primary)] transition-colors">Luyện thi HSK</Link>
+                    <Icon name="chevron_right" size="xs" />
+                    <span className="text-[var(--text-main)] line-clamp-1">{exam.title}</span>
+                    <Icon name="chevron_right" size="xs" />
+                    <span className="text-[var(--text-muted)]">Đáp án</span>
+                </nav>
+
+                {/* Section content */}
                 {section ? <SectionView section={section} /> : null}
             </main>
+
+            <Footer />
         </div>
     );
 }

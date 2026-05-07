@@ -79,26 +79,23 @@ export default function TextbookLesson({ lessonId }: Props) {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-main)]">{lesson.title}</h1>
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--primary)]/10 text-[var(--primary)]">
-                        HSK {lesson.hsk_level}
-                    </span>
+            {/* Title + HSK badge được render ở parent (lessons/[id]/page.tsx) —
+                ở đây chỉ giữ thông tin riêng của textbook context: progress + objectives. */}
+            {(progress?.status === 'completed' || lesson.objectives_vi) && (
+                <div className="space-y-2">
                     {progress?.status === 'completed' && (
                         <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-600 inline-flex items-center gap-1">
-                            <Icon name="check_circle" size="xs" /> Đã xong
+                            <Icon name="check_circle" size="xs" /> Đã hoàn thành bài học
                         </span>
                     )}
+                    {lesson.objectives_vi && (
+                        <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                            <span className="font-semibold text-[var(--text-main)]">Mục tiêu: </span>
+                            {lesson.objectives_vi}
+                        </p>
+                    )}
                 </div>
-                {lesson.objectives_vi && (
-                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                        <span className="font-semibold text-[var(--text-main)]">Mục tiêu: </span>
-                        {lesson.objectives_vi}
-                    </p>
-                )}
-            </div>
+            )}
 
             {/* Tabs */}
             <div className="border-b border-[var(--border)]">

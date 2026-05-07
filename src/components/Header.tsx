@@ -32,9 +32,10 @@ export default function Header() {
         { href: '/', label: 'Trang chủ', icon: 'home' },
         { href: '/vocab', label: 'Từ vựng', icon: 'menu_book' },
         { href: '/grammar', label: 'Ngữ pháp', icon: 'auto_stories' },
-        { href: '/flashcard', label: 'Luyện tập', icon: 'school' },
+        { href: '/practice', label: 'Luyện tập', icon: 'school' },
         { href: '/courses', label: 'Khóa học', icon: 'play_circle' },
         { href: '/hsk-test', label: 'Luyện thi HSK', icon: 'quiz' },
+        { href: '/leaderboard', label: 'Xếp hạng', icon: 'emoji_events' },
         { href: '/chat', label: 'Học cùng AI', icon: 'smart_toy' },
     ];
 
