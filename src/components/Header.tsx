@@ -7,56 +7,79 @@ import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthContext';
 import { Icon } from './ui/Icon';
 
+interface NavItem {
+    href: string;
+    label: string;
+    icon: string;
+}
+
+const PRIMARY_NAV: NavItem[] = [
+    { href: '/vocab', label: 'Từ vựng', icon: 'menu_book' },
+    { href: '/practice', label: 'Luyện tập', icon: 'school' },
+    { href: '/courses', label: 'Khóa học', icon: 'play_circle' },
+    { href: '/hsk-test', label: 'Luyện thi HSK', icon: 'quiz' },
+];
+
+const SECONDARY_NAV: NavItem[] = [
+    { href: '/', label: 'Trang chủ', icon: 'home' },
+    { href: '/grammar', label: 'Ngữ pháp', icon: 'auto_stories' },
+    { href: '/leaderboard', label: 'Xếp hạng', icon: 'emoji_events' },
+    { href: '/chat', label: 'Học cùng AI', icon: 'smart_toy' },
+];
+
+const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV];
+
 export default function Header() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
+    const [exploreMenuOpen, setExploreMenuOpen] = useState(false);
     const pathname = usePathname();
     const { resolvedTheme, toggleTheme } = useTheme();
     const { user, isAuthenticated, logout } = useAuth();
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const userDropdownRef = useRef<HTMLDivElement>(null);
+    const exploreDropdownRef = useRef<HTMLDivElement>(null);
 
-    // Close dropdown when clicking outside
+    // Close dropdowns when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            if (userDropdownRef.current && !userDropdownRef.current.contains(target)) {
                 setUserMenuOpen(false);
             }
+            if (exploreDropdownRef.current && !exploreDropdownRef.current.contains(target)) {
+                setExploreMenuOpen(false);
+            }
         }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const navItems = [
-        { href: '/', label: 'Trang chủ', icon: 'home' },
-        { href: '/vocab', label: 'Từ vựng', icon: 'menu_book' },
-        { href: '/grammar', label: 'Ngữ pháp', icon: 'auto_stories' },
-        { href: '/practice', label: 'Luyện tập', icon: 'school' },
-        { href: '/courses', label: 'Khóa học', icon: 'play_circle' },
-        { href: '/hsk-test', label: 'Luyện thi HSK', icon: 'quiz' },
-        { href: '/leaderboard', label: 'Xếp hạng', icon: 'emoji_events' },
-        { href: '/chat', label: 'Học cùng AI', icon: 'smart_toy' },
-    ];
+    // Active match: '/' chỉ exact, các route khác match cả sub-routes
+    // (ví dụ /vocab/123 → highlight "Từ vựng", /practice/match → "Luyện tập").
+    const isNavActive = (href: string) => {
+        if (href === '/') return pathname === '/';
+        return pathname === href || pathname.startsWith(href + '/');
+    };
+    const exploreActive = SECONDARY_NAV.some(item => isNavActive(item.href));
 
     return (
-        <header className="sticky top-0 z-50 w-full border-b border-[var(--border)] bg-[var(--surface)]/80 backdrop-blur-md transition-colors duration-300">
+        <header className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--surface)]/80 backdrop-blur-md transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16 sm:h-20">
-                    {/* Logo */}
-                    <Link href="/" className="flex items-center gap-3 group">
+                <div className="flex items-center justify-between gap-4 h-16 sm:h-20">
+                    {/* Logo — shrinks ở viewport hẹp để không đè nav */}
+                    <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink-0">
                         <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/20 group-hover:scale-105 transition-transform duration-300">
                             <Icon name="translate" size="md" />
                         </div>
-                        <h1 className="text-xl font-bold tracking-tight text-[var(--text-main)] group-hover:text-[var(--primary)] transition-colors">
+                        <h1 className="hidden sm:block text-xl font-bold tracking-tight text-[var(--text-main)] group-hover:text-[var(--primary)] transition-colors">
                             HanXue
                         </h1>
                     </Link>
 
-                    {/* Desktop Nav */}
-                    <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center min-w-0">
-                        {navItems.map(item => {
-                            const isActive = pathname === item.href;
+                    {/* Desktop Nav: 4 primary + Khám phá dropdown */}
+                    <nav className="hidden lg:flex items-center gap-1">
+                        {PRIMARY_NAV.map(item => {
+                            const isActive = isNavActive(item.href);
                             return (
                                 <Link
                                     key={item.href}
@@ -71,10 +94,45 @@ export default function Header() {
                                 </Link>
                             );
                         })}
+
+                        {/* Khám phá dropdown */}
+                        <div className="relative" ref={exploreDropdownRef}>
+                            <button
+                                onClick={() => setExploreMenuOpen(o => !o)}
+                                className={`px-3 xl:px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1 whitespace-nowrap ${exploreActive
+                                    ? 'text-[var(--primary)] bg-[var(--primary)]/10'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--surface-secondary)]'
+                                    }`}
+                            >
+                                Khám phá
+                                <Icon name={exploreMenuOpen ? 'expand_less' : 'expand_more'} size="sm" />
+                            </button>
+                            {exploreMenuOpen && (
+                                <div className="absolute left-0 top-[calc(100%+8px)] w-56 bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden z-50 p-2">
+                                    {SECONDARY_NAV.map(item => {
+                                        const isActive = isNavActive(item.href);
+                                        return (
+                                            <Link
+                                                key={item.href}
+                                                href={item.href}
+                                                onClick={() => setExploreMenuOpen(false)}
+                                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                                                    ? 'text-[var(--primary)] bg-[var(--primary)]/10'
+                                                    : 'text-[var(--text-main)] hover:bg-[var(--surface-secondary)]'
+                                                    }`}
+                                            >
+                                                <Icon name={item.icon} size="sm" className={isActive ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)]'} />
+                                                {item.label}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </nav>
 
                     {/* Right Section */}
-                    <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                         {/* Theme Toggle */}
                         <button
                             onClick={(e) => toggleTheme(e)}
@@ -97,14 +155,14 @@ export default function Header() {
 
                         {/* User Area */}
                         {isAuthenticated && user ? (
-                            <div className="relative" ref={dropdownRef}>
+                            <div className="relative" ref={userDropdownRef}>
                                 <button
                                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                                    className="flex items-center gap-2 sm:gap-3 p-1 pr-2 sm:pr-3 rounded-xl hover:bg-[var(--surface-secondary)] transition-all border border-transparent hover:border-[var(--border)] group"
+                                    className="flex items-center gap-2 p-1 sm:pr-2 rounded-xl hover:bg-[var(--surface-secondary)] transition-all border border-transparent hover:border-[var(--border)] group"
                                 >
-                                    {/* Desktop User Info */}
-                                    <div className="hidden lg:block text-right">
-                                        <p className="text-sm font-bold text-[var(--text-main)] leading-tight group-hover:text-[var(--primary)] transition-colors">
+                                    {/* Desktop User Info — chỉ hiện ở xl+ để nhường chỗ nav */}
+                                    <div className="hidden xl:block text-right pr-1">
+                                        <p className="text-sm font-bold text-[var(--text-main)] leading-tight group-hover:text-[var(--primary)] transition-colors max-w-[140px] truncate">
                                             {user.displayName}
                                         </p>
                                         <div className="flex items-center justify-end gap-1.5 mt-0.5">
@@ -127,7 +185,7 @@ export default function Header() {
                                             (user.displayName || '?').charAt(0).toUpperCase()
                                         )}
                                     </div>
-                                    <Icon name="expand_more" className="text-[var(--text-secondary)] group-hover:text-[var(--text-main)] transition-colors" />
+                                    <Icon name="expand_more" size="sm" className="text-[var(--text-secondary)] group-hover:text-[var(--text-main)] transition-colors" />
                                 </button>
 
                                 {/* Dropdown Menu */}
@@ -135,7 +193,6 @@ export default function Header() {
                                     <div className="absolute right-0 top-[calc(100%+8px)] w-[280px] sm:w-[320px] bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
                                         {/* Dropdown Header */}
                                         <div className="p-5 border-b border-[var(--border)] bg-[var(--surface-secondary)] relative">
-                                            {/* Decoration */}
                                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[var(--primary)] to-orange-500"></div>
 
                                             <div className="flex items-center gap-4">
@@ -162,7 +219,6 @@ export default function Header() {
                                                 </div>
                                             </div>
 
-                                            {/* Quick Stats */}
                                             <div className="grid grid-cols-2 gap-2 mt-4">
                                                 <div className="bg-[var(--background)] rounded-xl p-3 text-center border border-[var(--border)] hover:border-[var(--primary)]/30 transition-colors">
                                                     <span className="block text-xl font-bold text-[var(--text-main)]">{user.currentStreak || 0}</span>
@@ -175,7 +231,6 @@ export default function Header() {
                                             </div>
                                         </div>
 
-                                        {/* Menu Items */}
                                         <div className="p-2 flex flex-col gap-1">
                                             <Link
                                                 href="/profile"
@@ -214,8 +269,7 @@ export default function Header() {
                                 )}
                             </div>
                         ) : (
-                            // Guest Action
-                            <div className="flex items-center gap-2 sm:gap-4">
+                            <div className="flex items-center gap-2 sm:gap-3">
                                 <Link
                                     href="/register"
                                     className="hidden sm:block text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors"
@@ -224,7 +278,7 @@ export default function Header() {
                                 </Link>
                                 <Link
                                     href="/login"
-                                    className="flex items-center justify-center h-10 px-5 bg-[var(--primary)] hover:bg-[var(--primary-dark)] active:scale-95 transition-all text-white text-sm font-bold rounded-xl shadow-lg shadow-[var(--primary)]/25"
+                                    className="flex items-center justify-center h-10 px-4 sm:px-5 bg-[var(--primary)] hover:bg-[var(--primary-dark)] active:scale-95 transition-all text-white text-sm font-bold rounded-xl shadow-lg shadow-[var(--primary)]/25"
                                 >
                                     Đăng nhập
                                 </Link>
@@ -241,11 +295,11 @@ export default function Header() {
                     </div>
                 </div>
 
-                {/* Mobile Nav */}
+                {/* Mobile Nav: full list (primary + secondary) */}
                 {mobileMenuOpen && (
                     <nav className="lg:hidden py-4 border-t border-[var(--border)] animate-in slide-in-from-top-2">
-                        {navItems.map(item => {
-                            const isActive = pathname === item.href;
+                        {ALL_NAV.map(item => {
+                            const isActive = isNavActive(item.href);
                             return (
                                 <Link
                                     key={item.href}

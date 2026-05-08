@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
-import { startHskExam, submitHskAnswer, finishHskExam, getMediaUrl, type HskExamStartResponse, type HskQuestion, type HskSection } from '@/lib/api';
+import { startHskExam, submitHskAnswer, finishHskExam, fetchHskExamAnswers, type HskExamStartResponse, type HskQuestion, type HskSection } from '@/lib/api';
 import { HskTestProvider, useHskTest } from '@/components/hsk-test/HskTestContext';
 import { QuestionRenderer } from '@/components/hsk-test/QuestionRenderer';
 import { GroupHeader } from '@/components/hsk-test/GroupHeader';
@@ -48,11 +48,44 @@ const SECTION_TYPE_LABELS: Record<string, string> = {
     writing: 'Viết',
 };
 
+// Practice mode: với câu nhập text (sentence_assembly / fill_hanzi /
+// fill_blank / short_answer), không reveal đáp án onChange — đợi user bấm
+// "Kiểm tra". Câu kiểu chọn (TF / MCQ / image_grid_match / reply_match /
+// word_bank_fill) reveal ngay khi click vì 1 click = 1 câu trả lời cuối.
+const TEXT_ENTRY_TYPES = new Set([
+    'sentence_assembly',
+    'fill_hanzi',
+    'fill_blank',
+    'short_answer',
+]);
+function isTextEntryType(qt?: string) {
+    return !!qt && TEXT_ENTRY_TYPES.has(qt);
+}
+
 export default function ExamTakingPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary)] mx-auto mb-4"></div>
+                    <p className="text-[var(--text-secondary)]">Đang tải đề thi...</p>
+                </div>
+            </div>
+        }>
+            <ExamTakingPageContent />
+        </Suspense>
+    );
+}
+
+function ExamTakingPageContent() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { isAuthenticated } = useAuth();
     const examId = Number(params.examId);
+
+    // Mode: 'test' (timed, full audio merged, no feedback) | 'practice' (no timer, per-Q audio + feedback ngay)
+    const mode: 'test' | 'practice' = searchParams.get('mode') === 'practice' ? 'practice' : 'test';
 
     // Core state
     const [exam, setExam] = useState<HskExamStartResponse | null>(null);
@@ -67,24 +100,25 @@ export default function ExamTakingPage() {
     const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
     const [showGrid, setShowGrid] = useState(false);
 
-    // Timer
+    // Practice mode: lookup correct answers + explanations để show feedback ngay
+    const [correctAnswerMap, setCorrectAnswerMap] = useState<Record<number, { answer: string; explanation?: string }>>({});
+    // Practice: lưu xem user đã reveal (chọn đáp án) câu nào — để toggle feedback panel
+    const [revealed, setRevealed] = useState<Set<number>>(new Set());
+
+    // Timer (chỉ dùng trong test mode)
     const [timeLeft, setTimeLeft] = useState(0);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const autoFinishCalledRef = useRef(false);
 
-    // Track answer submission to server
+    // Track answer submission to server (chỉ dùng trong test mode)
     const pendingSubmitRef = useRef<Record<number, string>>({});
     const submitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const submittingRef = useRef(false);
 
-    // Audio play count tracking: key = "section:{sectionId}" or "question:{questionId}"
-    const [audioPlays, setAudioPlays] = useState<Record<string, number>>({});
-    // Track whether a play event is a fresh start (not a resume)
-    const audioFreshPlayRef = useRef<Record<string, boolean>>({});
-
     // Load exam
     useEffect(() => {
-        if (!isAuthenticated) {
+        // Practice mode public — không cần auth. Test mode cần auth để track attempt.
+        if (mode === 'test' && !isAuthenticated) {
             router.push('/login');
             return;
         }
@@ -92,27 +126,55 @@ export default function ExamTakingPage() {
         async function load() {
             try {
                 setLoading(true);
-                const data = await startHskExam(examId);
-                setExam(data);
+                if (mode === 'practice') {
+                    // Practice: dùng public endpoint, không tạo attempt
+                    const data = await fetchHskExamAnswers(examId);
+                    // Synthesize HskExamStartResponse-shaped object để reuse render logic
+                    const totalQ = data.sections.reduce((sum, s) => sum + s.questions.length, 0);
+                    const synthesized: HskExamStartResponse = {
+                        id: data.id,
+                        title: data.title,
+                        hsk_level: data.hsk_level,
+                        exam_type: data.exam_type,
+                        total_questions: totalQ,
+                        duration_minutes: data.duration_minutes,
+                        passing_score: 0,
+                        attemptId: 0,
+                        startedAt: new Date().toISOString(),
+                        savedAnswers: [],
+                        sections: data.sections,
+                    };
+                    setExam(synthesized);
+                    setQuestions(flattenQuestions(data.sections));
+                    // Build correct answer map
+                    const cMap: Record<number, { answer: string; explanation?: string }> = {};
+                    data.sections.forEach(s => s.questions.forEach(q => {
+                        cMap[q.id] = { answer: q.correctAnswer, explanation: q.explanation };
+                    }));
+                    setCorrectAnswerMap(cMap);
+                    // Practice không có timer
+                    setTimeLeft(0);
+                } else {
+                    const data = await startHskExam(examId);
+                    setExam(data);
+                    setQuestions(flattenQuestions(data.sections));
 
-                const flat = flattenQuestions(data.sections);
-                setQuestions(flat);
+                    // Restore saved answers (resume support)
+                    if (data.savedAnswers && data.savedAnswers.length > 0) {
+                        const restored: Record<number, string> = {};
+                        data.savedAnswers.forEach(sa => {
+                            restored[sa.questionId] = sa.answer;
+                        });
+                        setAnswers(restored);
+                    }
 
-                // Restore saved answers (resume support)
-                if (data.savedAnswers && data.savedAnswers.length > 0) {
-                    const restored: Record<number, string> = {};
-                    data.savedAnswers.forEach(sa => {
-                        restored[sa.questionId] = sa.answer;
-                    });
-                    setAnswers(restored);
+                    // Calculate remaining time
+                    const totalSeconds = data.duration_minutes * 60;
+                    const startedAt = new Date(data.startedAt).getTime();
+                    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+                    const remaining = Math.max(0, totalSeconds - elapsed);
+                    setTimeLeft(remaining);
                 }
-
-                // Calculate remaining time
-                const totalSeconds = data.duration_minutes * 60;
-                const startedAt = new Date(data.startedAt).getTime();
-                const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-                const remaining = Math.max(0, totalSeconds - elapsed);
-                setTimeLeft(remaining);
             } catch (err: unknown) {
                 const message = err instanceof Error ? err.message : 'Failed to load exam';
                 setError(message);
@@ -122,10 +184,11 @@ export default function ExamTakingPage() {
         }
 
         load();
-    }, [examId, isAuthenticated, router]);
+    }, [examId, isAuthenticated, router, mode]);
 
-    // Timer countdown
+    // Timer countdown — practice mode KHÔNG đếm giờ
     useEffect(() => {
+        if (mode === 'practice') return;
         if (timeLeft <= 0 || !exam) return;
 
         timerRef.current = setInterval(() => {
@@ -149,7 +212,7 @@ export default function ExamTakingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [exam]);
 
-    // Submit answer to server (debounced)
+    // Submit answer to server (debounced) — KHÔNG dùng trong practice mode
     const submitAnswerToServer = useCallback((questionId: number, answer: string) => {
         if (!exam) return;
         pendingSubmitRef.current[questionId] = answer;
@@ -171,7 +234,30 @@ export default function ExamTakingPage() {
 
     const handleSelectAnswer = (questionId: number, answer: string) => {
         setAnswers(prev => ({ ...prev, [questionId]: answer }));
-        submitAnswerToServer(questionId, answer);
+        if (mode === 'practice') {
+            // Discrete-choice (TF/MCQ/image_grid/reply/word_bank): reveal ngay
+            // sau click vì 1 click = đáp án cuối. Text-entry (writing/fill):
+            // KHÔNG reveal onChange — đợi user bấm "Kiểm tra" (revealAnswer()).
+            const q = questions.find(q => q.id === questionId);
+            if (!isTextEntryType(q?.questionType)) {
+                setRevealed(prev => {
+                    const next = new Set(prev);
+                    next.add(questionId);
+                    return next;
+                });
+            }
+        } else {
+            submitAnswerToServer(questionId, answer);
+        }
+    };
+
+    // Practice mode — bấm "Kiểm tra" để reveal đáp án cho câu nhập text.
+    const revealAnswer = (questionId: number) => {
+        setRevealed(prev => {
+            const next = new Set(prev);
+            next.add(questionId);
+            return next;
+        });
     };
 
     const handleToggleFlag = (questionId: number) => {
@@ -185,6 +271,13 @@ export default function ExamTakingPage() {
 
     const handleFinish = useCallback(async () => {
         if (!exam) return;
+
+        // Practice mode: chỉ navigate về list, không grading
+        if (mode === 'practice') {
+            router.push('/hsk-test');
+            return;
+        }
+
         if (submittingRef.current) return;
         submittingRef.current = true;
 
@@ -215,7 +308,7 @@ export default function ExamTakingPage() {
         } finally {
             setShowConfirmSubmit(false);
         }
-    }, [exam, router]);
+    }, [exam, router, mode]);
 
     // Keep a ref to handleFinish so the timer interval always calls the latest version
     const handleFinishRef = useRef(handleFinish);
@@ -254,12 +347,20 @@ export default function ExamTakingPage() {
     const totalQuestions = questions.length;
     const isWarning = timeLeft > 0 && timeLeft <= 300; // 5 minutes warning
 
-    const testMode: 'practice' | 'full' = exam.exam_type === 'practice' ? 'practice' : 'full';
+    // URL mode override: practice mode → per-question audio inline + feedback ngay
+    // test mode → merged audio cho cả section, không feedback
+    const testMode: 'practice' | 'full' = mode === 'practice' ? 'practice' : 'full';
     const currentSection = exam.sections[currentQuestion.sectionIndex];
     const showSectionAudio =
         testMode === 'full' &&
         currentSection?.section_type === 'listening' &&
         Boolean(currentSection.audio_url);
+
+    // Practice mode: feedback cho câu hiện tại
+    const currentAnswer = answers[currentQuestion.id];
+    const currentCorrect = correctAnswerMap[currentQuestion.id];
+    const isRevealed = mode === 'practice' && revealed.has(currentQuestion.id);
+    const isCorrect = isRevealed && currentCorrect && currentAnswer === currentCorrect.answer;
 
     return (
         <HskTestProvider testMode={testMode}>
@@ -284,24 +385,40 @@ export default function ExamTakingPage() {
                         <PinyinToggle />
                     </div>
 
-                    {/* Center - Timer */}
-                    <div className={`flex items-center gap-2 px-4 py-1.5 rounded-xl font-mono text-lg font-bold ${
-                        isWarning
-                            ? 'bg-red-500/10 text-red-500 animate-pulse'
-                            : 'bg-[var(--surface-secondary)] text-[var(--text-main)]'
-                    }`}>
-                        <Icon name="schedule" size="sm" />
-                        {formatTime(timeLeft)}
-                    </div>
+                    {/* Center - Timer (test) hoặc Practice badge */}
+                    {mode === 'test' ? (
+                        <div className={`flex items-center gap-2 px-4 py-1.5 rounded-xl font-mono text-lg font-bold ${
+                            isWarning
+                                ? 'bg-red-500/10 text-red-500 animate-pulse'
+                                : 'bg-[var(--surface-secondary)] text-[var(--text-main)]'
+                        }`}>
+                            <Icon name="schedule" size="sm" />
+                            {formatTime(timeLeft)}
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-semibold">
+                            <Icon name="school" size="sm" />
+                            Chế độ luyện tập
+                        </div>
+                    )}
 
-                    {/* Right - Submit */}
-                    <button
-                        onClick={() => setShowConfirmSubmit(true)}
-                        disabled={submitting}
-                        className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors disabled:opacity-50"
-                    >
-                        Nộp bài
-                    </button>
+                    {/* Right - Submit / Kết thúc */}
+                    {mode === 'test' ? (
+                        <button
+                            onClick={() => setShowConfirmSubmit(true)}
+                            disabled={submitting}
+                            className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors disabled:opacity-50"
+                        >
+                            Nộp bài
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => router.push('/hsk-test')}
+                            className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--border)] transition-colors"
+                        >
+                            Kết thúc
+                        </button>
+                    )}
                 </div>
 
                 {/* Progress bar */}
@@ -513,6 +630,54 @@ export default function ExamTakingPage() {
                             value={answers[currentQuestion.id] || ''}
                             onChange={v => handleSelectAnswer(currentQuestion.id, v)}
                         />
+
+                        {/* Practice mode + text-entry: nút "Kiểm tra" để gate reveal */}
+                        {mode === 'practice'
+                            && isTextEntryType(currentQuestion.questionType)
+                            && !isRevealed
+                            && (answers[currentQuestion.id] || '').trim().length > 0 && (
+                            <button
+                                onClick={() => revealAnswer(currentQuestion.id)}
+                                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors"
+                            >
+                                <Icon name="check" size="sm" />
+                                Kiểm tra
+                            </button>
+                        )}
+
+                        {/* Practice mode: feedback panel sau khi user chọn đáp án */}
+                        {isRevealed && currentCorrect && (
+                            <div className={`mt-4 rounded-xl border-2 p-4 ${
+                                isCorrect
+                                    ? 'border-emerald-500/50 bg-emerald-500/10'
+                                    : 'border-red-500/50 bg-red-500/10'
+                            }`}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Icon
+                                        name={isCorrect ? 'check_circle' : 'cancel'}
+                                        size="sm"
+                                        className={isCorrect ? 'text-emerald-500' : 'text-red-500'}
+                                        filled
+                                    />
+                                    <span className={`font-semibold text-sm ${
+                                        isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                                    }`}>
+                                        {isCorrect ? 'Chính xác!' : 'Chưa đúng'}
+                                    </span>
+                                    {!isCorrect && (
+                                        <span className="ml-auto text-sm text-[var(--text-secondary)]">
+                                            Đáp án đúng: <strong className="text-[var(--text-main)]">{currentCorrect.answer}</strong>
+                                        </span>
+                                    )}
+                                </div>
+                                {currentCorrect.explanation && (
+                                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                                        <span className="font-medium text-[var(--text-main)]">Giải thích: </span>
+                                        {currentCorrect.explanation}
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Bottom Navigation */}

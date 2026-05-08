@@ -8,6 +8,7 @@ import { Icon } from '@/components/ui/Icon';
 import { HSKBadge } from '@/components/ui/Badge';
 import {
     HSK_PRESETS, HSK_SECTION_PRESETS, HSK_AVAILABLE_LEVELS, EXAM_TYPES,
+    // HSK_PRESETS giữ lại cho `summarizeLevel` hiển thị duration/passing_score.
 } from '@/components/admin/hsk-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
@@ -67,75 +68,29 @@ export default function AdminHskTestNewPage() {
         setError('');
         try {
             const token = localStorage.getItem('adminToken');
-            const preset = HSK_PRESETS[level];
 
-            // Step A: tạo exam
-            const examRes = await fetch(`${API_BASE}/api/hsk-exams`, {
+            // HF2: 1 atomic call → BE service `instantiateTemplate(level)` tạo
+            // exam + sections + groups + N placeholder questions trong cùng 1
+            // transaction. Nếu fail → ROLLBACK, không có state nửa vời.
+            const res = await fetch(`${API_BASE}/api/hsk-exams/from-template`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                // BE createExam destructures: title, hsk_level, exam_type,
-                // duration_minutes, passing_score, description. total_questions
-                // được auto-cập nhật từ tổng section (xem hskExam.model.js).
                 body: JSON.stringify({
+                    level,
                     title: form.title,
-                    hsk_level: level,
                     exam_type: form.exam_type,
-                    duration_minutes: preset.duration_minutes,
-                    passing_score: preset.passing_score,
                     description: form.description || null,
                 }),
             });
-            const examJson = await examRes.json();
-            if (!examRes.ok || !examJson.data?.id) {
-                throw new Error(examJson.message || 'Không thể tạo đề thi');
-            }
-            const examId = examJson.data.id;
-
-            // Step B: auto-create các section rỗng theo preset.
-            // BE `createSection` không nhận total_questions (column này tự bump
-            // khi thêm câu) — nên section sẽ rỗng, admin thêm câu thủ công sau.
-            const sections = HSK_SECTION_PRESETS[level];
-            const failed: string[] = [];
-            for (const s of sections) {
-                const sectionRes = await fetch(`${API_BASE}/api/hsk-exams/${examId}/sections`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                        section_type: s.section_type,
-                        section_order: s.section_order,
-                        title: s.title,
-                        instructions: s.instructions,
-                        duration_seconds: s.duration_seconds,
-                        audio_url: '',
-                    }),
-                });
-                if (!sectionRes.ok) {
-                    const sd = await sectionRes.json().catch(() => ({}));
-                    failed.push(`${s.title}: ${sd.message || `HTTP ${sectionRes.status}`}`);
-                }
+            const json = await res.json();
+            if (!res.ok || !json.data?.id) {
+                throw new Error(json.message || `Không tạo được đề (HTTP ${res.status})`);
             }
 
-            if (failed.length > 0) {
-                // Fail-fast: surface error, không redirect — admin có exam ở DB
-                // nhưng thiếu một số section, tự quyết định retry hoặc xóa.
-                setError(
-                    `Đề được tạo (id=${examId}) nhưng ${failed.length}/${sections.length} ` +
-                    `section thất bại:\n  - ${failed.join('\n  - ')}\n\n` +
-                    `Mở list đề và xem section nào bị thiếu, rồi thêm thủ công ` +
-                    `hoặc xóa đề và tạo lại.`,
-                );
-                setSubmitting(false);
-                return;
-            }
-
-            // All sections OK — redirect về list, expand đề mới
-            router.replace(`/admin/hsk-test?expand=${examId}`);
+            router.replace(`/admin/hsk-test?expand=${json.data.id}`);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Lỗi không xác định');
             setSubmitting(false);
@@ -167,8 +122,9 @@ export default function AdminHskTestNewPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--text-main)] mb-2">Chọn cấp độ HSK</h1>
                     <p className="text-sm text-[var(--text-muted)] mb-6">
-                        Mỗi cấp độ có cấu trúc đề riêng. Hệ thống tự động scaffold các phần
-                        (section) <strong>rỗng</strong> theo cấu trúc; admin thêm câu hỏi vào từng phần ở bước tiếp theo.
+                        Mỗi cấp độ có cấu trúc đề riêng. Hệ thống tự động scaffold đầy đủ:
+                        sections, groups (lưới ảnh / bộ từ / câu trả lời) và <strong>N câu hỏi
+                        placeholder</strong> đúng số. Admin chỉ cần edit nội dung từng câu.
                     </p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -245,11 +201,11 @@ export default function AdminHskTestNewPage() {
 
                     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 mb-6">
                         <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">
-                            Sẽ scaffold các phần rỗng
+                            Sẽ scaffold đầy đủ section + group + câu hỏi placeholder
                         </p>
                         <p className="text-xs text-[var(--text-muted)] mb-3 italic">
-                            Số câu dưới đây là <strong>mục tiêu</strong> theo chuẩn HSK — section được tạo rỗng,
-                            admin thêm câu hỏi sau ở bước editor.
+                            Đề mới sẽ chứa N câu placeholder theo đúng chuẩn HSK {level} —
+                            admin chỉ cần edit nội dung, không cần tạo câu mới từ đầu.
                         </p>
                         <div className="grid grid-cols-3 gap-3">
                             {summary.sections.map(s => (
@@ -319,7 +275,7 @@ export default function AdminHskTestNewPage() {
 
                     <div className="flex gap-3 mt-6">
                         <Button type="submit" disabled={submitting || !form.title.trim()}>
-                            {submitting ? 'Đang tạo...' : 'Tạo đề & sang bước thêm câu hỏi'}
+                            {submitting ? 'Đang tạo skeleton...' : `Scaffold đầy đủ HSK ${level} (${summary.totalQuestions} câu placeholder)`}
                         </Button>
                         <Link href="/admin/hsk-test">
                             <Button type="button" variant="ghost">Hủy</Button>

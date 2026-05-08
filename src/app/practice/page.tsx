@@ -1,14 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
-import { fetchLearningStats } from '@/lib/api';
 
 type GameId = 'flashcard' | 'quiz' | 'match' | 'write' | 'type' | 'dictation' | 'translate';
 
@@ -30,11 +27,11 @@ interface GameTile {
 const GAMES: GameTile[] = [
     { id: 'flashcard',  label: 'Flashcard',     sub: 'Trắc nghiệm A/B/C/D',     icon: 'style',          accent: 'text-pink-500',    bg: 'bg-pink-500/10',    available: true },
     { id: 'quiz',       label: 'Trắc nghiệm',   sub: 'Chọn nghĩa đúng',         icon: 'check_box',      accent: 'text-emerald-500', bg: 'bg-emerald-500/10', available: true },
-    { id: 'match',      label: 'Nối từ',        sub: 'Ghép Hán ↔ nghĩa',        icon: 'compare_arrows', accent: 'text-amber-500',   bg: 'bg-amber-500/10',   available: false },
+    { id: 'match',      label: 'Nối từ',        sub: 'Ghép Hán ↔ nghĩa',        icon: 'compare_arrows', accent: 'text-amber-500',   bg: 'bg-amber-500/10',   available: true },
     { id: 'write',      label: 'Viết chữ',      sub: 'Vẽ Hán theo nét',         icon: 'draw',           accent: 'text-orange-500',  bg: 'bg-orange-500/10',  available: false },
     { id: 'type',       label: 'Gõ từ',         sub: 'Gõ nghĩa tiếng Việt',     icon: 'keyboard',       accent: 'text-sky-500',     bg: 'bg-sky-500/10',     available: true },
     { id: 'dictation',  label: 'Nghe viết',     sub: 'Nghe → gõ Hán',           icon: 'hearing',        accent: 'text-purple-500',  bg: 'bg-purple-500/10',  available: true },
-    { id: 'translate',  label: 'Dịch câu',      sub: 'Dịch Việt ↔ Trung',       icon: 'translate',      accent: 'text-indigo-500',  bg: 'bg-indigo-500/10',  available: false },
+    { id: 'translate',  label: 'Dịch câu',      sub: 'AI sinh câu, bạn dịch',    icon: 'translate',      accent: 'text-indigo-500',  bg: 'bg-indigo-500/10',  available: true },
 ];
 
 const HSK_OPTS = [
@@ -55,29 +52,6 @@ export default function PracticeHubPage() {
 
     const [hsk, setHsk] = useState('');
     const [count, setCount] = useState(20);
-    const [dueCount, setDueCount] = useState(0);
-    const [loadingDue, setLoadingDue] = useState(false);
-
-    const loadDue = useCallback(async () => {
-        if (!isAuthenticated) {
-            setDueCount(0);
-            return;
-        }
-        setLoadingDue(true);
-        try {
-            // Dùng `due_today` từ /api/progress/stats — count chính xác (không bị
-            // cap bởi limit). Stats hiện chưa filter theo HSK level → số là tổng
-            // toàn cục, đúng kỳ vọng cho hub-level "N từ sẵn sàng".
-            const stats = await fetchLearningStats();
-            setDueCount(stats.dueToday || 0);
-        } catch (e) {
-            console.error('fetchLearningStats failed', e);
-        } finally {
-            setLoadingDue(false);
-        }
-    }, [isAuthenticated]);
-
-    useEffect(() => { loadDue(); }, [loadDue]);
 
     const startGame = (id: GameId) => {
         const game = GAMES.find(g => g.id === id);
@@ -90,17 +64,6 @@ export default function PracticeHubPage() {
         if (hsk) params.set('hsk', hsk);
         params.set('limit', String(count));
         router.push(`/practice/${id}?${params.toString()}`);
-    };
-
-    const startSrs = () => {
-        if (!isAuthenticated) {
-            router.push('/login');
-            return;
-        }
-        const params = new URLSearchParams();
-        if (hsk) params.set('hsk', hsk);
-        params.set('limit', String(count));
-        router.push(`/practice/srs?${params.toString()}`);
     };
 
     return (
@@ -174,46 +137,6 @@ export default function PracticeHubPage() {
                     ))}
                 </div>
 
-                {/* SRS panel */}
-                <div className="rounded-2xl border-2 border-[var(--primary)]/30 bg-gradient-to-r from-[var(--primary)]/10 to-purple-500/10 p-5">
-                    <div className="flex items-center justify-between flex-wrap gap-4">
-                        <div className="flex items-start gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-[var(--primary)]/20 text-[var(--primary)] flex items-center justify-center shrink-0">
-                                <Icon name="autorenew" size="md" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-[var(--text-main)] flex items-center gap-2">
-                                    Ôn tập ngắt quãng (SRS)
-                                </h3>
-                                <p className="text-sm text-[var(--text-secondary)] mt-1">
-                                    Hệ thống tự động lên lịch ôn từ vào đúng thời điểm sắp quên. Dùng SM-2.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="text-right">
-                                <p className="text-2xl font-bold text-[var(--primary)]">
-                                    {loadingDue ? '...' : dueCount}
-                                </p>
-                                <p className="text-xs text-[var(--text-muted)]">từ sẵn sàng</p>
-                            </div>
-                            <Button
-                                onClick={startSrs}
-                                disabled={!isAuthenticated || dueCount === 0}
-                                className="whitespace-nowrap"
-                            >
-                                Bắt đầu ôn tập
-                                <Icon name="arrow_forward" size="sm" className="ml-1" />
-                            </Button>
-                        </div>
-                    </div>
-                    {!isAuthenticated && (
-                        <p className="text-xs text-[var(--text-muted)] mt-3">
-                            <Link href="/login" className="text-[var(--primary)] hover:underline">Đăng nhập</Link> để
-                            theo dõi tiến độ + dùng SRS.
-                        </p>
-                    )}
-                </div>
             </main>
 
             <Footer />

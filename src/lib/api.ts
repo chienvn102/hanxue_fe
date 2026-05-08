@@ -2,6 +2,16 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
 // Types
+export interface VocabTheme {
+    id: number;
+    slug: string;
+    name_vi: string;
+    name_en?: string | null;
+    icon?: string | null;
+    color?: string | null;
+    sort_order?: number;
+}
+
 export interface Vocabulary {
     id: number;
     simplified: string;
@@ -15,6 +25,7 @@ export interface Vocabulary {
     audioUrl?: string;
     frequencyRank?: number;
     examples?: { zh: string; pinyin: string; vi: string }[];
+    themes?: VocabTheme[];
 }
 
 export interface Character {
@@ -66,16 +77,25 @@ export async function fetchVocab(params: {
     page?: number;
     hsk?: number;
     q?: string;
+    theme?: string;
 }): Promise<{ data: Vocabulary[]; pagination: { total: number; limit: number; page: number; totalPages: number } }> {
     const searchParams = new URLSearchParams();
     if (params.limit) searchParams.set('limit', params.limit.toString());
     if (params.page) searchParams.set('page', params.page.toString());
     if (params.hsk) searchParams.set('hsk', params.hsk.toString());
     if (params.q) searchParams.set('q', params.q);
+    if (params.theme) searchParams.set('theme', params.theme);
 
     const res = await fetch(`${API_BASE_URL}/api/vocab?${searchParams.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch vocabulary');
     return res.json();
+}
+
+export async function fetchVocabThemes(): Promise<VocabTheme[]> {
+    const res = await fetch(`${API_BASE_URL}/api/vocab/themes`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.data || [];
 }
 
 export async function fetchVocabById(id: number): Promise<Vocabulary> {
@@ -160,27 +180,22 @@ export async function playAudio(word: string): Promise<void> {
 }
 
 // ============================================================
-// SRS (Spaced Repetition System) Types & Functions
+// Progress Tracking Types & Functions (HF4: SRS removed — flashcard
+// session vẫn POST /review để cộng dồn times_seen/correct/wrong.)
 // ============================================================
 
 export interface VocabProgress {
     masteryLevel: number;
-    easeFactor: number;
-    intervalDays: number;
-    repetitions: number;
-    nextReview: string;
     timesSeen: number;
     timesCorrect: number;
-}
-
-export interface VocabWithProgress extends Vocabulary {
-    progress: VocabProgress;
+    timesWrong?: number;
+    lastReviewed?: string;
+    avgResponseMs?: number;
 }
 
 export interface LearningStats {
     totalLearned: number;
     mastered: number;
-    dueToday: number;
     avgMastery: number;
     totalReviews: number;
     accuracy: number;
@@ -192,8 +207,8 @@ export interface ReviewResult {
     success: boolean;
     vocabId: number;
     quality: number;
-    qualityDescription: string;
-    newProgress: VocabProgress;
+    correct: boolean;
+    xpEarned: number;
 }
 
 // Helper to get auth header
@@ -249,38 +264,6 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
 }
 
 /**
- * Get vocabulary due for review today
- */
-export async function fetchDueVocabs(params?: { limit?: number; hsk?: number }): Promise<{ count: number; data: VocabWithProgress[] }> {
-    const searchParams = new URLSearchParams();
-    if (params?.limit) searchParams.set('limit', params.limit.toString());
-    if (params?.hsk) searchParams.set('hsk', params.hsk.toString());
-
-    const res = await authFetch(`${API_BASE_URL}/api/progress/due?${searchParams.toString()}`);
-    if (!res.ok) {
-        if (res.status === 401) throw new Error('Unauthorized');
-        throw new Error('Failed to fetch due vocabulary');
-    }
-    return res.json();
-}
-
-/**
- * Get new vocabulary to learn (not started yet)
- */
-export async function fetchNewVocabs(params?: { limit?: number; hsk?: number }): Promise<{ count: number; data: Vocabulary[] }> {
-    const searchParams = new URLSearchParams();
-    if (params?.limit) searchParams.set('limit', params.limit.toString());
-    if (params?.hsk) searchParams.set('hsk', params.hsk.toString());
-
-    const res = await authFetch(`${API_BASE_URL}/api/progress/new?${searchParams.toString()}`);
-    if (!res.ok) {
-        if (res.status === 401) throw new Error('Unauthorized');
-        throw new Error('Failed to fetch new vocabulary');
-    }
-    return res.json();
-}
-
-/**
  * Get user's learning statistics
  */
 export async function fetchLearningStats(): Promise<LearningStats> {
@@ -293,16 +276,10 @@ export async function fetchLearningStats(): Promise<LearningStats> {
 }
 
 /**
- * Submit vocabulary review result
+ * Submit a flashcard review result.
  * @param vocabId - Vocabulary ID
- * @param quality - Quality rating 0-5
- *   0: Không nhớ gì
- *   1: Nhớ sai nhưng nhận ra đáp án
- *   2: Nhớ sai nhưng quen thuộc
- *   3: Nhớ đúng với nỗ lực
- *   4: Nhớ đúng sau do dự
- *   5: Nhớ đúng ngay lập tức
- * @param responseMs - Optional response time in milliseconds
+ * @param quality - 0–5 (≥3 = correct). FE flashcard hiện chỉ truyền 5 hoặc 0.
+ * @param responseMs - optional time-to-answer in milliseconds
  */
 export async function submitReview(vocabId: number, quality: number, responseMs?: number): Promise<ReviewResult> {
     const res = await authFetch(`${API_BASE_URL}/api/progress/review`, {
@@ -318,22 +295,97 @@ export async function submitReview(vocabId: number, quality: number, responseMs?
     return res.json();
 }
 
-/**
- * Get progress for a specific vocabulary
- */
-export async function fetchVocabProgress(vocabId: number): Promise<{ learned: boolean; progress?: VocabProgress }> {
-    const res = await authFetch(`${API_BASE_URL}/api/progress/${vocabId}`);
-    if (!res.ok) {
-        if (res.status === 401) throw new Error('Unauthorized');
-        throw new Error('Failed to fetch progress');
-    }
-    return res.json();
+// ============================================================
+// Practice — Match game (HF4.3)
+// Server giữ session với token; client phải dùng token để claim từng cặp.
+// ============================================================
+
+export interface MatchPair {
+    id: number;
+    simplified: string;
+    pinyin: string;
+    meaningVi: string;
 }
 
-// Quality rating descriptions (Vietnamese)
-export const QUALITY_RATINGS = [
-    { value: 5, label: 'Hoàn hảo', description: 'Nhớ đúng ngay lập tức', color: 'emerald' }
-] as const;
+export interface MatchSession {
+    token: string;
+    pairs: MatchPair[];
+}
+
+export async function fetchMatchSession(params: { hsk?: number; limit?: number }): Promise<MatchSession> {
+    const sp = new URLSearchParams();
+    if (params.hsk) sp.set('hsk', String(params.hsk));
+    sp.set('limit', String(params.limit || 8));
+    const res = await authFetch(`${API_BASE_URL}/api/practice/match?${sp.toString()}`);
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch match pairs');
+    }
+    const json = await res.json();
+    return { token: json.token, pairs: json.pairs || [] };
+}
+
+export async function clearMatchPair(token: string, vocabId: number): Promise<{ xpEarned: number; cleared: number; total: number }> {
+    const res = await authFetch(`${API_BASE_URL}/api/practice/match-clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, vocabId }),
+    });
+    if (!res.ok) return { xpEarned: 0, cleared: 0, total: 0 };
+    const json = await res.json();
+    return {
+        xpEarned: json.data?.xpEarned || 0,
+        cleared: json.data?.cleared || 0,
+        total: json.data?.total || 0,
+    };
+}
+
+// ============================================================
+// Practice — Translate game (HF4.4)
+// Server giữ vi + expected_zh (KHÔNG gửi về client trước khi grade).
+// ============================================================
+
+export interface TranslatePrompt {
+    token: string;
+    vi: string;
+    hsk: number;
+}
+
+export interface TranslateGrade {
+    score: number;
+    feedbackVi: string;
+    correctZh: string;
+    expectedPinyin?: string;
+    xpEarned: number;
+}
+
+export async function fetchTranslatePrompt(hsk: number): Promise<TranslatePrompt> {
+    const res = await authFetch(`${API_BASE_URL}/api/practice/translate-prompt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hsk }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Không tạo được câu dịch');
+    }
+    const json = await res.json();
+    return json.data;
+}
+
+export async function gradeTranslate(payload: { token: string; user_zh: string }): Promise<TranslateGrade> {
+    const res = await authFetch(`${API_BASE_URL}/api/practice/translate-grade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Không chấm được bài dịch');
+    }
+    const json = await res.json();
+    return json.data;
+}
 
 // ============================================================
 // Grammar Functions

@@ -9,12 +9,13 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { HSKBadge } from '@/components/ui/Badge';
-import { fetchVocab, Vocabulary, playAudio, fetchSavedVocabIds, toggleSaveVocab } from '@/lib/api';
+import { fetchVocab, fetchVocabThemes, Vocabulary, VocabTheme, playAudio, fetchSavedVocabIds, toggleSaveVocab } from '@/lib/api';
 import { useAuth } from '@/components/AuthContext';
 
 function VocabList() {
     const searchParams = useSearchParams();
     const hskLevel = searchParams.get('hsk');
+    const themeSlug = searchParams.get('theme');
     const [vocabs, setVocabs] = useState<Vocabulary[]>([]);
     const [loading, setLoading] = useState(true);
     const [total, setTotal] = useState(0);
@@ -23,6 +24,7 @@ function VocabList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [savedVocabIds, setSavedVocabIds] = useState<Set<number>>(new Set());
+    const [themes, setThemes] = useState<VocabTheme[]>([]);
     const { isAuthenticated } = useAuth();
     const limit = 20;
 
@@ -44,6 +46,18 @@ function VocabList() {
         }
     }, [isAuthenticated]);
 
+    // Fetch theme list once
+    useEffect(() => {
+        fetchVocabThemes()
+            .then(setThemes)
+            .catch(() => setThemes([]));
+    }, []);
+
+    // Reset to page 1 khi đổi theme/hsk
+    useEffect(() => {
+        setPage(1);
+    }, [themeSlug, hskLevel]);
+
     // Fetch vocab with search query
     useEffect(() => {
         let cancelled = false;
@@ -54,6 +68,7 @@ function VocabList() {
                 page,
                 hsk: hskLevel ? parseInt(hskLevel) : undefined,
                 q: debouncedQuery.trim() || undefined,
+                theme: themeSlug || undefined,
             })
                 .then((res) => {
                     if (!cancelled) {
@@ -66,7 +81,18 @@ function VocabList() {
         };
         loadVocab();
         return () => { cancelled = true; };
-    }, [hskLevel, page, debouncedQuery]);
+    }, [hskLevel, themeSlug, page, debouncedQuery]);
+
+    // Build href that preserves the OTHER filter when switching one
+    const hrefWith = (next: { hsk?: string | null; theme?: string | null }) => {
+        const sp = new URLSearchParams();
+        const finalHsk = next.hsk !== undefined ? next.hsk : hskLevel;
+        const finalTheme = next.theme !== undefined ? next.theme : themeSlug;
+        if (finalHsk) sp.set('hsk', finalHsk);
+        if (finalTheme) sp.set('theme', finalTheme);
+        const qs = sp.toString();
+        return qs ? `/vocab?${qs}` : '/vocab';
+    };
 
     const handleSaveToggle = (vocabId: number, saved: boolean) => {
         if (saved) {
@@ -107,17 +133,21 @@ function VocabList() {
             </div>
 
             {/* Filter Bar */}
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
                 <p className="text-sm text-[var(--text-secondary)]">
                     <strong className="text-[var(--text-main)]">{total}</strong> từ vựng
                     {hskLevel && ` HSK ${hskLevel}`}
+                    {themeSlug && themes.length > 0 && (() => {
+                        const t = themes.find(t => t.slug === themeSlug);
+                        return t ? ` · ${t.name_vi}` : '';
+                    })()}
                     {debouncedQuery.trim() && ` cho "${debouncedQuery}"`}
                 </p>
                 <div className="flex flex-wrap gap-2">
                     {[1, 2, 3, 4, 5, 6].map((level) => (
                         <Link
                             key={level}
-                            href={`/vocab?hsk=${level}`}
+                            href={hrefWith({ hsk: String(level) })}
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${hskLevel === String(level)
                                 ? 'bg-[var(--primary)] text-white'
                                 : 'bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
@@ -127,7 +157,7 @@ function VocabList() {
                         </Link>
                     ))}
                     <Link
-                        href="/vocab"
+                        href={hrefWith({ hsk: null })}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${!hskLevel
                             ? 'bg-[var(--primary)] text-white'
                             : 'bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
@@ -137,6 +167,39 @@ function VocabList() {
                     </Link>
                 </div>
             </div>
+
+            {/* Theme Filter Row (chỉ hiện nếu BE đã có theme data) */}
+            {themes.length > 0 && (
+                <div className="mb-6 flex flex-wrap items-center gap-2">
+                    <Link
+                        href={hrefWith({ theme: null })}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${!themeSlug
+                            ? 'bg-[var(--primary)] text-white'
+                            : 'bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
+                            }`}
+                    >
+                        <Icon name="filter_list" size="xs" />
+                        Tất cả chủ đề
+                    </Link>
+                    {themes.map((t) => {
+                        const active = themeSlug === t.slug;
+                        return (
+                            <Link
+                                key={t.slug}
+                                href={hrefWith({ theme: t.slug })}
+                                title={t.name_en || t.name_vi}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${active
+                                    ? 'bg-[var(--primary)] text-white'
+                                    : 'bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]'
+                                    }`}
+                            >
+                                {t.icon && <Icon name={t.icon} size="xs" />}
+                                {t.name_vi}
+                            </Link>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Vocab Grid */}
             {loading ? (
@@ -151,7 +214,9 @@ function VocabList() {
                     <p className="text-[var(--text-secondary)]">
                         {debouncedQuery.trim()
                             ? `Không tìm thấy từ vựng phù hợp với "${debouncedQuery}"`
-                            : 'Không có từ vựng nào'}
+                            : themeSlug || hskLevel
+                                ? 'Không có từ vựng phù hợp với bộ lọc đã chọn.'
+                                : 'Không có từ vựng nào'}
                     </p>
                 </div>
             ) : (

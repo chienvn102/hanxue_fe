@@ -77,12 +77,21 @@ export default function HskTestPage() {
         return { attempts: attempts.length, completed: completed.length, inProgress, bestScore, bestMaxScore, bestPassed };
     };
 
-    const handleExamClick = (exam: HskExam) => {
+    const handleStartTest = (exam: HskExam) => {
         if (!isAuthenticated) {
             router.push('/login');
             return;
         }
-        router.push(`/hsk-test/${exam.id}`);
+        router.push(`/hsk-test/${exam.id}?mode=test`);
+    };
+
+    const handleStartPractice = (exam: HskExam) => {
+        // Practice mode public — không cần đăng nhập (giống /answers)
+        router.push(`/hsk-test/${exam.id}?mode=practice`);
+    };
+
+    const handleViewAnswers = (exam: HskExam) => {
+        router.push(`/hsk-test/${exam.id}/answers`);
     };
 
     return (
@@ -140,16 +149,7 @@ export default function HskTestPage() {
                             return (
                                 <div
                                     key={exam.id}
-                                    onClick={() => handleExamClick(exam)}
-                                    role="button"
-                                    tabIndex={0}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            handleExamClick(exam);
-                                        }
-                                    }}
-                                    className="cursor-pointer text-left bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6 hover:border-[var(--primary)]/50 hover:shadow-lg transition-all duration-300 group"
+                                    className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6 hover:border-[var(--primary)]/50 hover:shadow-lg transition-all duration-300 group"
                                 >
                                     {/* Header row */}
                                     <div className="flex items-start justify-between mb-4">
@@ -193,23 +193,9 @@ export default function HskTestPage() {
                                         </span>
                                     </div>
 
-                                    {/* "Đáp án / Transcript" — public, không cần đã làm bài */}
-                                    <div className="mb-3">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                router.push(`/hsk-test/${exam.id}/answers`);
-                                            }}
-                                            className="text-xs text-[var(--primary)] hover:underline inline-flex items-center gap-1"
-                                        >
-                                            <Icon name="menu_book" size="xs" />
-                                            Đáp án &amp; Transcript
-                                        </button>
-                                    </div>
-
                                     {/* Status badge */}
                                     {status ? (
-                                        <div className={`flex items-center justify-between pt-4 border-t border-[var(--border)]`}>
+                                        <div className={`flex items-center justify-between pt-4 mt-1 border-t border-[var(--border)]`}>
                                             {status.inProgress ? (
                                                 <span className="flex items-center gap-1.5 text-sm font-medium text-amber-500">
                                                     <Icon name="pending" size="xs" />
@@ -233,10 +219,38 @@ export default function HskTestPage() {
                                             </span>
                                         </div>
                                     ) : (
-                                        <div className="pt-4 border-t border-[var(--border)]">
+                                        <div className="pt-4 mt-1 border-t border-[var(--border)]">
                                             <span className="text-sm text-[var(--text-muted)]">Chưa thi</span>
                                         </div>
                                     )}
+
+                                    {/* 3-mode action buttons */}
+                                    <div className="grid grid-cols-3 gap-2 mt-4">
+                                        <button
+                                            onClick={() => handleStartTest(exam)}
+                                            className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl bg-[var(--primary)] text-white text-xs font-semibold hover:bg-[var(--primary-hover)] transition-colors"
+                                            title="Làm test có đếm giờ, audio merged theo phần"
+                                        >
+                                            <Icon name="schedule" size="sm" />
+                                            Làm test
+                                        </button>
+                                        <button
+                                            onClick={() => handleStartPractice(exam)}
+                                            className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-semibold hover:bg-emerald-500/20 transition-colors"
+                                            title="Luyện tập không đếm giờ, có audio mỗi câu, hiện đáp án ngay"
+                                        >
+                                            <Icon name="school" size="sm" />
+                                            Luyện tập
+                                        </button>
+                                        <button
+                                            onClick={() => handleViewAnswers(exam)}
+                                            className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border)] text-xs font-semibold hover:bg-[var(--border)] transition-colors"
+                                            title="Xem đáp án + transcript (không cần làm bài)"
+                                        >
+                                            <Icon name="menu_book" size="sm" />
+                                            Đáp án
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         })}

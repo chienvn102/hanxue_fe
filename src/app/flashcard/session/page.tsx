@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import { Card } from '@/components/ui/Card';
@@ -29,9 +29,11 @@ interface Choice {
 
 function FlashcardSessionContent() {
     const searchParams = useSearchParams();
-    const router = useRouter();
 
-    const hsk = searchParams.get('hsk') || '1';
+    const hskRaw = searchParams.get('hsk');
+    const hskInt = hskRaw ? parseInt(hskRaw, 10) : NaN;
+    // Chỉ filter nếu hsk hợp lệ (1-6); nếu missing/invalid → null = "tất cả".
+    const hsk = Number.isFinite(hskInt) && hskInt >= 1 && hskInt <= 6 ? String(hskInt) : '';
     const limit = searchParams.get('limit') || '20';
     const mode = searchParams.get('mode') || 'choice';
 
@@ -53,39 +55,47 @@ function FlashcardSessionContent() {
     const [totalAttempts, setTotalAttempts] = useState(0);
     const [completed, setCompleted] = useState(false);
     const [wrongCards, setWrongCards] = useState<Set<number>>(new Set());
+    const [xpEarned, setXpEarned] = useState(0);
 
     // Hint state for listen mode
     const [showHint, setShowHint] = useState(false);
 
-    // Load flashcards
-    useEffect(() => {
-        const loadFlashcards = async () => {
-            try {
-                const res = await fetch(`${API_BASE}/api/flashcard?hsk=${hsk}&limit=${limit}`);
-                const data = await res.json();
+    // Load flashcards (lifted ra ngoài effect để `restart` reuse được)
+    const loadFlashcards = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const qs = new URLSearchParams({ limit });
+            if (hsk) qs.set('hsk', hsk);
+            const res = await fetch(`${API_BASE}/api/flashcard?${qs.toString()}`);
+            const data = await res.json();
 
-                if (data.flashcards && data.flashcards.length > 0) {
-                    setFlashcards(data.flashcards);
-                    setQueue(data.flashcards.map((_: Flashcard, i: number) => i));
-                } else {
-                    setError('Không tìm thấy từ vựng');
-                }
-            } catch (err) {
-                setError('Không thể tải flashcard');
-            } finally {
-                setLoading(false);
+            if (data.flashcards && data.flashcards.length > 0) {
+                setFlashcards(data.flashcards);
+                setQueue(data.flashcards.map((_: Flashcard, i: number) => i));
+                setCurrentIndex(0);
+            } else {
+                setError('Không tìm thấy từ vựng');
             }
-        };
-
-        loadFlashcards();
+        } catch (err) {
+            setError('Không thể tải flashcard');
+        } finally {
+            setLoading(false);
+        }
     }, [hsk, limit]);
+
+    useEffect(() => {
+        loadFlashcards();
+    }, [loadFlashcards]);
 
     // Load choices for current card
     const loadChoices = useCallback(async (card: Flashcard) => {
         if (mode !== 'choice') return;
 
         try {
-            const res = await fetch(`${API_BASE}/api/flashcard/choices?exclude=${card.id}&count=3&hsk=${hsk}`);
+            const qs = new URLSearchParams({ exclude: String(card.id), count: '3' });
+            if (hsk) qs.set('hsk', hsk);
+            const res = await fetch(`${API_BASE}/api/flashcard/choices?${qs.toString()}`);
             const data = await res.json();
 
             const allChoices = [
@@ -170,11 +180,13 @@ function FlashcardSessionContent() {
             setWrongCards(prev => new Set([...prev, queue[currentIndex]]));
         }
 
-        // Submit review to backend (updates SRS & Streak)
+        // Submit review — BE trả `xpEarned` (10 cho quality=5, 0 cho 0).
+        // Hiển thị tổng XP dựa trên BE thay vì tự nhân FE → tránh drift.
         try {
-            // Quality 5 for correct, 0 for wrong
-            // In a real app we might want to measure time taken
-            await submitReview(currentCard.id, correct ? 5 : 0);
+            const result = await submitReview(currentCard.id, correct ? 5 : 0);
+            if (result?.xpEarned) {
+                setXpEarned(prev => prev + result.xpEarned);
+            }
         } catch (err) {
             console.error('Failed to submit review:', err);
         }
@@ -201,8 +213,20 @@ function FlashcardSessionContent() {
         setUserAnswer('');
     };
 
-    // /flashcard giờ redirect → /practice. Đẩy thẳng tới hub mới.
-    const restart = () => router.push('/practice');
+    // Reset toàn bộ session state + refetch cùng params (hsk/limit). Reuse
+    // loadFlashcards thay vì redirect về /practice (label nút là "Luyện tập
+    // lại" — phải thực sự bắt đầu lại session ở đây).
+    const restart = async () => {
+        setCompleted(false);
+        setCorrectCount(0);
+        setTotalAttempts(0);
+        setWrongCards(new Set());
+        setShowResult(false);
+        setSelectedChoice(null);
+        setUserAnswer('');
+        setShowHint(false);
+        await loadFlashcards();
+    };
 
     if (loading) {
         return (
@@ -240,7 +264,7 @@ function FlashcardSessionContent() {
                     <Card hover={false} padding="lg" className="text-center">
                         <Icon name="celebration" size="xl" className="text-[var(--primary)] mb-4" />
                         <h1 className="text-3xl font-bold mb-2 text-[var(--text-main)]">Hoàn thành!</h1>
-                        <p className="text-[var(--text-secondary)] mb-8">Bạn đã làm rất tốt! Điểm kinh nghiệm +{correctCount * 5} XP</p>
+                        <p className="text-[var(--text-secondary)] mb-8">Bạn đã làm rất tốt! Điểm kinh nghiệm +{xpEarned} XP</p>
 
                         <div className="grid grid-cols-2 gap-6 mb-8">
                             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6">

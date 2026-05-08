@@ -155,6 +155,21 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
                                             <span className="han-viet">{vocab.hanViet}</span>
                                         )}
                                     </div>
+
+                                    {vocab.themes && vocab.themes.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-3">
+                                            {vocab.themes.map((t) => (
+                                                <Link
+                                                    key={t.slug}
+                                                    href={`/vocab?theme=${t.slug}`}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors"
+                                                    title={t.name_en || t.name_vi}
+                                                >
+                                                    {t.name_vi}
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex gap-2">
