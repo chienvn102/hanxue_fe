@@ -466,10 +466,18 @@ export default function HskExamAdminPage() {
                                 <span className={`text-xs px-2 py-0.5 rounded ${exam.is_active ? 'bg-green-500/10 text-green-500' : 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'}`}>
                                     {exam.is_active ? 'Đang hoạt động' : 'Tắt'}
                                 </span>
-                                <button onClick={() => openEditExamModal(exam)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400">
+                                {/* Trang chi tiết — format locked, chỉ sửa nội dung từng câu */}
+                                <Link
+                                    href={`/admin/hsk-test/${exam.id}`}
+                                    className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20"
+                                    title="Mở trang chi tiết — sửa nội dung từng câu"
+                                >
+                                    <Icon name="open_in_new" size="xs" /> Chi tiết
+                                </Link>
+                                <button onClick={() => openEditExamModal(exam)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400" title="Sửa thông tin đề (tiêu đề, thời gian, ...)">
                                     <Icon name="edit" size="sm" />
                                 </button>
-                                <button onClick={() => handleDeleteExam(exam.id)} className="p-1.5 text-[var(--text-muted)] hover:text-red-500">
+                                <button onClick={() => handleDeleteExam(exam.id)} className="p-1.5 text-[var(--text-muted)] hover:text-red-500" title="Xóa đề thi">
                                     <Icon name="delete" size="sm" />
                                 </button>
                             </div>

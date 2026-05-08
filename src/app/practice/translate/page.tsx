@@ -28,6 +28,31 @@ function TranslateGameContent() {
     const [errMsg, setErrMsg] = useState('');
     const [totalXp, setTotalXp] = useState(0);
 
+    const changeHsk = (next: number) => {
+        if (next === hsk) return;
+        const sp = new URLSearchParams(searchParams.toString());
+        sp.set('hsk', String(next));
+        router.replace(`/practice/translate?${sp.toString()}`);
+    };
+
+    // Map các lỗi fetch của browser/network sang message tiếng Việt rõ ràng.
+    const friendlyErr = (e: unknown): string => {
+        const raw = e instanceof Error ? e.message : String(e);
+        if (/Failed to fetch|NetworkError|TypeError/i.test(raw)) {
+            return 'Mất kết nối tới server. Kiểm tra mạng hoặc thử lại sau.';
+        }
+        if (/quá chậm|timeout/i.test(raw)) {
+            return 'AI phản hồi quá chậm. Thử lại nhé.';
+        }
+        if (/quá tải|429/i.test(raw)) {
+            return 'AI đang quá tải, vui lòng thử lại sau 1 phút.';
+        }
+        if (/het luot|đã hết|exceeded/i.test(raw)) {
+            return 'Bạn đã dùng hết lượt AI hôm nay. Quay lại ngày mai nhé.';
+        }
+        return raw || 'Lỗi tải câu';
+    };
+
     const loadPrompt = useCallback(async () => {
         setPhase('loading');
         setErrMsg('');
@@ -38,7 +63,7 @@ function TranslateGameContent() {
             setPrompt(data);
             setPhase('answering');
         } catch (e) {
-            setErrMsg(e instanceof Error ? e.message : 'Lỗi tải câu');
+            setErrMsg(friendlyErr(e));
             setPhase('error');
         }
     }, [hsk]);
@@ -54,6 +79,7 @@ function TranslateGameContent() {
     const handleSubmit = async () => {
         if (!prompt || !userZh.trim()) return;
         setPhase('grading');
+        setErrMsg('');
         try {
             const result = await gradeTranslate({
                 token: prompt.token,
@@ -63,7 +89,7 @@ function TranslateGameContent() {
             setTotalXp(prev => prev + (result.xpEarned || 0));
             setPhase('graded');
         } catch (e) {
-            setErrMsg(e instanceof Error ? e.message : 'Lỗi chấm bài');
+            setErrMsg(friendlyErr(e));
             setPhase('answering'); // cho user thử submit lại
         }
     };
@@ -86,6 +112,16 @@ function TranslateGameContent() {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
+                        <select
+                            value={hsk}
+                            onChange={e => changeHsk(parseInt(e.target.value, 10))}
+                            className="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
+                            title="Đổi HSK level"
+                        >
+                            {[1, 2, 3, 4, 5, 6].map(n => (
+                                <option key={n} value={n}>HSK {n}</option>
+                            ))}
+                        </select>
                         <span className="text-sm text-[var(--text-muted)]">
                             <Icon name="bolt" size="xs" className="text-yellow-500 inline" /> +{totalXp} XP
                         </span>

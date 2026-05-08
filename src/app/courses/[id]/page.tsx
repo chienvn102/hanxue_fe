@@ -334,20 +334,54 @@ export default function CourseDetailPage() {
 
                             {/* CTA Button — priority: in_progress > not_started > first lesson.
                                 Logic cũ (`!== 'completed'`) chỉ phân biệt completed/non-completed,
-                                bỏ qua việc user đang học dở bài nào → click có thể nhảy lùi về bài 1. */}
+                                bỏ qua việc user đang học dở bài nào → click có thể nhảy lùi về bài 1.
+                                Button text dựa vào progress_status THẬT của lesson, không dựa vào
+                                course.completed_lessons (chỉ ratio). */}
                             <div className="mt-6">
                                 {lessons.length > 0 ? (() => {
-                                    const next =
-                                        lessons.find(l => l.progress_status === 'in_progress')
-                                        ?? lessons.find(l => !l.progress_status || l.progress_status === 'not_started')
-                                        ?? lessons[0];
+                                    const inProgress = lessons.find(l => l.progress_status === 'in_progress');
+                                    const allCompleted = lessons.every(l => l.progress_status === 'completed');
+                                    const hasAnyTouched = lessons.some(
+                                        l => l.progress_status === 'in_progress' || l.progress_status === 'completed'
+                                    );
+                                    // next: bài đang học dở > bài chưa bắt đầu kế tiếp > bài 1
+                                    const nextNotStarted = lessons.find(
+                                        l => !l.progress_status || l.progress_status === 'not_started'
+                                    );
+                                    const next = inProgress ?? nextNotStarted ?? lessons[0];
+
+                                    const lessonIdx = lessons.findIndex(l => l.id === next.id);
+                                    const lessonNo = lessonIdx >= 0 ? lessonIdx + 1 : 1;
+
+                                    let label: string;
+                                    let subline: string | null = null;
+                                    if (allCompleted) {
+                                        label = 'Học lại từ đầu';
+                                        subline = 'Bạn đã hoàn thành toàn bộ khóa';
+                                    } else if (inProgress) {
+                                        label = 'Học tiếp';
+                                        subline = `Tiếp tục bài ${lessonNo}: ${next.title}`;
+                                    } else if (hasAnyTouched) {
+                                        label = 'Học tiếp';
+                                        subline = `Bài ${lessonNo}: ${next.title}`;
+                                    } else {
+                                        label = 'Bắt đầu học';
+                                    }
+
                                     return (
-                                        <Link href={`/lessons/${next.id}`} className="block">
-                                            <Button fullWidth size="lg" className="justify-center">
-                                                <Icon name="play_arrow" size="sm" className="mr-2" />
-                                                {progress > 0 ? 'Tiếp tục học' : 'Bắt đầu học'}
-                                            </Button>
-                                        </Link>
+                                        <>
+                                            <Link href={`/lessons/${next.id}`} className="block">
+                                                <Button fullWidth size="lg" className="justify-center">
+                                                    <Icon name="play_arrow" size="sm" className="mr-2" />
+                                                    {label}
+                                                </Button>
+                                            </Link>
+                                            {subline && (
+                                                <p className="text-xs text-[var(--text-muted)] text-center mt-2 line-clamp-1">
+                                                    {subline}
+                                                </p>
+                                            )}
+                                        </>
                                     );
                                 })() : (
                                     <Button fullWidth size="lg" disabled variant="secondary" className="justify-center">

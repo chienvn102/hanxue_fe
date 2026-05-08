@@ -131,6 +131,22 @@ function MatchGameContent() {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
+                        <select
+                            value={hsk ?? ''}
+                            onChange={e => {
+                                const v = e.target.value;
+                                const sp = new URLSearchParams(searchParams.toString());
+                                if (v) sp.set('hsk', v); else sp.delete('hsk');
+                                router.replace(`/practice/match?${sp.toString()}`);
+                            }}
+                            className="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
+                            title="Đổi HSK level"
+                        >
+                            <option value="">Tất cả HSK</option>
+                            {[1, 2, 3, 4, 5, 6].map(n => (
+                                <option key={n} value={n}>HSK {n}</option>
+                            ))}
+                        </select>
                         <span className="text-sm text-[var(--text-muted)]">
                             <Icon name="bolt" size="xs" className="text-yellow-500 inline" /> +{xpEarned} XP
                         </span>

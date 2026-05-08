@@ -316,6 +316,25 @@ function ExamTakingPageContent() {
         handleFinishRef.current = handleFinish;
     }, [handleFinish]);
 
+    // FIX: nếu user back ra khỏi test rồi quay lại sau khi quá `duration_minutes`,
+    // BE resume cùng attempt với started_at cũ → remaining = 0 → timer effect
+    // early-return → user kẹt ở 00:00. Auto-finish ngay để chấm + redirect.
+    const expiredHandledRef = useRef(false);
+    useEffect(() => {
+        if (mode !== 'test') return;
+        if (loading || !exam) return;
+        if (timeLeft > 0) return;
+        if (expiredHandledRef.current || autoFinishCalledRef.current) return;
+        expiredHandledRef.current = true;
+        autoFinishCalledRef.current = true;
+        setSubmitError('Bài thi đã hết giờ — đang tự động nộp và chấm điểm...');
+        // Cho UI render banner trước khi chuyển trang
+        const t = setTimeout(() => {
+            handleFinishRef.current?.();
+        }, 500);
+        return () => clearTimeout(t);
+    }, [mode, loading, exam, timeLeft]);
+
     // Loading state
     if (loading) {
         return (

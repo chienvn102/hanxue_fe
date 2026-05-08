@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import { Card } from '@/components/ui/Card';
@@ -29,6 +29,7 @@ interface Choice {
 
 function FlashcardSessionContent() {
     const searchParams = useSearchParams();
+    const router = useRouter();
 
     const hskRaw = searchParams.get('hsk');
     const hskInt = hskRaw ? parseInt(hskRaw, 10) : NaN;
@@ -36,6 +37,13 @@ function FlashcardSessionContent() {
     const hsk = Number.isFinite(hskInt) && hskInt >= 1 && hskInt <= 6 ? String(hskInt) : '';
     const limit = searchParams.get('limit') || '20';
     const mode = searchParams.get('mode') || 'choice';
+
+    const switchHsk = (next: string) => {
+        if (next === hsk) return;
+        const sp = new URLSearchParams(searchParams.toString());
+        if (next) sp.set('hsk', next); else sp.delete('hsk');
+        router.replace(`/flashcard/session?${sp.toString()}`);
+    };
 
     const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -304,10 +312,23 @@ function FlashcardSessionContent() {
                 <main className="flex-1 flex flex-col gap-6 max-w-3xl mx-auto w-full">
                     {/* Progress Bar */}
                     <div className="flex flex-col gap-2 w-full">
-                        <div className="flex justify-between items-end">
-                            <p className="text-[var(--text-secondary)] text-sm font-medium">
-                                HSK Level {hsk} • {mode === 'choice' ? 'Trắc nghiệm' : mode === 'listen' ? 'Nghe viết' : 'Tự luận'}
-                            </p>
+                        <div className="flex justify-between items-end gap-3">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-[var(--text-secondary)] text-sm font-medium">
+                                    {mode === 'choice' ? 'Trắc nghiệm' : mode === 'listen' ? 'Nghe viết' : 'Tự luận'} •
+                                </p>
+                                <select
+                                    value={hsk}
+                                    onChange={e => switchHsk(e.target.value)}
+                                    className="px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface)] text-xs text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
+                                    title="Đổi HSK level"
+                                >
+                                    <option value="">Tất cả HSK</option>
+                                    {[1, 2, 3, 4, 5, 6].map(n => (
+                                        <option key={n} value={String(n)}>HSK {n}</option>
+                                    ))}
+                                </select>
+                            </div>
                             <p className="text-[var(--text-main)] text-sm font-bold">{progress}%</p>
                         </div>
                         <div className="h-3 w-full rounded-full bg-[var(--border)] overflow-hidden">
