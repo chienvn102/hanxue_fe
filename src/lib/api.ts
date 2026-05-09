@@ -243,9 +243,30 @@ async function tryRefreshToken(): Promise<string | null> {
     }
 }
 
+// 90s default — đủ cho Groq 60s timeout + retries phía BE.
+// Endpoint AI chậm hơn endpoint thường nên cần dài hơn fetch mặc định.
+const FETCH_TIMEOUT_MS = 90000;
+
 async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
     const headers = { ...getAuthHeader(), ...options.headers };
-    let res = await fetch(url, { ...options, headers });
+
+    // Wrap fetch trong AbortController để có timeout rõ ràng (browser ko có default).
+    const doFetch = async (h: HeadersInit): Promise<Response> => {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+        try {
+            return await fetch(url, { ...options, headers: h, signal: ctrl.signal });
+        } catch (e) {
+            if (e instanceof DOMException && e.name === 'AbortError') {
+                throw new Error('Server phản hồi quá chậm (timeout). Thử lại nhé.');
+            }
+            throw e;
+        } finally {
+            clearTimeout(t);
+        }
+    };
+
+    let res = await doFetch(headers);
 
     if (res.status === 401) {
         // Deduplicate concurrent refresh attempts
@@ -256,7 +277,7 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
         const newToken = await refreshPromise;
         if (newToken) {
             const retryHeaders = { ...options.headers, 'Authorization': `Bearer ${newToken}` };
-            res = await fetch(url, { ...options, headers: retryHeaders });
+            res = await doFetch(retryHeaders);
         }
     }
 

@@ -36,19 +36,21 @@ function TranslateGameContent() {
     };
 
     // Map các lỗi fetch của browser/network sang message tiếng Việt rõ ràng.
+    // Thứ tự quan trọng: timeout/AI-chậm phải check TRƯỚC TypeError (vì error
+    // message có thể chứa cả 2 từ khoá khi backend trả 504).
     const friendlyErr = (e: unknown): string => {
         const raw = e instanceof Error ? e.message : String(e);
-        if (/Failed to fetch|NetworkError|TypeError/i.test(raw)) {
-            return 'Mất kết nối tới server. Kiểm tra mạng hoặc thử lại sau.';
-        }
-        if (/quá chậm|timeout/i.test(raw)) {
-            return 'AI phản hồi quá chậm. Thử lại nhé.';
+        if (/quá chậm|timeout|AbortError/i.test(raw)) {
+            return 'AI phản hồi quá chậm. Thử lại nhé (đã có retry tự động).';
         }
         if (/quá tải|429/i.test(raw)) {
             return 'AI đang quá tải, vui lòng thử lại sau 1 phút.';
         }
         if (/het luot|đã hết|exceeded/i.test(raw)) {
             return 'Bạn đã dùng hết lượt AI hôm nay. Quay lại ngày mai nhé.';
+        }
+        if (/Failed to fetch|NetworkError|TypeError/i.test(raw)) {
+            return 'Mất kết nối tới server. Kiểm tra mạng hoặc thử lại sau.';
         }
         return raw || 'Lỗi tải câu';
     };
