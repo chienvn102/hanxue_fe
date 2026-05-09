@@ -36,12 +36,17 @@ function TranslateGameContent() {
     };
 
     // Map các lỗi fetch của browser/network sang message tiếng Việt rõ ràng.
-    // Thứ tự quan trọng: timeout/AI-chậm phải check TRƯỚC TypeError (vì error
-    // message có thể chứa cả 2 từ khoá khi backend trả 504).
+    // Thứ tự quan trọng: status-code rõ ràng phải check trước network-generic.
     const friendlyErr = (e: unknown): string => {
         const raw = e instanceof Error ? e.message : String(e);
-        if (/quá chậm|timeout|AbortError/i.test(raw)) {
-            return 'AI phản hồi quá chậm. Thử lại nhé (đã có retry tự động).';
+        if (/502|gateway lỗi/i.test(raw)) {
+            return 'Server gateway lỗi (502). BE đang khởi động lại hoặc nginx timeout. Thử lại sau 30s.';
+        }
+        if (/503/.test(raw)) {
+            return 'Server tạm dừng (503). Thử lại sau 30s.';
+        }
+        if (/504|quá chậm|timeout|AbortError/i.test(raw)) {
+            return 'AI phản hồi quá chậm (504). Thử lại nhé.';
         }
         if (/quá tải|429/i.test(raw)) {
             return 'AI đang quá tải, vui lòng thử lại sau 1 phút.';

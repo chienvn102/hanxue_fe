@@ -45,6 +45,8 @@ export default function AdminVocabularyPage() {
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingVocab, setEditingVocab] = useState<Vocab | null>(null);
+    const [formError, setFormError] = useState<string>('');
+    const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         simplified: '',
         traditional: '',
@@ -147,6 +149,7 @@ export default function AdminVocabularyPage() {
 
     const openCreateModal = () => {
         setEditingVocab(null);
+        setFormError('');
         setFormData({
             simplified: '', traditional: '', pinyin: '', han_viet: '',
             meaning_vi: '', meaning_en: '', hsk_level: 1, word_type: '', audio_url: '', examples: []
@@ -156,6 +159,7 @@ export default function AdminVocabularyPage() {
 
     const openEditModal = (vocab: Vocab) => {
         setEditingVocab(vocab);
+        setFormError('');
         setFormData({
             simplified: vocab.simplified,
             traditional: vocab.traditional || '',
@@ -173,6 +177,26 @@ export default function AdminVocabularyPage() {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        setFormError('');
+
+        // Trim các field text trước khi submit (whitespace gây trùng giả).
+        const payload = {
+            ...formData,
+            simplified: formData.simplified.trim(),
+            traditional: formData.traditional.trim(),
+            pinyin: formData.pinyin.trim(),
+            han_viet: formData.han_viet.trim(),
+            meaning_vi: formData.meaning_vi.trim(),
+            meaning_en: formData.meaning_en.trim(),
+            word_type: formData.word_type.trim(),
+        };
+
+        if (!payload.simplified || !payload.pinyin || !payload.meaning_vi) {
+            setFormError('Vui lòng điền đủ Chữ giản thể, Pinyin, Nghĩa tiếng Việt.');
+            return;
+        }
+
+        setSaving(true);
         try {
             const url = editingVocab
                 ? `${API_BASE}/api/vocab/${editingVocab.id}`
@@ -185,19 +209,66 @@ export default function AdminVocabularyPage() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
 
-            const data = await res.json();
-            if (data.success) {
+            // Body có thể không phải JSON khi nginx/Cloudflare trả HTML.
+            const ct = res.headers.get('content-type') || '';
+            const data = ct.includes('application/json')
+                ? await res.json().catch(() => ({}))
+                : { success: false, message: `HTTP ${res.status}: ${res.statusText}` };
+
+            if (res.ok && data.success) {
                 setIsModalOpen(false);
                 fetchVocabs();
-            } else {
-                alert(data.message || 'Lỗi khi lưu từ vựng');
+                return;
             }
+
+            // Duplicate — show in form (không alert) và hỏi xem có muốn mở bản ghi cũ.
+            if (res.status === 409 && data.code === 'DUPLICATE_SIMPLIFIED') {
+                const existingId = data.data?.existingId;
+                setFormError(data.message || 'Chữ Hán đã tồn tại.');
+                if (existingId && confirm(`${data.message}\n\nMở chỉnh sửa từ vựng cũ (id ${existingId})?`)) {
+                    // Nạp bản ghi cũ vào modal để admin sửa thẳng
+                    try {
+                        const r = await fetch(`${API_BASE}/api/vocab/${existingId}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const v = await r.json();
+                        if (v && v.id) {
+                            setEditingVocab({
+                                id: v.id, simplified: v.simplified, traditional: v.traditional,
+                                pinyin: v.pinyin, hanViet: v.hanViet, meaningVi: v.meaningVi,
+                                meaningEn: v.meaningEn, hskLevel: v.hskLevel, wordType: v.wordType,
+                                audioUrl: v.audioUrl, examples: v.examples
+                            });
+                            setFormData({
+                                simplified: v.simplified || '',
+                                traditional: v.traditional || '',
+                                pinyin: v.pinyin || '',
+                                han_viet: v.hanViet || '',
+                                meaning_vi: v.meaningVi || '',
+                                meaning_en: v.meaningEn || '',
+                                hsk_level: v.hskLevel || 1,
+                                word_type: v.wordType || '',
+                                audio_url: v.audioUrl || '',
+                                examples: v.examples || []
+                            });
+                            setFormError('');
+                        }
+                    } catch (loadErr) {
+                        console.error('Load existing vocab error', loadErr);
+                    }
+                }
+                return;
+            }
+
+            setFormError(data.message || `Lỗi khi lưu từ vựng (HTTP ${res.status}).`);
         } catch (error) {
             console.error('Save error', error);
-            alert('Lỗi kết nối server');
+            setFormError('Mất kết nối tới server. Kiểm tra mạng hoặc thử lại.');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -356,6 +427,12 @@ export default function AdminVocabularyPage() {
                             </button>
                         </div>
                         <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                            {formError && (
+                                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-sm flex items-start gap-2">
+                                    <Icon name="error_outline" size="sm" className="mt-0.5 flex-shrink-0" />
+                                    <span>{formError}</span>
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Chữ giản thể *</label>
@@ -363,7 +440,7 @@ export default function AdminVocabularyPage() {
                                         type="text" required
                                         className="w-full px-3 py-2 border rounded-lg bg-[var(--surface)] text-[var(--text-main)] text-2xl font-bold"
                                         value={formData.simplified}
-                                        onChange={e => setFormData({ ...formData, simplified: e.target.value })}
+                                        onChange={e => { setFormData({ ...formData, simplified: e.target.value }); if (formError) setFormError(''); }}
                                     />
                                 </div>
                                 <div>
@@ -480,11 +557,11 @@ export default function AdminVocabularyPage() {
                             </div>
 
                             <div className="flex gap-4 pt-4 sticky bottom-0 bg-[var(--surface)] pb-2">
-                                <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="flex-1">
+                                <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="flex-1" disabled={saving}>
                                     Hủy
                                 </Button>
-                                <Button type="submit" className="flex-1">
-                                    {editingVocab ? 'Lưu thay đổi' : 'Tạo Từ vựng'}
+                                <Button type="submit" className="flex-1" disabled={saving}>
+                                    {saving ? 'Đang lưu...' : editingVocab ? 'Lưu thay đổi' : 'Tạo Từ vựng'}
                                 </Button>
                             </div>
                         </form>

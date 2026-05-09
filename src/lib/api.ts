@@ -380,6 +380,21 @@ export interface TranslateGrade {
     xpEarned: number;
 }
 
+// Map upstream HTTP errors (502/503/504 từ nginx/Cloudflare) sang message
+// nhận diện được. Giữ status trong message để friendlyErr phân loại.
+async function readApiError(res: Response, fallback: string): Promise<string> {
+    const ct = res.headers.get('content-type') || '';
+    // Cloudflare/nginx error trả HTML, không phải JSON → status-based message.
+    if (!ct.includes('application/json')) {
+        if (res.status === 502) return 'Server gateway lỗi (502). BE có thể đang restart hoặc nginx timeout.';
+        if (res.status === 503) return 'Server tạm thời không phản hồi (503). Thử lại sau 30s.';
+        if (res.status === 504) return 'Gateway timeout (504). Server xử lý quá lâu.';
+        return `${fallback} (HTTP ${res.status})`;
+    }
+    const body = await res.json().catch(() => ({}));
+    return body.message || `${fallback} (HTTP ${res.status})`;
+}
+
 export async function fetchTranslatePrompt(hsk: number): Promise<TranslatePrompt> {
     const res = await authFetch(`${API_BASE_URL}/api/practice/translate-prompt`, {
         method: 'POST',
@@ -387,8 +402,7 @@ export async function fetchTranslatePrompt(hsk: number): Promise<TranslatePrompt
         body: JSON.stringify({ hsk }),
     });
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Không tạo được câu dịch');
+        throw new Error(await readApiError(res, 'Không tạo được câu dịch'));
     }
     const json = await res.json();
     return json.data;
@@ -401,8 +415,7 @@ export async function gradeTranslate(payload: { token: string; user_zh: string }
         body: JSON.stringify(payload),
     });
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Không chấm được bài dịch');
+        throw new Error(await readApiError(res, 'Không chấm được bài dịch'));
     }
     const json = await res.json();
     return json.data;
