@@ -18,10 +18,16 @@ interface RP {
  * Audio + image → A. TRUE / B. FALSE
  * ───────────────────────────────────────────────────────────────────── */
 export function AudioImageJudge({ question, value, onChange }: RP) {
-    const { testMode } = useHskTest();
+    const { testMode, allowQuestionAudio } = useHskTest();
     return (
         <div>
-            {question.questionAudio && testMode === 'practice' && <AudioPlayer src={question.questionAudio} />}
+            {question.questionAudio && allowQuestionAudio && (
+                <AudioPlayer
+                    key={question.id}
+                    src={question.questionAudio}
+                    maxPlays={testMode === 'full' ? question.audioPlayCount : undefined}
+                />
+            )}
             {question.questionImage && (
                 <img
                     src={getMediaUrl(question.questionImage)}
@@ -71,12 +77,18 @@ export function ImageCharJudge({ question, value, onChange }: RP) {
  * Audio + ★ statement → A. TRUE / B. FALSE
  * ───────────────────────────────────────────────────────────────────── */
 export function AudioStatementJudge({ question, value, onChange }: RP) {
-    const { showPinyin, testMode } = useHskTest();
+    const { showPinyin, testMode, allowQuestionAudio } = useHskTest();
     const meta = (question.meta || {}) as { pinyin?: { statement?: string } };
     const stmtPinyin = meta.pinyin?.statement;
     return (
         <div>
-            {question.questionAudio && testMode === 'practice' && <AudioPlayer src={question.questionAudio} />}
+            {question.questionAudio && allowQuestionAudio && (
+                <AudioPlayer
+                    key={question.id}
+                    src={question.questionAudio}
+                    maxPlays={testMode === 'full' ? question.audioPlayCount : undefined}
+                />
+            )}
             {question.statement && (
                 <div className="mt-3 p-3 rounded-lg bg-[var(--surface-secondary)] border-l-4 border-[var(--primary)]">
                     <span className="text-[var(--primary)] mr-2">★</span>

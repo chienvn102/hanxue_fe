@@ -71,6 +71,11 @@ export interface AuthResponse {
     user: User;
 }
 
+export interface RegisterResponse {
+    message: string;
+    userId: number;
+}
+
 // API Functions
 export async function fetchVocab(params: {
     limit?: number;
@@ -137,7 +142,20 @@ export async function login(email: string, password: string): Promise<AuthRespon
     return res.json();
 }
 
-export async function register(email: string, password: string, displayName?: string): Promise<AuthResponse> {
+export async function googleLogin(credential: string): Promise<AuthResponse> {
+    const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential }),
+    });
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Google login failed');
+    }
+    return res.json();
+}
+
+export async function register(email: string, password: string, displayName?: string): Promise<RegisterResponse> {
     const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -146,6 +164,32 @@ export async function register(email: string, password: string, displayName?: st
     if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Registration failed');
+    }
+    return res.json();
+}
+
+export async function requestPasswordReset(email: string): Promise<{ message: string }> {
+    const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to request password reset');
+    }
+    return res.json();
+}
+
+export async function resetPassword(email: string, code: string, newPassword: string): Promise<{ message: string }> {
+    const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code, newPassword }),
+    });
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to reset password');
     }
     return res.json();
 }

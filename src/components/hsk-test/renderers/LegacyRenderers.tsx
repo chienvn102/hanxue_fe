@@ -5,11 +5,25 @@ import { McqChoice } from '../McqChoice';
 import { TrueFalseChoice } from '../TrueFalseChoice';
 import { useHskTest } from '../HskTestContext';
 import { PinyinRuby } from '../PinyinRuby';
+import { AudioPlayer } from '../AudioPlayer';
 
 interface RP {
     question: HskQuestion;
     value: string;
     onChange: (v: string) => void;
+}
+
+function QuestionAudio({ question }: { question: HskQuestion }) {
+    const { testMode, allowQuestionAudio } = useHskTest();
+    if (!question.questionAudio || !allowQuestionAudio) return null;
+
+    return (
+        <AudioPlayer
+            key={question.id}
+            src={question.questionAudio}
+            maxPlays={testMode === 'full' ? question.audioPlayCount : undefined}
+        />
+    );
 }
 
 /**
@@ -25,6 +39,7 @@ export function LegacyMcq({ question, value, onChange }: RP) {
     const meta = (question.meta || {}) as { pinyin?: { question_text?: string } };
     return (
         <div>
+            <QuestionAudio question={question} />
             {question.questionText && (
                 <div className="my-3">
                     <PinyinRuby zh={question.questionText} pinyin={meta.pinyin?.question_text} show={showPinyin} fontSize="lg" />
@@ -45,6 +60,7 @@ export function LegacyTrueFalse({ question, value, onChange }: RP) {
     });
     return (
         <div>
+            <QuestionAudio question={question} />
             {question.questionText && (
                 <div className="my-3">
                     <PinyinRuby zh={question.questionText} pinyin={meta.pinyin?.question_text} show={showPinyin} fontSize="lg" />
@@ -60,6 +76,7 @@ export function LegacyFillBlank({ question, value, onChange }: RP) {
     const meta = (question.meta || {}) as { pinyin?: { question_text?: string } };
     return (
         <div>
+            <QuestionAudio question={question} />
             {question.questionText && (
                 <div className="my-3">
                     <PinyinRuby zh={question.questionText} pinyin={meta.pinyin?.question_text} show={showPinyin} fontSize="lg" />
@@ -82,6 +99,7 @@ export function LegacyShortAnswer({ question, value, onChange }: RP) {
     const meta = (question.meta || {}) as { pinyin?: { question_text?: string } };
     return (
         <div>
+            <QuestionAudio question={question} />
             {question.questionText && (
                 <div className="my-3">
                     <PinyinRuby zh={question.questionText} pinyin={meta.pinyin?.question_text} show={showPinyin} fontSize="lg" />

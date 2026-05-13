@@ -382,7 +382,7 @@ function ExamTakingPageContent() {
     const isCorrect = isRevealed && currentCorrect && currentAnswer === currentCorrect.answer;
 
     return (
-        <HskTestProvider testMode={testMode}>
+        <HskTestProvider testMode={testMode} allowQuestionAudio={testMode === 'practice' || !showSectionAudio}>
         <div className="min-h-screen flex flex-col bg-[var(--background)]">
             {/* Sticky Header */}
             <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md">

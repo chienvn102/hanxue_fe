@@ -17,10 +17,16 @@ interface RP {
  * Audio + 3 options A/B/C (text + pinyin nếu có)
  * ───────────────────────────────────────────────────────────────────── */
 export function AudioMcqShort({ question, value, onChange }: RP) {
-    const { testMode } = useHskTest();
+    const { testMode, allowQuestionAudio } = useHskTest();
     return (
         <div>
-            {question.questionAudio && testMode === 'practice' && <AudioPlayer src={question.questionAudio} />}
+            {question.questionAudio && allowQuestionAudio && (
+                <AudioPlayer
+                    key={question.id}
+                    src={question.questionAudio}
+                    maxPlays={testMode === 'full' ? question.audioPlayCount : undefined}
+                />
+            )}
             <McqChoice options={question.options} value={value} onChange={onChange} />
         </div>
     );

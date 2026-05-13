@@ -16,6 +16,7 @@ interface Props {
     onEnded?: () => void;
     mode?: 'practice' | 'full';
     autoPlay?: boolean;
+    maxPlays?: number;
 }
 
 /**
@@ -23,13 +24,19 @@ interface Props {
  * - mode='practice': replay unlimited, seekable, reset khi hết.
  * - mode='full': auto-play, seek locked, KHÔNG reset, để cho FE tracking offset.
  */
-export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'practice', autoPlay = false }: Props) {
+export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'practice', autoPlay = false, maxPlays }: Props) {
     const ref = useRef<HTMLAudioElement>(null);
     const [playing, setPlaying] = useState(false);
     const [progress, setProgress] = useState(0); // 0-1
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
+    const [playsUsed, setPlaysUsed] = useState(0);
+    const [activePlayCounted, setActivePlayCounted] = useState(false);
+    const activePlayCountedRef = useRef(false);
     const locked = mode === 'full';
+    const playLimit = typeof maxPlays === 'number' && maxPlays > 0 ? maxPlays : null;
+    const limitReached = playLimit !== null && playsUsed >= playLimit && !activePlayCounted;
+    const seekLocked = locked || playLimit !== null;
 
     useEffect(() => {
         if (!autoPlay) return;
@@ -47,9 +54,8 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
         const el = ref.current;
         if (!el) return;
         if (el.paused) {
-            el.play();
-            setPlaying(true);
-            onPlay?.();
+            if (limitReached) return;
+            el.play().catch(() => setPlaying(false));
         } else if (!locked) {
             // Full mode: pause cho phép, nhưng không seek về 0
             el.pause();
@@ -68,6 +74,18 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
         onTime?.(el.currentTime, el.duration || 0);
     };
 
+    const handlePlay = () => {
+        setPlaying(true);
+        if (!activePlayCountedRef.current) {
+            activePlayCountedRef.current = true;
+            setActivePlayCounted(true);
+            if (playLimit !== null) {
+                setPlaysUsed(prev => Math.min(prev + 1, playLimit));
+            }
+        }
+        onPlay?.();
+    };
+
     const onLoadedMetadata = () => {
         const el = ref.current;
         if (!el) return;
@@ -78,6 +96,8 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
         const el = ref.current;
         if (el && !locked) el.currentTime = 0;
         setPlaying(false);
+        setActivePlayCounted(false);
+        activePlayCountedRef.current = false;
         if (!locked) {
             setProgress(0);
             setCurrentTime(0);
@@ -88,7 +108,7 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
     };
 
     const seek = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (locked) return;
+        if (seekLocked) return;
         const el = ref.current;
         if (!el || !duration) return;
         const rect = e.currentTarget.getBoundingClientRect();
@@ -107,16 +127,21 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
         <div className="flex items-center gap-3 py-2">
             <button
                 onClick={toggle}
-                className="w-9 h-9 rounded-full bg-[var(--primary)] text-white flex items-center justify-center hover:opacity-90 transition-opacity flex-shrink-0"
-                aria-label={playing ? 'Pause' : 'Play'}
+                disabled={limitReached}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-opacity flex-shrink-0 ${
+                    limitReached
+                        ? 'bg-[var(--surface-secondary)] text-[var(--text-muted)] cursor-not-allowed'
+                        : 'bg-[var(--primary)] text-white hover:opacity-90'
+                }`}
+                aria-label={limitReached ? 'Đã hết lượt nghe' : playing ? 'Tạm dừng' : 'Phát audio'}
                 type="button"
             >
-                <Icon name={playing ? 'pause' : 'play_arrow'} size="sm" />
+                <Icon name={limitReached ? 'block' : playing ? 'pause' : 'play_arrow'} size="sm" />
             </button>
             <div
                 onClick={seek}
-                className={`flex-1 h-1.5 bg-[var(--surface-secondary)] rounded-full overflow-hidden ${locked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                title={locked ? 'Chế độ thi thật — không seek được' : undefined}
+                className={`flex-1 h-1.5 bg-[var(--surface-secondary)] rounded-full overflow-hidden ${seekLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                title={seekLocked ? 'Không tua được audio giới hạn lượt nghe' : undefined}
             >
                 <div
                     className="h-full bg-[var(--primary)] transition-all"
@@ -129,6 +154,11 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
             {label && (
                 <span className="text-xs text-[var(--text-secondary)] shrink-0">{label}</span>
             )}
+            {playLimit !== null && (
+                <span className={`text-xs shrink-0 ${limitReached ? 'text-red-500' : 'text-[var(--text-muted)]'}`}>
+                    {limitReached ? 'Hết lượt nghe' : `Còn ${Math.max(playLimit - playsUsed, 0)}/${playLimit} lượt`}
+                </span>
+            )}
             <audio
                 ref={ref}
                 src={getMediaUrl(src)}
@@ -137,7 +167,7 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
                 onLoadedMetadata={onLoadedMetadata}
                 onEnded={handleEnded}
                 onPause={() => setPlaying(false)}
-                onPlay={() => setPlaying(true)}
+                onPlay={handlePlay}
             />
         </div>
     );

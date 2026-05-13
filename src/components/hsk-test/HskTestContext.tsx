@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 export type HskTestMode = 'practice' | 'full';
 
@@ -13,6 +13,8 @@ interface HskTestCtx {
      * lock seek; audio inline per-câu bị ẩn để tránh trùng.
      */
     testMode: HskTestMode;
+    // False when full-test mode already has merged section audio.
+    allowQuestionAudio: boolean;
 }
 
 const Ctx = createContext<HskTestCtx | null>(null);
@@ -23,19 +25,20 @@ interface ProviderProps {
     children: ReactNode;
     defaultShowPinyin?: boolean;
     testMode?: HskTestMode;
+    allowQuestionAudio?: boolean;
 }
 
 export function HskTestProvider({
     children,
     defaultShowPinyin = true,
     testMode = 'practice',
+    allowQuestionAudio = true,
 }: ProviderProps) {
-    const [showPinyin, setShowPinyinState] = useState(defaultShowPinyin);
-
-    useEffect(() => {
+    const [showPinyin, setShowPinyinState] = useState(() => {
+        if (typeof window === 'undefined') return defaultShowPinyin;
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored !== null) setShowPinyinState(stored === '1');
-    }, []);
+        return stored === null ? defaultShowPinyin : stored === '1';
+    });
 
     const setShowPinyin = (v: boolean) => {
         setShowPinyinState(v);
@@ -43,7 +46,7 @@ export function HskTestProvider({
     };
 
     return (
-        <Ctx.Provider value={{ showPinyin, setShowPinyin, testMode }}>
+        <Ctx.Provider value={{ showPinyin, setShowPinyin, testMode, allowQuestionAudio }}>
             {children}
         </Ctx.Provider>
     );

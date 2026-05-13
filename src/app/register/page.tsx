@@ -67,7 +67,7 @@ export default function RegisterPage() {
                     </div>
                     <div className="flex-1">
                         <h4 className="font-bold text-green-500 mb-1">Đăng ký thành công!</h4>
-                        <p className="text-sm text-green-600 dark:text-green-400">Vui lòng kiểm tra email để xác thực tài khoản của bạn. Đang chuyển hướng...</p>
+                        <p className="text-sm text-green-600 dark:text-green-400">Tài khoản đã được tạo. Đang chuyển hướng đến trang đăng nhập...</p>
                     </div>
                 </div>
             )}

@@ -41,17 +41,30 @@ function getLabels(group: HskQuestionGroup | undefined): string[] {
     return items ? items.map(i => i.label) : ['A', 'B', 'C', 'D', 'E', 'F'];
 }
 
+function QuestionAudio({ question }: { question: HskQuestion }) {
+    const { testMode, allowQuestionAudio } = useHskTest();
+    if (!question.questionAudio || !allowQuestionAudio) return null;
+
+    return (
+        <AudioPlayer
+            key={question.id}
+            src={question.questionAudio}
+            maxPlays={testMode === 'full' ? question.audioPlayCount : undefined}
+        />
+    );
+}
+
 /* ─────────────────────────────────────────────────────────────────────
  * ImageGridMatch — HSK 1/2 Listening + Reading
  * User nghe audio HOẶC đọc text → chọn ảnh từ grid (label A-F).
  * Group resource (image grid) đã render ở GroupHeader phía trên.
  * ───────────────────────────────────────────────────────────────────── */
 export function ImageGridMatch({ question, group, value, onChange }: RP) {
-    const { showPinyin, testMode } = useHskTest();
+    const { showPinyin } = useHskTest();
     const meta = (question.meta || {}) as { pinyin?: { question_text?: string } };
     return (
         <div>
-            {question.questionAudio && testMode === 'practice' && <AudioPlayer src={question.questionAudio} />}
+            <QuestionAudio question={question} />
             {question.questionText && (
                 <div className="my-3">
                     <PinyinRuby zh={question.questionText} pinyin={meta.pinyin?.question_text} show={showPinyin} fontSize="lg" />
@@ -71,6 +84,7 @@ export function WordBankFill({ question, group, value, onChange }: RP) {
     const meta = (question.meta || {}) as { pinyin?: { question_text?: string } };
     return (
         <div>
+            <QuestionAudio question={question} />
             {question.questionText && (
                 <div className="my-3 leading-relaxed">
                     <PinyinRuby zh={question.questionText} pinyin={meta.pinyin?.question_text} show={showPinyin} fontSize="lg" />
@@ -90,6 +104,7 @@ export function ReplyMatch({ question, group, value, onChange }: RP) {
     const meta = (question.meta || {}) as { pinyin?: { question_text?: string } };
     return (
         <div>
+            <QuestionAudio question={question} />
             {question.questionText && (
                 <div className="my-3 leading-relaxed">
                     <PinyinRuby zh={question.questionText} pinyin={meta.pinyin?.question_text} show={showPinyin} fontSize="lg" />

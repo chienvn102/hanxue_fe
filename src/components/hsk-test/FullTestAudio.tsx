@@ -53,9 +53,11 @@ export function FullTestAudio({ audioUrl, questions, sectionTitle }: Props) {
                     </div>
                 </div>
                 <AudioPlayer
+                    key={audioUrl}
                     src={audioUrl}
                     mode="full"
                     autoPlay
+                    maxPlays={1}
                     onTime={onTime}
                     onEnded={() => setEnded(true)}
                 />
