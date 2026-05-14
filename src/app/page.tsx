@@ -43,11 +43,19 @@ const colorClasses: Record<string, { text: string; border: string; bg: string }>
 
 
 export default function HomePage() {
+  const router = useRouter();
   const { user, isAuthenticated, updateUser, logout } = useAuth();
   const [featuredVocab, setFeaturedVocab] = useState<Vocab[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [savedVocabIds, setSavedVocabIds] = useState<Set<number>>(new Set());
+
+  // Autocomplete suggestions — fetch khi user gõ, debounce 250ms.
+  const [suggestions, setSuggestions] = useState<Vocab[]>([]);
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const [loadingSuggest, setLoadingSuggest] = useState(false);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
 
   // Fetch fresh profile data on mount to keep stats updated
   useEffect(() => {
@@ -92,6 +100,53 @@ export default function HomePage() {
       }
     };
     loadVocab();
+  }, []);
+
+  // Debounce search → /api/vocab?q=&limit=8. AbortController hủy request cũ
+  // khi user gõ tiếp, tránh race-condition khiến gợi ý cũ overwrite kết quả mới.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSuggestions([]);
+      setLoadingSuggest(false);
+      setActiveIdx(-1);
+      return;
+    }
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      setLoadingSuggest(true);
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/vocab?q=${encodeURIComponent(q)}&limit=8`,
+          { signal: ctrl.signal }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setSuggestions(Array.isArray(data.data) ? data.data : []);
+        setActiveIdx(-1);
+      } catch (e) {
+        if ((e as Error).name !== 'AbortError') {
+          setSuggestions([]);
+        }
+      } finally {
+        setLoadingSuggest(false);
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [searchQuery]);
+
+  // Click ra ngoài input/dropdown → đóng panel gợi ý.
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setShowSuggest(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
   const handleBookmark = async (vocabId: number) => {
@@ -139,8 +194,8 @@ export default function HomePage() {
               </p>
             </div>
             <div className="w-full max-w-lg mt-4">
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-white/60">
+              <div className="relative group" ref={searchBoxRef}>
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-white/60 z-10">
                   <Icon name="search" />
                 </div>
                 <input
@@ -148,23 +203,104 @@ export default function HomePage() {
                   placeholder="Tìm kiếm từ vựng, Pinyin..."
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setShowSuggest(true); }}
+                  onFocus={() => setShowSuggest(true)}
+                  role="combobox"
+                  aria-expanded={showSuggest && suggestions.length > 0}
+                  aria-controls="vocab-suggest-list"
+                  aria-activedescendant={activeIdx >= 0 ? `vocab-suggest-${activeIdx}` : undefined}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && searchQuery.trim()) {
-                      window.location.href = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
+                    const open = showSuggest && suggestions.length > 0;
+                    if (e.key === 'ArrowDown' && open) {
+                      e.preventDefault();
+                      setActiveIdx(i => (i + 1) % suggestions.length);
+                    } else if (e.key === 'ArrowUp' && open) {
+                      e.preventDefault();
+                      setActiveIdx(i => (i <= 0 ? suggestions.length - 1 : i - 1));
+                    } else if (e.key === 'Escape') {
+                      setShowSuggest(false);
+                      setActiveIdx(-1);
+                    } else if (e.key === 'Enter') {
+                      if (open && activeIdx >= 0) {
+                        e.preventDefault();
+                        router.push(`/vocab/${suggestions[activeIdx].id}`);
+                      } else if (searchQuery.trim()) {
+                        router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                      }
                     }
                   }}
                 />
                 <button
                   onClick={() => {
                     if (searchQuery.trim()) {
-                      window.location.href = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
+                      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
                     }
                   }}
-                  className="absolute right-2 top-2 bottom-2 bg-white hover:bg-white/90 text-[var(--primary)] font-bold py-1.5 px-4 rounded-lg transition-colors flex items-center cursor-pointer"
+                  className="absolute right-2 top-2 bottom-2 bg-white hover:bg-white/90 text-[var(--primary)] font-bold py-1.5 px-4 rounded-lg transition-colors flex items-center cursor-pointer z-10"
                 >
                   Tìm kiếm
                 </button>
+
+                {/* Suggestion dropdown */}
+                {showSuggest && searchQuery.trim() && (
+                  <div
+                    id="vocab-suggest-list"
+                    role="listbox"
+                    className="absolute top-full left-0 right-0 mt-2 bg-[var(--surface)] text-[var(--text-main)] rounded-xl shadow-2xl border border-[var(--border)] max-h-96 overflow-y-auto z-20 text-left"
+                  >
+                    {loadingSuggest && suggestions.length === 0 && (
+                      <div className="px-4 py-3 text-sm text-[var(--text-muted)] flex items-center gap-2">
+                        <div className="animate-spin w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full"></div>
+                        Đang tìm...
+                      </div>
+                    )}
+                    {!loadingSuggest && suggestions.length === 0 && (
+                      <div className="px-4 py-3 text-sm text-[var(--text-muted)]">
+                        Không tìm thấy từ vựng nào khớp với &quot;{searchQuery.trim()}&quot;.
+                      </div>
+                    )}
+                    {suggestions.map((v, i) => (
+                      <Link
+                        key={v.id}
+                        id={`vocab-suggest-${i}`}
+                        role="option"
+                        aria-selected={i === activeIdx}
+                        href={`/vocab/${v.id}`}
+                        onClick={() => setShowSuggest(false)}
+                        onMouseEnter={() => setActiveIdx(i)}
+                        className={`flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border)] last:border-b-0 transition-colors ${
+                          i === activeIdx ? 'bg-[var(--surface-secondary)]' : 'hover:bg-[var(--surface-secondary)]'
+                        }`}
+                      >
+                        <span className="hanzi text-2xl font-bold text-[var(--text-main)] min-w-[2.5rem]">
+                          {v.simplified}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-[var(--primary)] truncate">{v.pinyin}</div>
+                          <div className="text-sm text-[var(--text-secondary)] truncate">
+                            {v.hanViet && <span className="italic text-[var(--text-muted)] mr-2">{v.hanViet}</span>}
+                            {v.meaningVi}
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-white bg-[var(--primary)] px-2 py-0.5 rounded flex-shrink-0">
+                          HSK {v.hskLevel}
+                        </span>
+                      </Link>
+                    ))}
+                    {searchQuery.trim() && suggestions.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setShowSuggest(false);
+                          router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                        }}
+                        className="w-full px-4 py-2.5 text-sm text-[var(--primary)] hover:bg-[var(--surface-secondary)] font-medium flex items-center justify-center gap-1 border-t border-[var(--border)]"
+                      >
+                        <Icon name="search" size="sm" />
+                        Xem tất cả kết quả cho &quot;{searchQuery.trim()}&quot;
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
