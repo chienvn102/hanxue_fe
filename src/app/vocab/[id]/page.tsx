@@ -174,7 +174,7 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
 
                                 <div className="flex gap-2">
                                     <button
-                                        onClick={() => playAudio(vocab.simplified)}
+                                        onClick={() => playAudio(vocab.simplified, vocab.audioUrl)}
                                         className="btn-audio animate-pulse-glow"
                                         title="Nghe phát âm"
                                     >

@@ -119,14 +119,33 @@ export default function AdminVocabularyPage() {
         }
     };
 
+    /**
+     * Gen audio AI:
+     * - Khi đang sửa (có editingVocab.id): gọi /api/admin/vocab/:id/gen-audio
+     *   → BE đọc simplified từ DB, gen TTS, UPDATE audio_url của vocab đó luôn.
+     * - Khi đang tạo mới: cần formData.simplified, gọi /api/admin/gen-audio-text
+     *   → BE chỉ gen audio dựa trên text, trả URL → admin save vocab sau.
+     */
     const handleGenerateAudio = async () => {
-        if (!editingVocab) return;
+        const word = formData.simplified.trim();
+        if (!editingVocab && !word) {
+            alert('Vui lòng nhập chữ giản thể trước khi tạo audio.');
+            return;
+        }
         setGeneratingAudio(true);
         try {
-            const res = await fetch(`${API_BASE}/api/admin/vocab/${editingVocab.id}/gen-audio`, {
+            const endpoint = editingVocab
+                ? `${API_BASE}/api/admin/vocab/${editingVocab.id}/gen-audio`
+                : `${API_BASE}/api/admin/gen-audio-text`;
+            const init: RequestInit = {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
-            });
+            };
+            if (!editingVocab) {
+                init.headers = { ...init.headers, 'Content-Type': 'application/json' };
+                init.body = JSON.stringify({ text: word });
+            }
+            const res = await fetch(endpoint, init);
             const queued = await res.json();
             if (!res.ok || !queued.jobId) throw new Error(queued.message || 'Tao audio that bai');
 
@@ -137,6 +156,7 @@ export default function AdminVocabularyPage() {
                 });
                 const status = await statusRes.json();
                 if (status.status === 'done' && status.url) {
+                    // FE giữ signed URL để play preview; khi save BE sẽ normalize → gs://
                     setFormData(prev => ({ ...prev, audio_url: status.url }));
                     return;
                 }
@@ -572,17 +592,16 @@ export default function AdminVocabularyPage() {
                                                 <Icon name="play_arrow" size="sm" /> Nghe
                                             </button>
                                         )}
-                                        {editingVocab && (
-                                            <button
-                                                type="button"
-                                                onClick={handleGenerateAudio}
-                                                disabled={generatingAudio || uploading}
-                                                className="px-4 py-2 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 disabled:opacity-60 transition-colors flex items-center gap-1"
-                                            >
-                                                <Icon name="graphic_eq" size="sm" />
-                                                {generatingAudio ? 'Dang tao...' : 'AI'}
-                                            </button>
-                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={handleGenerateAudio}
+                                            disabled={generatingAudio || uploading || !formData.simplified.trim()}
+                                            title={!formData.simplified.trim() ? 'Nhập chữ giản thể trước' : 'Tạo audio bằng AI (Google Cloud TTS)'}
+                                            className="px-4 py-2 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                                        >
+                                            <Icon name="graphic_eq" size="sm" />
+                                            {generatingAudio ? 'Đang tạo...' : 'AI'}
+                                        </button>
                                     </div>
                                     {formData.audio_url && (
                                         <div className="flex items-center gap-2 text-xs">

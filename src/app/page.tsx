@@ -21,6 +21,7 @@ interface Vocab {
   hanViet: string;
   meaningVi: string;
   hskLevel: number;
+  audioUrl?: string;
 }
 
 const hskLevels = [
@@ -372,7 +373,7 @@ export default function HomePage() {
                       hskLevel={vocab.hskLevel}
                       bookmarked={savedVocabIds.has(vocab.id)}
                       onBookmark={handleBookmark}
-                      onAudio={() => playAudio(vocab.simplified)}
+                      onAudio={() => playAudio(vocab.simplified, vocab.audioUrl)}
                     />
                   ))}
                 </div>

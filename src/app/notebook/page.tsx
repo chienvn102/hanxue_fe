@@ -55,7 +55,7 @@ function SavedVocabCard({ vocab, onRemove }: { vocab: SavedVocab; onRemove: () =
                     <HSKBadge level={vocab.hsk_level as 1 | 2 | 3 | 4 | 5 | 6} />
                     <div className="flex items-center gap-1">
                         <button
-                            onClick={() => playAudio(vocab.simplified)}
+                            onClick={() => playAudio(vocab.simplified, (vocab as { audioUrl?: string; audio_url?: string }).audioUrl || (vocab as { audio_url?: string }).audio_url)}
                             className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-muted)] flex items-center justify-center hover:bg-[var(--primary)] hover:text-white transition-colors"
                             title="Phát âm"
                         >

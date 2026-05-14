@@ -159,7 +159,7 @@ function VocabResult({ vocab, index }: { vocab: Vocabulary; index: number }) {
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            playAudio(vocab.simplified);
+                            playAudio(vocab.simplified, (vocab as { audioUrl?: string }).audioUrl);
                         }}
                         className="ml-4 w-12 h-12 rounded-full bg-[var(--surface-secondary)] text-[var(--primary)] flex items-center justify-center hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer border border-[var(--border)]"
                         title="Nghe phát âm"

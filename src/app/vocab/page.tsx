@@ -327,7 +327,7 @@ function VocabCard({ vocab, index, isSavedInitial = false, onSaveToggle }: {
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    playAudio(vocab.simplified);
+                                    playAudio(vocab.simplified, vocab.audioUrl);
                                 }}
                                 className="w-8 h-8 rounded-full bg-[var(--surface-secondary)] text-[var(--text-muted)] flex items-center justify-center hover:bg-[var(--primary)] hover:text-white transition-colors cursor-pointer"
                             >
