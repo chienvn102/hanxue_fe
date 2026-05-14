@@ -25,7 +25,7 @@ export default function LoginPage() {
         try {
             const data = await googleLogin(credential);
             login(data.accessToken, data.refreshToken, data.user);
-            router.push('/');
+            router.push(data.user.requiresOnboarding ? '/onboarding' : '/');
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Đăng nhập Google thất bại');
         } finally {
@@ -41,7 +41,7 @@ export default function LoginPage() {
         try {
             const data = await apiLogin(email, password);
             login(data.accessToken, data.refreshToken, data.user);
-            router.push('/');
+            router.push(data.user.requiresOnboarding ? '/onboarding' : '/');
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');
         } finally {

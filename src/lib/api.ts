@@ -62,7 +62,13 @@ export interface User {
     totalStudyDays?: number;
     lastStudyDate?: string;
     nativeLanguage?: string;
+    preferredVoice?: 'male' | 'female';
     createdAt?: string;
+    hasPassword?: boolean;
+    profileCompleted?: boolean;
+    requiresOnboarding?: boolean;
+    emailVerified?: boolean;
+    googleLinked?: boolean;
 }
 
 export interface AuthResponse {
@@ -190,6 +196,63 @@ export async function resetPassword(email: string, code: string, newPassword: st
     if (!res.ok) {
         const error = await res.json().catch(() => ({}));
         throw new Error(error.error || 'Failed to reset password');
+    }
+    return res.json();
+}
+
+export interface ProfileUpdatePayload {
+    displayName?: string;
+    targetHsk?: number;
+    nativeLanguage?: string;
+    dailyGoalMins?: number;
+    preferredVoice?: 'male' | 'female';
+    avatarUrl?: string | null;
+}
+
+export interface OnboardingPayload extends ProfileUpdatePayload {
+    newPassword: string;
+    code: string;
+}
+
+export async function sendPasswordChangeCode(): Promise<{ message: string }> {
+    const res = await authFetch(`${API_BASE_URL}/api/user/password-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+    });
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to send verification code');
+    }
+    return res.json();
+}
+
+export async function completeOnboarding(payload: OnboardingPayload): Promise<User> {
+    const res = await authFetch(`${API_BASE_URL}/api/user/onboarding`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to complete onboarding');
+    }
+    return res.json();
+}
+
+export async function changePassword(payload: {
+    currentPassword?: string;
+    newPassword: string;
+    code: string;
+}): Promise<{ message: string }> {
+    const res = await authFetch(`${API_BASE_URL}/api/user/password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to change password');
     }
     return res.json();
 }
@@ -524,7 +587,7 @@ export async function fetchProfile(): Promise<User> {
     return res.json();
 }
 
-export async function updateProfile(data: { displayName?: string; targetHsk?: number; nativeLanguage?: string }): Promise<void> {
+export async function updateProfile(data: ProfileUpdatePayload): Promise<User> {
     const res = await authFetch(`${API_BASE_URL}/api/user/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -534,6 +597,7 @@ export async function updateProfile(data: { displayName?: string; targetHsk?: nu
         if (res.status === 401) throw new Error('Unauthorized');
         throw new Error('Failed to update profile');
     }
+    return res.json();
 }
 
 // ============================================================

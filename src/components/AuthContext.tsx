@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 
 // Imports removed (duplicates)
 import { User } from '@/lib/api';
@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
+    const pathname = usePathname();
 
     useEffect(() => {
         // Wrapped in function to satisfy react-hooks/set-state-in-effect
@@ -47,16 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadAuth();
     }, []);
 
-    const login = (newToken: string, newRefreshToken: string, newUser: User) => {
+    const login = useCallback((newToken: string, newRefreshToken: string, newUser: User) => {
         setToken(newToken);
         setUser(newUser);
 
         localStorage.setItem('accessToken', newToken);
         localStorage.setItem('refreshToken', newRefreshToken);
         localStorage.setItem('user', JSON.stringify(newUser));
-    };
+    }, []);
 
-    const logout = () => {
+    const logout = useCallback(() => {
         setToken(null);
         setUser(null);
 
@@ -65,12 +66,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('user');
 
         router.push('/login');
-    };
+    }, [router]);
 
-    const updateUser = (updatedUser: User) => {
+    const updateUser = useCallback((updatedUser: User) => {
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
-    };
+    }, []);
+
+    useEffect(() => {
+        if (loading || !user?.requiresOnboarding || !pathname) return;
+
+        const allowedPaths = ['/onboarding', '/login', '/register', '/forgot-password'];
+        if (!allowedPaths.some((path) => pathname.startsWith(path))) {
+            router.replace('/onboarding');
+        }
+    }, [loading, pathname, router, user]);
 
     return (
         <AuthContext.Provider value={{ user, token, loading, login, logout, updateUser, isAuthenticated: !!token }}>
