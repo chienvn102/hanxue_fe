@@ -17,6 +17,7 @@ interface Course {
     lesson_count: number;
     completed_lessons?: number;
     prerequisite_course_id?: number | null;
+    prerequisite_title?: string;
     is_active?: boolean;
 }
 
@@ -133,9 +134,16 @@ function CourseCard({ course, isLocked }: { course: Course; isLocked: boolean })
 
                 {/* CTA Button */}
                 {isLocked ? (
-                    <div className="mt-4 w-full py-2.5 rounded-xl bg-[var(--surface-secondary)] text-[var(--text-muted)] font-medium text-sm flex items-center justify-center gap-2">
+                    <div
+                        className="mt-4 w-full py-2.5 rounded-xl bg-[var(--surface-secondary)] text-[var(--text-muted)] font-medium text-sm flex items-center justify-center gap-2 px-3"
+                        title={course.prerequisite_title ? `Cần hoàn thành: ${course.prerequisite_title}` : 'Cần hoàn thành khoá trước'}
+                    >
                         <Icon name="lock" size="sm" />
-                        Hoàn thành khóa trước để mở
+                        <span className="truncate">
+                            {course.prerequisite_title
+                                ? `🔒 Cần hoàn thành: ${course.prerequisite_title}`
+                                : 'Hoàn thành khóa trước để mở'}
+                        </span>
                     </div>
                 ) : isCompleted ? (
                     <div className="mt-4 w-full py-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 font-medium text-sm flex items-center justify-center gap-2">
@@ -245,10 +253,14 @@ export default function CoursesPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredCourses.map((course, index) => {
                             // Check if prerequisite course is completed
-                            const isLocked = course.prerequisite_course_id
+                            const prereq = course.prerequisite_course_id
+                                ? courses.find(c => c.id === course.prerequisite_course_id)
+                                : null;
+                            const courseWithPrereqTitle: Course = prereq
+                                ? { ...course, prerequisite_title: prereq.title }
+                                : course;
+                            const isLocked = prereq
                                 ? (() => {
-                                    const prereq = courses.find(c => c.id === course.prerequisite_course_id);
-                                    if (!prereq) return false;
                                     const prereqProgress = prereq.lesson_count > 0 && prereq.completed_lessons
                                         ? Math.round((prereq.completed_lessons / prereq.lesson_count) * 100)
                                         : 0;
@@ -262,7 +274,7 @@ export default function CoursesPage() {
                                     className="animate-fade-in"
                                     style={{ animationDelay: `${index * 0.05}s` }}
                                 >
-                                    <CourseCard course={course} isLocked={isLocked} />
+                                    <CourseCard course={courseWithPrereqTitle} isLocked={isLocked} />
                                 </div>
                             );
                         })}

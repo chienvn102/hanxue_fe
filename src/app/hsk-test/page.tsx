@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import Link from 'next/link';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
 import { fetchHskExams, fetchHskHistory, type HskExam, type HskExamAttempt } from '@/lib/api';
@@ -99,9 +100,18 @@ export default function HskTestPage() {
             <Header />
             <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Page Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-[var(--text-main)] mb-2">Luyện thi HSK</h1>
-                    <p className="text-[var(--text-secondary)]">Chọn đề thi phù hợp với trình độ của bạn</p>
+                <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                    <div>
+                        <h1 className="text-3xl font-bold text-[var(--text-main)] mb-2">Luyện thi HSK</h1>
+                        <p className="text-[var(--text-secondary)]">Chọn đề thi phù hợp với trình độ của bạn</p>
+                    </div>
+                    <Link
+                        href="/hsk-test/history"
+                        className="self-start sm:self-end inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors"
+                    >
+                        <Icon name="history" size="sm" />
+                        Lịch sử làm bài
+                    </Link>
                 </div>
 
                 {/* HSK Level Filter */}

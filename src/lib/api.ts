@@ -1133,6 +1133,13 @@ export async function fetchCourseById(id: string | number): Promise<unknown> {
     const res = await authFetch(`${API_BASE_URL}/api/courses/${id}`);
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
+        if (res.status === 403) {
+            const body = await res.json().catch(() => ({}));
+            const err = new Error(body?.message || 'Khoá đã bị khoá');
+            (err as { code?: string }).code = body?.code || 'COURSE_LOCKED';
+            (err as { data?: unknown }).data = body?.data;
+            throw err;
+        }
         throw new Error('Failed to fetch course');
     }
     return res.json();

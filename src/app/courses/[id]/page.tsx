@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
@@ -148,14 +148,17 @@ function LessonCard({ lesson, index, isCompleted, isLocked }: {
 
 export default function CourseDetailPage() {
     const params = useParams();
+    const router = useRouter();
     const { isAuthenticated } = useAuth();
     const [course, setCourse] = useState<Course | null>(null);
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
+    const [lockedMsg, setLockedMsg] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
+            setLockedMsg(null);
             const [courseData, lessonsData] = await Promise.all([
                 fetchCourseById(params.id as string),
                 fetchLessonsByCourse(params.id as string)
@@ -166,11 +169,18 @@ export default function CourseDetailPage() {
             if (cd.success) setCourse(cd.data);
             if (ld.success) setLessons(ld.data);
         } catch (error) {
+            const errCode = (error as { code?: string })?.code;
+            if (errCode === 'COURSE_LOCKED') {
+                const msg = (error as Error).message || 'Khoá này bị khoá. Hoàn thành khoá trước để mở.';
+                setLockedMsg(msg);
+                setTimeout(() => router.push('/courses'), 2000);
+                return;
+            }
             console.error('Failed to load course data', error);
         } finally {
             setLoading(false);
         }
-    }, [params.id]);
+    }, [params.id, router]);
 
     useEffect(() => {
         if (params.id) {
@@ -188,6 +198,23 @@ export default function CourseDetailPage() {
                 <Header />
                 <div className="flex-1 flex items-center justify-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary)]"></div>
+                </div>
+            </div>
+        );
+    }
+
+    if (lockedMsg) {
+        return (
+            <div className="min-h-screen flex flex-col bg-[var(--background)]">
+                <Header />
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto">
+                    <Icon name="lock" size="xl" className="text-amber-400 mb-4" />
+                    <h1 className="text-2xl font-bold text-[var(--text-main)] mb-2">Khoá đang bị khoá</h1>
+                    <p className="text-[var(--text-secondary)] mb-4">{lockedMsg}</p>
+                    <p className="text-xs text-[var(--text-muted)]">Đang chuyển về danh sách khoá học...</p>
+                    <Link href="/courses" className="mt-4 text-[var(--primary)] hover:underline">
+                        Quay lại ngay
+                    </Link>
                 </div>
             </div>
         );

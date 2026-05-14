@@ -20,6 +20,7 @@ import { HskTestProvider, useHskTest } from '@/components/hsk-test/HskTestContex
 import { GroupHeader } from '@/components/hsk-test/GroupHeader';
 import { PinyinRuby } from '@/components/hsk-test/PinyinRuby';
 import { AudioPlayer } from '@/components/hsk-test/AudioPlayer';
+import { SafeRender } from '@/components/SafeRender';
 
 const SECTION_LABEL: Record<string, string> = {
     listening: 'Nghe (听力)',
@@ -183,6 +184,10 @@ function AnswerCard({ question, questionNumber }: AnswerCardProps) {
                     <div className="space-y-2">
                         {options.map((opt, idx) => {
                             const isCorrect = opt.label === correct;
+                            const optionImage = Array.isArray(question.optionImages)
+                                && question.optionImages.length > idx
+                                ? question.optionImages[idx]
+                                : null;
                             return (
                                 <div
                                     key={idx}
@@ -199,19 +204,19 @@ function AnswerCard({ question, questionNumber }: AnswerCardProps) {
                                                 : 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'
                                         }`}
                                     >
-                                        {opt.label}
+                                        {opt.label || String.fromCharCode(65 + idx)}
                                     </span>
                                     <div className="flex-1">
-                                        {question.optionImages?.[idx] && (
+                                        {optionImage && (
                                             <img
-                                                src={getMediaUrl(question.optionImages[idx])}
+                                                src={getMediaUrl(optionImage)}
                                                 alt=""
                                                 className="max-w-[200px] rounded mb-2"
                                             />
                                         )}
                                         <div className="hanzi text-sm">
                                             <PinyinRuby
-                                                zh={opt.text}
+                                                zh={opt.text || ''}
                                                 pinyin={opt.pinyin}
                                                 show={showPinyin}
                                             />
@@ -236,7 +241,7 @@ function AnswerCard({ question, questionNumber }: AnswerCardProps) {
                     <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mr-2">
                         ✓ Đáp án đúng:
                     </span>
-                    <span className="hanzi font-semibold">{correct}</span>
+                    <span className="hanzi font-semibold">{correct || '(chưa có đáp án)'}</span>
                 </div>
             )}
 
@@ -280,12 +285,21 @@ function SectionView({ section }: SectionViewProps) {
                     q.groupId && !renderedGroupIds.has(q.groupId) && groupMap.has(q.groupId);
                 if (q.groupId && showGroup) renderedGroupIds.add(q.groupId);
                 return (
-                    <div key={q.id}>
-                        {showGroup && q.groupId && groupMap.has(q.groupId) && (
-                            <GroupHeader group={groupMap.get(q.groupId)!} />
-                        )}
-                        <AnswerCard question={q} questionNumber={idx + 1} />
-                    </div>
+                    <SafeRender
+                        key={q.id}
+                        fallback={
+                            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-600 dark:text-amber-400">
+                                Câu {idx + 1} bị thiếu dữ liệu — bỏ qua.
+                            </div>
+                        }
+                    >
+                        <div>
+                            {showGroup && q.groupId && groupMap.has(q.groupId) && (
+                                <GroupHeader group={groupMap.get(q.groupId)!} />
+                            )}
+                            <AnswerCard question={q} questionNumber={idx + 1} />
+                        </div>
+                    </SafeRender>
                 );
             })}
         </div>

@@ -149,13 +149,19 @@ export default function ChatPage() {
         }
     }, []);
 
-    // --- Auto-resize textarea ---
+    // --- Auto-resize textarea + auto-stop TTS khi user bắt đầu gõ ---
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setInput(e.target.value);
+        const newValue = e.target.value;
+        setInput(newValue);
         const textarea = e.target;
         textarea.style.height = 'auto';
         textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-    }, []);
+        // Auto-stop TTS audio đang phát khi user bắt đầu phản hồi.
+        // Chỉ stop khi user thực sự gõ (length tăng), không phải clear.
+        if (newValue.length > 0 && ttsAudioRef.current) {
+            stopTtsAudio();
+        }
+    }, [stopTtsAudio]);
 
     // --- Send message ---
     const sendMessage = useCallback(async (text?: string) => {
@@ -525,6 +531,16 @@ export default function ChatPage() {
                                                     <Icon name="volume_up" size="xs" />
                                                     Nghe
                                                 </button>
+                                                {isSpeaking && (
+                                                    <button
+                                                        onClick={stopTtsAudio}
+                                                        className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-600 transition-colors"
+                                                        title="Dừng phát"
+                                                    >
+                                                        <Icon name="stop_circle" size="xs" />
+                                                        Dừng
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </div>
