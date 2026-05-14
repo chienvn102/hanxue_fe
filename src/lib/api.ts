@@ -351,19 +351,32 @@ export function getMediaUrl(path: string | null | undefined): string {
     return `${API_BASE_URL}${path}`;
 }
 
-export async function playAudio(word: string): Promise<void> {
-    const audioUrl = `${API_BASE_URL}/audio/cmn-${encodeURIComponent(word)}.mp3`;
-    try {
-        const audio = new Audio(audioUrl);
-        await audio.play();
-    } catch {
-        // Fallback: Browser TTS
-        if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(word);
-            utterance.lang = 'zh-CN';
-            utterance.rate = 0.8;
-            speechSynthesis.speak(utterance);
+/**
+ * Phát audio cho 1 từ. Ưu tiên `customUrl` (signed URL từ vocab.audioUrl, ví dụ
+ * audio admin đã gen bằng AI/upload thủ công) → fallback `/audio/cmn-{word}.mp3`
+ * (corpus edge-tts cũ) → fallback browser speechSynthesis.
+ */
+export async function playAudio(word: string, customUrl?: string | null): Promise<void> {
+    const candidates: string[] = [];
+    if (customUrl) candidates.push(customUrl);
+    candidates.push(`${API_BASE_URL}/audio/cmn-${encodeURIComponent(word)}.mp3`);
+
+    for (const url of candidates) {
+        try {
+            const audio = new Audio(url);
+            await audio.play();
+            return; // play thành công → dừng tìm fallback
+        } catch {
+            // tiếp tục thử URL kế tiếp
         }
+    }
+
+    // All fallbacks fail → browser TTS
+    if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(word);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 0.8;
+        speechSynthesis.speak(utterance);
     }
 }
 
