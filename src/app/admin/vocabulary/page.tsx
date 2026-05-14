@@ -89,6 +89,7 @@ export default function AdminVocabularyPage() {
 
     // Audio upload
     const [uploading, setUploading] = useState(false);
+    const [generatingAudio, setGeneratingAudio] = useState(false);
     const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -115,6 +116,37 @@ export default function AdminVocabularyPage() {
             alert('Lỗi kết nối server');
         } finally {
             setUploading(false);
+        }
+    };
+
+    const handleGenerateAudio = async () => {
+        if (!editingVocab) return;
+        setGeneratingAudio(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/admin/vocab/${editingVocab.id}/gen-audio`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const queued = await res.json();
+            if (!res.ok || !queued.jobId) throw new Error(queued.message || 'Tao audio that bai');
+
+            for (let i = 0; i < 30; i++) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                const statusRes = await fetch(`${API_BASE}/api/admin/jobs/${queued.jobId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                });
+                const status = await statusRes.json();
+                if (status.status === 'done' && status.url) {
+                    setFormData(prev => ({ ...prev, audio_url: status.url }));
+                    return;
+                }
+                if (status.status === 'failed') throw new Error(status.error || 'Tao audio that bai');
+            }
+            throw new Error('Tao audio qua lau, vui long thu lai');
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'Tao audio that bai');
+        } finally {
+            setGeneratingAudio(false);
         }
     };
 
@@ -538,6 +570,17 @@ export default function AdminVocabularyPage() {
                                                 className="px-4 py-2 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition-colors flex items-center gap-1"
                                             >
                                                 <Icon name="play_arrow" size="sm" /> Nghe
+                                            </button>
+                                        )}
+                                        {editingVocab && (
+                                            <button
+                                                type="button"
+                                                onClick={handleGenerateAudio}
+                                                disabled={generatingAudio || uploading}
+                                                className="px-4 py-2 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 disabled:opacity-60 transition-colors flex items-center gap-1"
+                                            >
+                                                <Icon name="graphic_eq" size="sm" />
+                                                {generatingAudio ? 'Dang tao...' : 'AI'}
                                             </button>
                                         )}
                                     </div>

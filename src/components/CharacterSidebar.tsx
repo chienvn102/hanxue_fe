@@ -1,7 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { Character, playAudio } from '@/lib/api';
 import StrokeWriter from './StrokeWriter';
+import WriteModeModal from './WriteModeModal';
+import type { StrokeWriterMode } from './StrokeWriter';
 
 interface CharacterSidebarProps {
     characters: Character[];
@@ -9,6 +12,10 @@ interface CharacterSidebarProps {
 }
 
 export default function CharacterSidebar({ characters, mainWord }: CharacterSidebarProps) {
+    const [practiceChar, setPracticeChar] = useState('');
+    const [mode, setMode] = useState<StrokeWriterMode>('trace');
+    const [modeOpen, setModeOpen] = useState(false);
+
     if (characters.length === 0) {
         // No character data available
         if (!mainWord) return null;
@@ -75,6 +82,16 @@ export default function CharacterSidebar({ characters, mainWord }: CharacterSide
                                             <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
                                         </svg>
                                     </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPracticeChar(char.hanzi);
+                                            setModeOpen(true);
+                                        }}
+                                        className="px-2 py-1 rounded text-xs bg-[var(--surface-secondary)] hover:bg-[var(--border)] transition"
+                                    >
+                                        Luyen viet
+                                    </button>
                                 </div>
 
                                 {/* Pinyin & Han Viet */}
@@ -115,6 +132,12 @@ export default function CharacterSidebar({ characters, mainWord }: CharacterSide
                             </div>
                         </div>
 
+                        {practiceChar === char.hanzi && (
+                            <div className="mt-4 flex justify-center">
+                                <StrokeWriter character={char.hanzi} mode={mode} size={220} />
+                            </div>
+                        )}
+
                         {/* Separator */}
                         {index < characters.length - 1 && (
                             <hr className="my-4" style={{ borderColor: 'var(--border)' }} />
@@ -122,6 +145,12 @@ export default function CharacterSidebar({ characters, mainWord }: CharacterSide
                     </div>
                 ))}
             </div>
+            <WriteModeModal
+                open={modeOpen}
+                value={mode}
+                onChange={setMode}
+                onClose={() => setModeOpen(false)}
+            />
         </div>
     );
 }

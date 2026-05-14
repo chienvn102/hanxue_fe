@@ -585,6 +585,109 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
                 </div>
             )}
 
+            {/* ── HSK 4-6 writing AI-graded types ── */}
+            {(type === 'image_keyword_sentence' || type === 'short_essay' || type === 'summary_essay') && (
+                <div className="space-y-3">
+                    {type !== 'summary_essay' && (
+                        <UploadField
+                            label="Ảnh đề bài"
+                            value={form.question_image}
+                            onChange={v => set('question_image', v)}
+                            type="image"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                        />
+                    )}
+                    {type === 'summary_essay' ? (
+                        <div>
+                            <label className="text-xs text-[var(--text-muted)] block mb-1">Passage gốc</label>
+                            <textarea
+                                className="w-full px-3 py-2 border rounded-lg text-sm hanzi"
+                                rows={6}
+                                value={(form.meta as { source_passage?: string } | null)?.source_passage || form.passage}
+                                onChange={e => onChange({
+                                    ...form,
+                                    passage: e.target.value,
+                                    meta: { ...(form.meta || {}), source_passage: e.target.value, max_chars: 400 },
+                                })}
+                            />
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="text-xs text-[var(--text-muted)] block mb-1">
+                                {type === 'image_keyword_sentence' ? 'Keyword' : '5 keyword, ngăn cách bằng dấu phẩy'}
+                            </label>
+                            <input
+                                type="text"
+                                className="w-full px-3 py-2 border rounded-lg text-sm hanzi"
+                                value={type === 'image_keyword_sentence'
+                                    ? String((form.meta as { keyword?: string } | null)?.keyword || '')
+                                    : ((form.meta as { keywords?: string[] } | null)?.keywords || []).join(', ')}
+                                onChange={e => {
+                                    const raw = e.target.value;
+                                    onChange({
+                                        ...form,
+                                        meta: type === 'image_keyword_sentence'
+                                            ? { ...(form.meta || {}), keyword: raw }
+                                            : { ...(form.meta || {}), keywords: raw.split(',').map(s => s.trim()).filter(Boolean) },
+                                    });
+                                }}
+                            />
+                        </div>
+                    )}
+                    <div>
+                        <label className="text-xs text-[var(--text-muted)] block mb-1">
+                            Đáp án mẫu / reference cho AI chấm
+                        </label>
+                        <textarea
+                            className="w-full px-3 py-2 border rounded-lg text-sm hanzi"
+                            rows={3}
+                            value={form.correct_answer}
+                            onChange={e => set('correct_answer', e.target.value)}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* ── HSK 6 reading special types ── */}
+            {(type === 'multi_blank_choice' || type === 'sentence_into_passage') && (
+                <div className="space-y-3">
+                    <div>
+                        <label className="text-xs text-[var(--text-muted)] block mb-1">
+                            Passage có placeholder ___
+                        </label>
+                        <textarea
+                            className="w-full px-3 py-2 border rounded-lg text-sm hanzi"
+                            rows={4}
+                            value={form.passage}
+                            onChange={e => set('passage', e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        {form.options.map((opt, idx) => {
+                            const label = String.fromCharCode(65 + idx);
+                            return (
+                                <div key={label} className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => set('correct_answer', label)}
+                                        className={`w-8 h-8 rounded-full text-sm font-bold ${form.correct_answer === label ? 'bg-green-500 text-white' : 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'}`}
+                                    >
+                                        {label}
+                                    </button>
+                                    <input
+                                        type="text"
+                                        className="flex-1 px-3 py-1.5 border rounded-lg text-sm hanzi"
+                                        placeholder={type === 'multi_blank_choice' ? `${label}: từ1 / từ2 / từ3` : `${label}: câu điền vào đoạn`}
+                                        value={opt}
+                                        onChange={e => updateOption(idx, e.target.value)}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* ── Short answer ── */}
             {type === 'short_answer' && (
                 <div className="space-y-3">

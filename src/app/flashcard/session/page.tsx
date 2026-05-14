@@ -7,7 +7,7 @@ import Header from '@/components/Header';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { submitReview } from '@/lib/api';
+import { fetchFlashcardSession, submitReview } from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
@@ -32,6 +32,7 @@ function FlashcardSessionContent() {
     const router = useRouter();
 
     const hskRaw = searchParams.get('hsk');
+    const deck = searchParams.get('deck') || '';
     const hskInt = hskRaw ? parseInt(hskRaw, 10) : NaN;
     // Chỉ filter nếu hsk hợp lệ (1-6); nếu missing/invalid → null = "tất cả".
     const hsk = Number.isFinite(hskInt) && hskInt >= 1 && hskInt <= 6 ? String(hskInt) : '';
@@ -73,10 +74,7 @@ function FlashcardSessionContent() {
         setLoading(true);
         setError('');
         try {
-            const qs = new URLSearchParams({ limit });
-            if (hsk) qs.set('hsk', hsk);
-            const res = await fetch(`${API_BASE}/api/flashcard?${qs.toString()}`);
-            const data = await res.json();
+            const data = await fetchFlashcardSession({ deck, hsk, limit });
 
             if (data.flashcards && data.flashcards.length > 0) {
                 setFlashcards(data.flashcards);
@@ -90,7 +88,7 @@ function FlashcardSessionContent() {
         } finally {
             setLoading(false);
         }
-    }, [hsk, limit]);
+    }, [deck, hsk, limit]);
 
     useEffect(() => {
         loadFlashcards();

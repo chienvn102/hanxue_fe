@@ -110,6 +110,7 @@ export default function HskExamDetailAdminPage() {
     const [editing, setEditing] = useState<FlatQuestion | null>(null);
     const [editForm, setEditForm] = useState<QuestionFormData>({ ...DEFAULT_QUESTION_FORM });
     const [saving, setSaving] = useState(false);
+    const [generatingAudio, setGeneratingAudio] = useState(false);
     const [saveError, setSaveError] = useState('');
 
     const fetchExam = useCallback(async () => {
@@ -212,6 +213,39 @@ export default function HskExamDetailAdminPage() {
             setSaveError(e instanceof Error ? e.message : 'Lưu thất bại');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleGenerateAudio = async () => {
+        if (!editing) return;
+        setGeneratingAudio(true);
+        setSaveError('');
+        try {
+            const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+            const res = await fetch(`${API_BASE}/api/admin/hsk-questions/${editing.id}/gen-audio`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token || ''}` },
+            });
+            const queued = await res.json();
+            if (!res.ok || !queued.jobId) throw new Error(queued.message || 'Tao audio that bai');
+
+            for (let i = 0; i < 30; i++) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                const statusRes = await fetch(`${API_BASE}/api/admin/jobs/${queued.jobId}`, {
+                    headers: { Authorization: `Bearer ${token || ''}` },
+                });
+                const status = await statusRes.json();
+                if (status.status === 'done' && status.url) {
+                    setEditForm(prev => ({ ...prev, question_audio: status.url }));
+                    return;
+                }
+                if (status.status === 'failed') throw new Error(status.error || 'Tao audio that bai');
+            }
+            throw new Error('Tao audio qua lau, vui long thu lai');
+        } catch (error) {
+            setSaveError(error instanceof Error ? error.message : 'Tao audio that bai');
+        } finally {
+            setGeneratingAudio(false);
         }
     };
 
@@ -370,6 +404,18 @@ export default function HskExamDetailAdminPage() {
                         </div>
 
                         <div className="max-h-[70vh] overflow-y-auto pr-2">
+                            {editing.section_type === 'listening' && (
+                                <div className="mb-4 flex justify-end">
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleGenerateAudio}
+                                        disabled={generatingAudio || saving}
+                                    >
+                                        <Icon name="graphic_eq" size="sm" className="mr-2" />
+                                        {generatingAudio ? 'Dang tao audio...' : 'Tao audio AI'}
+                                    </Button>
+                                </div>
+                            )}
                             {/* Reuse form, nhưng KHÔNG render QuestionTypePicker → loại bỏ
                                 khả năng admin đổi loại câu. group_id giữ nguyên. */}
                             <QuestionFormByType

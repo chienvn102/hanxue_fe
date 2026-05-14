@@ -75,6 +75,8 @@ export default function ProfilePage() {
     if (!profile) return null;
 
     const currentHsk = profile.targetHsk || 1;
+    const completedHskLevels = new Set((profile.completedHskLevels || []).map(Number));
+    const nextUnlockLevel = [1, 2, 3, 4, 5, 6].find(level => !completedHskLevels.has(level));
 
     return (
         <div className="min-h-screen bg-[var(--background)] flex flex-col font-sans text-[var(--text-main)]">
@@ -245,7 +247,8 @@ export default function ProfilePage() {
                                 {[1, 2, 3, 4, 5, 6].map((level) => {
                                     const progress = getHskProgress(level);
                                     const isCurrentLevel = level === currentHsk;
-                                    const isCompleted = progress.percent >= 100;
+                                    const isCompleted = completedHskLevels.has(level);
+                                    const isNextUnlock = level === nextUnlockLevel;
                                     const isLocked = level > currentHsk && !isCompleted;
 
                                     return (
@@ -276,7 +279,7 @@ export default function ProfilePage() {
                                                                     ? 'text-[var(--primary)] font-bold'
                                                                     : 'text-[var(--text-muted)]'
                                                             }`}>
-                                                            {isCompleted ? 'Đã hoàn thành' : isCurrentLevel ? 'Đang học' : 'Chưa mở khóa'}
+                                                            {isCompleted ? 'Đã mở khóa' : isNextUnlock ? 'Cần 70% từ đã thuộc + đậu HSK' : isCurrentLevel ? 'Đang học' : 'Chưa mở khóa'}
                                                         </p>
                                                     </div>
                                                 </div>

@@ -3,6 +3,7 @@ import { Inter, Noto_Sans_SC } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/components/AuthContext";
+import NotificationPrompt from "@/components/NotificationPrompt";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -29,6 +30,7 @@ export default function RootLayout({
     <html lang="vi" suppressHydrationWarning>
       <head>
         {/* Material Symbols Icons */}
+        <link rel="manifest" href="/manifest.json" />
         <link
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
           rel="stylesheet"
@@ -53,6 +55,7 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             {children}
+            <NotificationPrompt />
           </AuthProvider>
         </ThemeProvider>
       </body>

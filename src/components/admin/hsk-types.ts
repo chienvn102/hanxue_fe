@@ -1,20 +1,24 @@
 // Shared types and constants for HSK admin
 
 export const HSK_COLORS: Record<number, string> = {
-    1: 'bg-green-500', 2: 'bg-teal-500', 3: 'bg-blue-500',
-    4: 'bg-purple-500', 5: 'bg-orange-500', 6: 'bg-red-500'
+    1: 'bg-green-500',
+    2: 'bg-teal-500',
+    3: 'bg-blue-500',
+    4: 'bg-purple-500',
+    5: 'bg-orange-500',
+    6: 'bg-red-500',
 };
 
 export const EXAM_TYPES = [
     { value: 'practice', label: 'Luyện tập' },
     { value: 'mock', label: 'Đề mẫu' },
-    { value: 'official', label: 'Đề chính thức' }
+    { value: 'official', label: 'Đề chính thức' },
 ];
 
 export const SECTION_TYPES = [
     { value: 'listening', label: 'Nghe hiểu' },
     { value: 'reading', label: 'Đọc hiểu' },
-    { value: 'writing', label: 'Viết' }
+    { value: 'writing', label: 'Viết' },
 ];
 
 export interface QuestionTypeOption {
@@ -26,30 +30,34 @@ export interface QuestionTypeOption {
 
 export const QUESTION_TYPES_BY_SECTION: Record<string, QuestionTypeOption[]> = {
     listening: [
-        { value: 'true_false', label: 'Đúng / Sai', icon: '✅', desc: 'Nghe → đúng hay sai' },
-        { value: 'image_match', label: 'Ghép ảnh', icon: '🖼️', desc: 'Nghe → chọn hình phù hợp' },
-        { value: 'image_grid_match', label: 'Lưới ảnh A-F', icon: '🔢', desc: 'Nghe → chọn 1 ảnh trong lưới 5-6 ảnh dùng chung' },
-        { value: 'multiple_choice', label: 'Trắc nghiệm nghe', icon: '🎧', desc: 'Nghe → chọn A/B/C/D' },
-        { value: 'reply_match', label: 'Ghép câu trả lời', icon: '💬', desc: 'Nghe câu hỏi → ghép câu trả lời từ bank' },
+        { value: 'true_false', label: 'Đúng / Sai', icon: '✓', desc: 'Nghe → đúng hay sai' },
+        { value: 'image_match', label: 'Ghép ảnh', icon: '▧', desc: 'Nghe → chọn hình phù hợp' },
+        { value: 'image_grid_match', label: 'Lưới ảnh A-F', icon: '▦', desc: 'Nghe → chọn ảnh trong lưới dùng chung' },
+        { value: 'multiple_choice', label: 'Trắc nghiệm nghe', icon: '◉', desc: 'Nghe → chọn A/B/C/D' },
+        { value: 'reply_match', label: 'Ghép câu trả lời', icon: '↔', desc: 'Nghe câu hỏi → ghép câu trả lời từ bank' },
     ],
     reading: [
-        { value: 'multiple_choice', label: 'Đọc hiểu trắc nghiệm', icon: '📄', desc: 'Đọc → chọn A/B/C/D' },
-        { value: 'fill_blank', label: 'Điền vào chỗ trống', icon: '✏️', desc: 'Đọc → điền từ phù hợp' },
-        { value: 'word_bank_fill', label: 'Điền từ vào câu (bank)', icon: '🧩', desc: 'Chọn 1 từ trong bank chung điền vào chỗ trống' },
-        { value: 'image_grid_match', label: 'Ghép ảnh-câu', icon: '🖼️', desc: 'Đọc câu → chọn 1 ảnh trong lưới' },
-        { value: 'true_false', label: 'Đúng / Sai (paragraph)', icon: '✅', desc: 'Đọc đoạn → judge ★ statement' },
-        { value: 'sentence_order', label: 'Sắp xếp câu', icon: '🔀', desc: 'Sắp xếp từ thành câu' },
-        { value: 'error_identify', label: 'Tìm câu sai', icon: '❌', desc: 'Chọn câu có lỗi' },
+        { value: 'multiple_choice', label: 'Đọc hiểu trắc nghiệm', icon: '□', desc: 'Đọc → chọn A/B/C/D' },
+        { value: 'fill_blank', label: 'Điền vào chỗ trống', icon: '_', desc: 'Đọc → điền từ phù hợp' },
+        { value: 'word_bank_fill', label: 'Điền từ từ bank', icon: '▤', desc: 'Chọn từ trong bank chung điền vào chỗ trống' },
+        { value: 'multi_blank_choice', label: 'Đa chỗ trống', icon: '≡', desc: 'HSK6: 3 blanks, chọn cụm từ' },
+        { value: 'sentence_into_passage', label: 'Câu vào đoạn', icon: '¶', desc: 'HSK6: chọn câu điền vào passage' },
+        { value: 'image_grid_match', label: 'Ghép ảnh-câu', icon: '▧', desc: 'Đọc câu → chọn ảnh trong lưới' },
+        { value: 'true_false', label: 'Đúng / Sai paragraph', icon: '✓', desc: 'Đọc đoạn → judge statement' },
+        { value: 'sentence_order', label: 'Sắp xếp câu', icon: '⇄', desc: 'Sắp xếp từ thành câu' },
+        { value: 'error_identify', label: 'Tìm câu sai', icon: '!', desc: 'Chọn câu có lỗi' },
     ],
     writing: [
-        { value: 'sentence_assembly', label: 'Lắp ghép câu', icon: '🧱', desc: 'Sắp xếp các mẩu thành câu hoàn chỉnh' },
-        { value: 'fill_hanzi', label: 'Viết Hán theo pinyin', icon: '🖋️', desc: 'Viết 1 chữ Hán điền vào ( ) theo pinyin' },
-        { value: 'short_answer', label: 'Viết ngắn', icon: '📝', desc: 'Viết câu / đoạn ngắn' },
-        { value: 'sentence_order', label: 'Sắp xếp câu', icon: '🔀', desc: 'Sắp xếp từ thành câu' },
+        { value: 'sentence_assembly', label: 'Lắp ghép câu', icon: '▣', desc: 'Sắp xếp các mẫu thành câu hoàn chỉnh' },
+        { value: 'fill_hanzi', label: 'Viết Hán theo pinyin', icon: '字', desc: 'Viết chữ Hán theo pinyin gợi ý' },
+        { value: 'image_keyword_sentence', label: 'Ảnh + từ khoá', icon: '▧', desc: 'HSK4: viết câu theo ảnh + keyword' },
+        { value: 'short_essay', label: 'Đoạn ngắn', icon: '✎', desc: 'HSK5: ảnh + 5 keyword → đoạn 80 chữ' },
+        { value: 'summary_essay', label: 'Tóm tắt', icon: '¶', desc: 'HSK6: tóm tắt bài đọc dài' },
+        { value: 'short_answer', label: 'Viết ngắn', icon: '✎', desc: 'Viết câu / đoạn ngắn' },
+        { value: 'sentence_order', label: 'Sắp xếp câu', icon: '⇄', desc: 'Sắp xếp từ thành câu' },
     ],
 };
 
-// Flat list for backward compat (label lookup in question list)
 export const QUESTION_TYPES = [
     { value: 'multiple_choice', label: 'Trắc nghiệm (A/B/C/D)' },
     { value: 'true_false', label: 'Đúng/Sai' },
@@ -60,6 +68,11 @@ export const QUESTION_TYPES = [
     { value: 'fill_blank', label: 'Điền vào chỗ trống' },
     { value: 'sentence_assembly', label: 'Lắp ghép câu' },
     { value: 'fill_hanzi', label: 'Viết Hán theo pinyin' },
+    { value: 'image_keyword_sentence', label: 'Ảnh + từ khoá' },
+    { value: 'short_essay', label: 'Đoạn ngắn' },
+    { value: 'multi_blank_choice', label: 'Đa chỗ trống' },
+    { value: 'sentence_into_passage', label: 'Câu vào đoạn' },
+    { value: 'summary_essay', label: 'Tóm tắt' },
     { value: 'sentence_order', label: 'Sắp xếp câu' },
     { value: 'error_identify', label: 'Tìm câu sai' },
     { value: 'short_answer', label: 'Viết ngắn' },
@@ -69,7 +82,7 @@ export const HSK_PRESETS: Record<number, { duration_minutes: number; passing_sco
     1: { duration_minutes: 35, passing_score: 120 },
     2: { duration_minutes: 50, passing_score: 120 },
     3: { duration_minutes: 85, passing_score: 180 },
-    4: { duration_minutes: 100, passing_score: 180 },
+    4: { duration_minutes: 105, passing_score: 180 },
     5: { duration_minutes: 125, passing_score: 180 },
     6: { duration_minutes: 140, passing_score: 180 },
 };
@@ -83,46 +96,59 @@ export interface SectionPreset {
     duration_seconds: number;
 }
 
-// Cấu trúc đề thi cố định theo level. HSK 4-6 chưa có spec chính thức từ user
-// (đặt placeholder ở UI). Khi cập nhật, sửa cả `HSK_AVAILABLE_LEVELS`.
 export const HSK_SECTION_PRESETS: Record<number, SectionPreset[]> = {
     1: [
         { section_type: 'listening', section_order: 1, title: 'Nghe (听力)', instructions: 'Nghe và chọn đáp án', total_questions: 20, duration_seconds: 900 },
-        { section_type: 'reading',   section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 20, duration_seconds: 1020 },
+        { section_type: 'reading', section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 20, duration_seconds: 1020 },
     ],
     2: [
         { section_type: 'listening', section_order: 1, title: 'Nghe (听力)', instructions: 'Nghe và chọn đáp án', total_questions: 35, duration_seconds: 1500 },
-        { section_type: 'reading',   section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 25, duration_seconds: 1320 },
+        { section_type: 'reading', section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 25, duration_seconds: 1320 },
     ],
     3: [
         { section_type: 'listening', section_order: 1, title: 'Nghe (听力)', instructions: 'Nghe và chọn đáp án', total_questions: 40, duration_seconds: 2100 },
-        { section_type: 'reading',   section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 30, duration_seconds: 1800 },
-        { section_type: 'writing',   section_order: 3, title: 'Viết (书写)', instructions: 'Hoàn thành câu / viết Hán', total_questions: 10, duration_seconds: 900 },
+        { section_type: 'reading', section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 30, duration_seconds: 1800 },
+        { section_type: 'writing', section_order: 3, title: 'Viết (书写)', instructions: 'Hoàn thành câu / viết Hán', total_questions: 10, duration_seconds: 900 },
+    ],
+    4: [
+        { section_type: 'listening', section_order: 1, title: 'Nghe (听力)', instructions: 'Nghe và chọn đáp án', total_questions: 45, duration_seconds: 1800 },
+        { section_type: 'reading', section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 40, duration_seconds: 2400 },
+        { section_type: 'writing', section_order: 3, title: 'Viết (书写)', instructions: 'Hoàn thành câu / viết câu theo ảnh', total_questions: 15, duration_seconds: 1500 },
+    ],
+    5: [
+        { section_type: 'listening', section_order: 1, title: 'Nghe (听力)', instructions: 'Nghe và chọn đáp án', total_questions: 45, duration_seconds: 1800 },
+        { section_type: 'reading', section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 45, duration_seconds: 2700 },
+        { section_type: 'writing', section_order: 3, title: 'Viết (书写)', instructions: 'Viết câu / đoạn văn ngắn', total_questions: 10, duration_seconds: 2700 },
+    ],
+    6: [
+        { section_type: 'listening', section_order: 1, title: 'Nghe (听力)', instructions: 'Nghe và chọn đáp án', total_questions: 50, duration_seconds: 2100 },
+        { section_type: 'reading', section_order: 2, title: 'Đọc (阅读)', instructions: 'Đọc và chọn đáp án', total_questions: 50, duration_seconds: 3000 },
+        { section_type: 'writing', section_order: 3, title: 'Viết (书写)', instructions: 'Đọc bài và viết tóm tắt', total_questions: 1, duration_seconds: 2700 },
     ],
 };
 
-export const HSK_AVAILABLE_LEVELS: number[] = [1, 2, 3];
+export const HSK_AVAILABLE_LEVELS: number[] = [1, 2, 3, 4, 5, 6];
 
 export interface QuestionFormData {
     question_number: number;
     question_type: string;
     question_text: string;
-    passage: string;             // HSK 2/3 reading paragraph
-    statement: string;            // HSK 3 listening ★ T/F
+    passage: string;
+    statement: string;
     question_image: string;
     question_audio: string;
-    transcript: string;           // Văn bản gốc của audio
+    transcript: string;
     audio_start_time: number;
     audio_end_time: number;
     audio_play_count: number;
-    options: string[];            // Legacy plain text — admin form vẫn dùng string[] để giữ tương thích
-    options_pinyin: string[];     // Pinyin tương ứng options[i] — render Cách A
+    options: string[];
+    options_pinyin: string[];
     option_images: string[];
     correct_answer: string;
     explanation: string;
     difficulty: number;
     points: number;
-    group_id: number | null;      // FK tới hsk_question_groups
+    group_id: number | null;
     meta: Record<string, unknown> | null;
 }
 

@@ -54,6 +54,7 @@ export interface User {
     avatarUrl?: string;
     role?: 'user' | 'admin';
     targetHsk?: number;
+    completedHskLevels?: number[];
     isPremium?: boolean;
     dailyGoalMins?: number;
     totalXp?: number;
@@ -80,6 +81,17 @@ export interface AuthResponse {
 export interface RegisterResponse {
     message: string;
     userId: number;
+}
+
+export interface FlashcardDeck {
+    id: number;
+    name: string;
+    description?: string | null;
+    source_type: 'manual' | 'notebook' | 'theme' | 'lesson' | 'hsk';
+    source_ref?: string | null;
+    card_count: number;
+    created_at: string;
+    last_studied_at?: string | null;
 }
 
 // API Functions
@@ -145,6 +157,75 @@ export async function login(email: string, password: string): Promise<AuthRespon
         const error = await res.json();
         throw new Error(error.error || 'Login failed');
     }
+    return res.json();
+}
+
+export async function getVapidPublicKey(): Promise<string> {
+    const res = await fetch(`${API_BASE_URL}/api/notifications/vapid-public-key`);
+    if (!res.ok) return '';
+    const data = await res.json();
+    return data.publicKey || '';
+}
+
+export async function subscribePush(subscription: PushSubscription): Promise<void> {
+    const res = await authFetch(`${API_BASE_URL}/api/notifications/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription.toJSON()),
+    });
+    if (!res.ok) throw new Error('Failed to subscribe push notifications');
+}
+
+export async function fetchFlashcardDecks(): Promise<FlashcardDeck[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/flashcard/decks`);
+    if (!res.ok) throw new Error('Failed to fetch flashcard decks');
+    const data = await res.json();
+    return data.data || [];
+}
+
+export async function createFlashcardDeck(input: {
+    name: string;
+    description?: string;
+    source_type: FlashcardDeck['source_type'];
+    source_ref?: string;
+}): Promise<{ id: number }> {
+    const res = await authFetch(`${API_BASE_URL}/api/flashcard/decks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error('Failed to create flashcard deck');
+    const data = await res.json();
+    return data.data;
+}
+
+export async function fetchFlashcardSession(params: {
+    deck?: string;
+    hsk?: string;
+    limit?: string;
+}): Promise<{ count: number; flashcards: any[] }> {
+    const qs = new URLSearchParams({ limit: params.limit || '20' });
+    if (params.deck) {
+        const res = await authFetch(`${API_BASE_URL}/api/flashcard/decks/${params.deck}/session?${qs.toString()}`);
+        if (!res.ok) throw new Error('Failed to fetch deck flashcards');
+        return res.json();
+    }
+    if (params.hsk) qs.set('hsk', params.hsk);
+    const res = await fetch(`${API_BASE_URL}/api/flashcard?${qs.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch flashcards');
+    return res.json();
+}
+
+export async function completeWritePractice(stats: {
+    charactersCompleted: number;
+    totalMistakes: number;
+}): Promise<{ success: boolean; xpEarned: number }> {
+    const res = await authFetch(`${API_BASE_URL}/api/practice/write-complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stats),
+    });
+    if (!res.ok) throw new Error('Failed to record write practice');
     return res.json();
 }
 
@@ -630,7 +711,13 @@ export type HskQuestionType =
     | 'word_bank_fill'
     | 'reply_match'
     | 'sentence_assembly'
-    | 'fill_hanzi';
+    | 'fill_hanzi'
+    // HSK 4-6:
+    | 'image_keyword_sentence'
+    | 'short_essay'
+    | 'multi_blank_choice'
+    | 'sentence_into_passage'
+    | 'summary_essay';
 
 // Option dạng object có pinyin (Cách A — tách Hán/pinyin)
 export interface HskOption {
@@ -643,7 +730,7 @@ export interface HskOption {
 export interface HskQuestionGroup {
     id: number;
     section_id: number;
-    group_type: 'image_grid' | 'word_bank' | 'reply_bank' | 'passage';
+    group_type: 'image_grid' | 'word_bank' | 'reply_bank' | 'passage' | 'passage_multi';
     title_vi?: string;
     instructions_vi?: string;
     content: HskGroupContent | null;
@@ -654,7 +741,7 @@ export type HskGroupContent =
     | { items: { label: string; image_url: string; alt_vi?: string }[]; example?: { label: string; content: { zh: string; pinyin?: string } } }
     | { items: { label: string; word: string; pinyin?: string }[]; example?: { label: string; sentence_zh: string; sentence_pinyin?: string } }
     | { items: { label: string; sentence_zh: string; sentence_pinyin?: string }[]; example?: { label: string; prompt_zh: string; prompt_pinyin?: string } }
-    | { passage_zh: string; passage_pinyin?: string; passage_vi?: string };
+    | { passage_zh: string; passage_pinyin?: string; passage_vi?: string; question_refs?: number[] };
 
 export interface HskQuestion {
     id: number;

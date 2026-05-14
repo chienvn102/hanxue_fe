@@ -13,7 +13,15 @@ import {
     WordBankFill,
     ReplyMatch,
 } from './renderers/GroupBasedRenderers';
-import { SentenceAssembly, FillHanzi } from './renderers/WritingRenderers';
+import {
+    SentenceAssembly,
+    FillHanzi,
+    ImageKeywordSentence,
+    ShortEssay,
+    SummaryEssay,
+    MultiBlankChoice,
+    SentenceIntoPassage,
+} from './renderers/WritingRenderers';
 import {
     LegacyMcq,
     LegacyTrueFalse,
@@ -51,6 +59,21 @@ export function QuestionRenderer({ question, group, value, onChange }: Props) {
 
         case 'fill_hanzi':
             return <FillHanzi {...props} />;
+
+        case 'image_keyword_sentence':
+            return <ImageKeywordSentence {...props} />;
+
+        case 'short_essay':
+            return <ShortEssay {...props} />;
+
+        case 'summary_essay':
+            return <SummaryEssay {...props} />;
+
+        case 'multi_blank_choice':
+            return <MultiBlankChoice {...props} />;
+
+        case 'sentence_into_passage':
+            return <SentenceIntoPassage {...props} />;
 
         // ─── true_false: chọn variant dựa vào fields ───────────────────
         case 'true_false':

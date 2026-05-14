@@ -14,7 +14,6 @@ interface Lesson {
     id: number;
     title: string;
     description?: string;
-    duration: number;
     order_index: number;
     content_count: number;
     youtube_id?: string;
@@ -133,10 +132,6 @@ function LessonCard({ lesson, index, isCompleted, isLocked }: {
                             <Icon name={statusIcon} className={statusColor} />
                         </div>
                         <div className="flex items-center gap-4 mt-2 text-xs text-[var(--text-muted)]">
-                            <span className="flex items-center gap-1">
-                                <Icon name="schedule" size="xs" />
-                                {Math.floor(lesson.duration / 60)} phút
-                            </span>
                             {lesson.content_count > 0 && (
                                 <span className="flex items-center gap-1">
                                     <Icon name="translate" size="xs" />
@@ -186,8 +181,6 @@ export default function CourseDetailPage() {
     const progress = course && course.lesson_count > 0 && course.completed_lessons
         ? Math.round((course.completed_lessons / course.lesson_count) * 100)
         : 0;
-
-    const totalDuration = lessons.reduce((acc, l) => acc + l.duration, 0);
 
     if (loading) {
         return (
@@ -311,13 +304,6 @@ export default function CourseDetailPage() {
                                 </div>
                                 <div className="flex items-center justify-between py-3 border-b border-[var(--border)]">
                                     <span className="flex items-center gap-2 text-[var(--text-secondary)]">
-                                        <Icon name="schedule" size="sm" />
-                                        Thời lượng
-                                    </span>
-                                    <span className="font-semibold text-[var(--text-main)]">{Math.round(totalDuration / 60)} giờ</span>
-                                </div>
-                                <div className="flex items-center justify-between py-3 border-b border-[var(--border)]">
-                                    <span className="flex items-center gap-2 text-[var(--text-secondary)]">
                                         <Icon name="signal_cellular_alt" size="sm" />
                                         Trình độ
                                     </span>
@@ -397,21 +383,6 @@ export default function CourseDetailPage() {
                             </button>
                         </div>
 
-                        {/* Instructor Card (Mock) */}
-                        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6">
-                            <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">
-                                Giảng viên
-                            </h3>
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full bg-[var(--primary)] flex items-center justify-center text-white font-bold">
-                                    TV
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-[var(--text-main)]">Cô Trương Mỹ Lan</p>
-                                    <p className="text-sm text-[var(--text-muted)]">Giảng viên HSK</p>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </main>

@@ -1,11 +1,16 @@
 'use client';
 
-import type { HskQuestion } from '@/lib/api';
+import type { HskOption, HskQuestion } from '@/lib/api';
+import { getMediaUrl } from '@/lib/api';
 
 interface RP {
     question: HskQuestion;
     value: string;
     onChange: (v: string) => void;
+}
+
+function optionToText(option: string | HskOption): string {
+    return typeof option === 'string' ? option : option.text;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -77,6 +82,139 @@ export function FillHanzi({ question, value, onChange }: RP) {
                         );
                     }
                     return <span key={i}>{part}</span>;
+                })}
+            </div>
+        </div>
+    );
+}
+
+export function ImageKeywordSentence({ question, value, onChange }: RP) {
+    const meta = (question.meta || {}) as { keyword?: string };
+    return (
+        <div className="space-y-4">
+            {question.questionImage && (
+                <img
+                    src={getMediaUrl(question.questionImage)}
+                    alt=""
+                    className="max-h-72 w-full object-contain rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]"
+                />
+            )}
+            {(meta.keyword || question.questionText) && (
+                <div className="text-sm text-[var(--text-secondary)]">
+                    {question.questionText}
+                    {meta.keyword && <span className="ml-2 font-semibold text-[var(--primary)]">{meta.keyword}</span>}
+                </div>
+            )}
+            <textarea
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                rows={3}
+                placeholder="Viết một câu hoàn chỉnh..."
+                className="w-full px-4 py-3 rounded-xl border-2 border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:outline-none"
+            />
+        </div>
+    );
+}
+
+export function ShortEssay({ question, value, onChange }: RP) {
+    const meta = (question.meta || {}) as { keywords?: string[] };
+    return (
+        <div className="space-y-4">
+            {question.questionImage && (
+                <img
+                    src={getMediaUrl(question.questionImage)}
+                    alt=""
+                    className="max-h-72 w-full object-contain rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]"
+                />
+            )}
+            {meta.keywords?.length ? (
+                <div className="flex flex-wrap gap-2">
+                    {meta.keywords.map((keyword, index) => (
+                        <span key={index} className="px-2.5 py-1 rounded-md bg-[var(--primary)]/10 text-[var(--primary)] text-sm font-medium">
+                            {keyword}
+                        </span>
+                    ))}
+                </div>
+            ) : null}
+            <textarea
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                rows={7}
+                placeholder="Viết đoạn văn theo yêu cầu..."
+                className="w-full px-4 py-3 rounded-xl border-2 border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:outline-none"
+            />
+        </div>
+    );
+}
+
+export function SummaryEssay({ question, value, onChange }: RP) {
+    const meta = (question.meta || {}) as { source_passage?: string; min_chars?: number; max_chars?: number };
+    return (
+        <div className="space-y-4">
+            <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] whitespace-pre-wrap leading-relaxed">
+                {meta.source_passage || question.passage || question.questionText}
+            </div>
+            <textarea
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                rows={9}
+                placeholder={`Viết tóm tắt${meta.max_chars ? ` tối đa ${meta.max_chars} chữ` : ''}...`}
+                className="w-full px-4 py-3 rounded-xl border-2 border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:outline-none"
+            />
+        </div>
+    );
+}
+
+export function MultiBlankChoice({ question, value, onChange }: RP) {
+    return (
+        <div className="space-y-4">
+            <p className="text-lg leading-relaxed whitespace-pre-wrap">{question.passage || question.questionText}</p>
+            <div className="grid gap-2">
+                {(question.options || []).map((option, index) => {
+                    const label = String.fromCharCode(65 + index);
+                    const selected = value === label;
+                    return (
+                        <button
+                            key={label}
+                            type="button"
+                            onClick={() => onChange(label)}
+                            className={`text-left p-3 rounded-xl border transition-colors ${
+                                selected
+                                    ? 'border-[var(--primary)] bg-[var(--primary)]/10'
+                                    : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-secondary)]'
+                            }`}
+                        >
+                            <span className="font-bold mr-2">{label}.</span>{optionToText(option)}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+export function SentenceIntoPassage({ question, value, onChange }: RP) {
+    return (
+        <div className="space-y-4">
+            <p className="text-lg leading-relaxed whitespace-pre-wrap">{question.passage || question.questionText}</p>
+            <div className="grid gap-2">
+                {(question.options || []).map((option, index) => {
+                    const label = String.fromCharCode(65 + index);
+                    const selected = value === label;
+                    return (
+                        <button
+                            key={label}
+                            type="button"
+                            onClick={() => onChange(label)}
+                            className={`text-left p-3 rounded-xl border transition-colors ${
+                                selected
+                                    ? 'border-[var(--primary)] bg-[var(--primary)]/10'
+                                    : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-secondary)]'
+                            }`}
+                        >
+                            <span className="font-bold mr-2">{label}.</span>{optionToText(option)}
+                        </button>
+                    );
                 })}
             </div>
         </div>
