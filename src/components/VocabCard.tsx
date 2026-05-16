@@ -71,11 +71,6 @@ export function VocabCard({
                     <p className="text-sm font-medium text-[var(--text-main)] mb-0.5">
                         {meaningVi}
                     </p>
-                    {hanViet && (
-                        <p className="text-xs italic text-[var(--text-muted)]">
-                            Hán Việt: {hanViet}
-                        </p>
-                    )}
                 </div>
 
                 {/* Audio Button */}

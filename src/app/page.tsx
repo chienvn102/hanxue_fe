@@ -279,7 +279,6 @@ export default function HomePage() {
                         <div className="flex-1 min-w-0">
                           <div className="text-sm text-[var(--primary)] truncate">{v.pinyin}</div>
                           <div className="text-sm text-[var(--text-secondary)] truncate">
-                            {v.hanViet && <span className="italic text-[var(--text-muted)] mr-2">{v.hanViet}</span>}
                             {v.meaningVi}
                           </div>
                         </div>

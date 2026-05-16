@@ -149,9 +149,6 @@ function VocabResult({ vocab, index }: { vocab: Vocabulary; index: number }) {
                         </div>
                         <div className="flex items-center gap-4 text-sm mb-3">
                             <span className="text-[var(--text-secondary)]">{vocab.pinyin}</span>
-                            {vocab.hanViet && (
-                                <span className="text-[var(--primary)] italic">{vocab.hanViet}</span>
-                            )}
                         </div>
                         <p className="text-[var(--text-main)]">{vocab.meaningVi}</p>
                     </div>

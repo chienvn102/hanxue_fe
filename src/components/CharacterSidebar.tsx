@@ -94,15 +94,10 @@ export default function CharacterSidebar({ characters, mainWord }: CharacterSide
                                     </button>
                                 </div>
 
-                                {/* Pinyin & Han Viet */}
+                                {/* Pinyin */}
                                 <div className="text-sm space-y-0.5">
                                     {char.pinyinMain && (
                                         <div className="pinyin text-base">{char.pinyinMain}</div>
-                                    )}
-                                    {char.hanViet && (
-                                        <div className="han-viet text-base italic" style={{ color: 'var(--accent)' }}>
-                                            {char.hanViet}
-                                        </div>
                                     )}
                                 </div>
 

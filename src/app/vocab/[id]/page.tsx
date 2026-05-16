@@ -151,9 +151,6 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
 
                                     <div className="flex items-center gap-4 text-lg">
                                         <span className="pinyin">{vocab.pinyin}</span>
-                                        {vocab.hanViet && (
-                                            <span className="han-viet">{vocab.hanViet}</span>
-                                        )}
                                     </div>
 
                                     {vocab.themes && vocab.themes.length > 0 && (

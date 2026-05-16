@@ -516,9 +516,9 @@ export default function AdminVocabularyPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Hán Việt *</label>
+                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Hán Việt (không bắt buộc)</label>
                                     <input
-                                        type="text" required
+                                        type="text"
                                         className="w-full px-3 py-2 border rounded-lg bg-[var(--surface)] text-[var(--text-main)] italic"
                                         value={formData.han_viet}
                                         onChange={e => setFormData({ ...formData, han_viet: e.target.value })}

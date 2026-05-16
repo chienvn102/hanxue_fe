@@ -349,11 +349,6 @@ function VocabCard({ vocab, index, isSavedInitial = false, onSaveToggle }: {
                         <p className="text-sm text-[var(--text-main)] line-clamp-2">
                             {vocab.meaningVi}
                         </p>
-                        {vocab.hanViet && (
-                            <p className="text-xs text-[var(--text-muted)] italic mt-1">
-                                Hán Việt: {vocab.hanViet}
-                            </p>
-                        )}
                     </div>
                 </div>
             </Card>
