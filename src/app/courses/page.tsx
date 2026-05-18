@@ -141,7 +141,7 @@ function CourseCard({ course, isLocked }: { course: Course; isLocked: boolean })
                         <Icon name="lock" size="sm" />
                         <span className="truncate">
                             {course.prerequisite_title
-                                ? `🔒 Cần hoàn thành: ${course.prerequisite_title}`
+                                ? `Cần hoàn thành: ${course.prerequisite_title}`
                                 : 'Hoàn thành khóa trước để mở'}
                         </span>
                     </div>
