@@ -111,9 +111,11 @@ export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
                             <Icon name="record_voice_over" className="text-[var(--primary)]" />
                             Thoại realtime với AI
                         </h2>
+                        {/*
                         <p className="text-xs text-[var(--text-muted)] mt-0.5">
                             Powered by OpenAI Realtime — phản hồi &lt; 1 giây, ngắt lời được
                         </p>
+                        */}
                     </div>
                     <button
                         onClick={async () => { await stop(); onClose(); }}
@@ -172,7 +174,7 @@ export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
                 {/* Controls */}
                 <div className="px-5 py-4 border-t border-[var(--border)] flex items-center justify-center gap-3">
                     {status === 'idle' || status === 'closed' || status === 'error' ? (
-                        <Button onClick={start} disabled={status === 'connecting' as RealtimeStatus}>
+                        <Button onClick={start}>
                             <Icon name="play_arrow" size="sm" />
                             Bắt đầu thoại
                         </Button>
@@ -189,9 +191,11 @@ export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
                     )}
                 </div>
 
+                {/*
                 <div className="px-5 pb-4 text-xs text-[var(--text-muted)] text-center">
                     Cần micro và HTTPS. Có thể ngắt lời AI bất cứ lúc nào.
                 </div>
+                */}
             </div>
         </div>
     );

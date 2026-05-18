@@ -36,7 +36,7 @@ const CONVERSATION_CHIPS = [
 // Tutor config per mode
 const TUTOR = {
     chat: { name: '小明', pinyin: 'Xiǎo Míng', avatar: '明', color: 'bg-emerald-500/10 text-emerald-600' },
-    conversation: { name: '小红', pinyin: 'Xiǎo Hóng', avatar: '红', color: 'bg-rose-500/10 text-rose-600' },
+    conversation: { name: 'GPT Realtime', pinyin: 'Realtime voice', avatar: 'AI', color: 'bg-rose-500/10 text-rose-600' },
     practice: { name: '老师', pinyin: 'Lǎo shī', avatar: '师', color: 'bg-blue-500/10 text-blue-600' },
 } as const;
 
@@ -309,8 +309,10 @@ export default function ChatPage() {
 
     // --- Mode switch ---
     const switchMode = useCallback((newMode: 'chat' | 'conversation' | 'practice') => {
-        if (newMode === mode) return;
-        if (newMode === 'conversation' && !sttSupported) return;
+        if (newMode === mode) {
+            if (newMode === 'conversation') setRealtimeOpen(true);
+            return;
+        }
         recorderRef.current?.cancel();
         stopTtsAudio();
         if (silenceTimerRef.current) {
@@ -322,7 +324,8 @@ export default function ChatPage() {
         setIsTranscribing(false);
         setTranscript('');
         setMode(newMode);
-    }, [mode, sttSupported, stopTtsAudio]);
+        if (newMode === 'conversation') setRealtimeOpen(true);
+    }, [mode, stopTtsAudio]);
 
     // --- Guest view ---
     if (!isAuthenticated) {
@@ -374,7 +377,7 @@ export default function ChatPage() {
                                 {mode === 'chat'
                                     ? `Gia sư ${tutor.name} (${tutor.pinyin})`
                                     : mode === 'conversation'
-                                        ? `Bạn trò chuyện ${tutor.name} (${tutor.pinyin})`
+                                        ? 'Hội thoại trực tiếp bằng GPT Realtime'
                                         : `Giáo viên ${tutor.name} (${tutor.pinyin})`
                                 } &middot; HSK {user?.targetHsk || 1}
                             </p>
@@ -396,15 +399,11 @@ export default function ChatPage() {
                         </button>
                         <button
                             onClick={() => switchMode('conversation')}
-                            disabled={!sttSupported}
                             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
                                 mode === 'conversation'
                                     ? 'bg-[var(--primary)] text-white'
-                                    : sttSupported
-                                        ? 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--surface)]'
-                                        : 'text-[var(--text-muted)] cursor-not-allowed'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--surface)]'
                             }`}
-                            title={!sttSupported ? 'Trình duyệt không hỗ trợ nhận diện giọng nói' : ''}
                         >
                             <Icon name="mic" size="xs" className="mr-1 align-middle" />
                             Hội thoại
@@ -423,8 +422,8 @@ export default function ChatPage() {
                     </div>
                 </div>
 
-                {/* Usage Counter — only for chat/conversation; practice has its own quota display */}
-                {mode !== 'practice' && remaining !== null && usageLimit !== null && (
+                {/* Usage Counter — only for text chat; realtime voice uses its own session */}
+                {mode === 'chat' && remaining !== null && usageLimit !== null && (
                     <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs">
                         <Icon name="bolt" size="xs" className="text-amber-500" />
                         <span className="text-[var(--text-secondary)]">
@@ -452,8 +451,28 @@ export default function ChatPage() {
                     </div>
                 ) : (
                     <>
+                        {mode === 'conversation' && (
+                            <div className="flex-1 rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6 mb-4 min-h-[360px] flex flex-col items-center justify-center text-center">
+                                <div className="w-16 h-16 mb-4 rounded-full bg-[var(--primary)]/10 flex items-center justify-center">
+                                    <Icon name="record_voice_over" size="lg" className="text-[var(--primary)]" />
+                                </div>
+                                <h2 className="text-xl font-bold text-[var(--text-main)] mb-2">Hội thoại GPT Realtime</h2>
+                                <p className="text-sm text-[var(--text-secondary)] max-w-md mb-6">
+                                    Luyện nói trực tiếp với AI bằng giọng nói.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setRealtimeOpen(true)}
+                                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition-colors"
+                                >
+                                    <Icon name="play_arrow" size="sm" />
+                                    Bắt đầu hội thoại
+                                </button>
+                            </div>
+                        )}
+
                         {/* Messages Area — chat & conversation only */}
-                        <div className="flex-1 overflow-y-auto rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-4 mb-4 min-h-[300px] max-h-[calc(100vh-320px)]">
+                        <div className={`${mode === 'conversation' ? 'hidden' : ''} flex-1 overflow-y-auto rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-4 mb-4 min-h-[300px] max-h-[calc(100vh-320px)]`}>
                             {messages.length === 0 && !isLoading && (
                                 <div className="flex flex-col items-center justify-center h-full text-center py-12">
                                     <div className={`w-16 h-16 mb-4 rounded-full ${tutor.color} flex items-center justify-center`}>
@@ -603,9 +622,9 @@ export default function ChatPage() {
                             </>
                         )}
 
-                        {/* Input Area — Conversation Mode */}
+                        {/* Legacy STT/TTS conversation UI is kept hidden; GPT Realtime is the active conversation path. */}
                         {mode === 'conversation' && (
-                            <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
+                            <div aria-hidden="true" className="hidden flex-col items-center gap-3 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
                                 {/* Realtime upgrade banner */}
                                 <button
                                     type="button"
