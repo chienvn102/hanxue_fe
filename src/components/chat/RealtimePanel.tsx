@@ -16,10 +16,11 @@ interface TranscriptEntry {
 
 interface RealtimePanelProps {
     token: string;
-    onClose: () => void;
+    onClose?: () => void;
+    variant?: 'modal' | 'inline';
 }
 
-export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
+export function RealtimePanel({ token, onClose, variant = 'modal' }: RealtimePanelProps) {
     const [status, setStatus] = useState<RealtimeStatus>('idle');
     const [error, setError] = useState<string | null>(null);
     const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
@@ -102,9 +103,13 @@ export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
         };
     }, []);
 
-    return (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="w-full max-w-2xl bg-[var(--surface)] rounded-2xl shadow-2xl border border-[var(--border)] flex flex-col max-h-[80vh]">
+    const isModal = variant === 'modal';
+
+    const panel = (
+        <div className={isModal
+            ? 'w-full max-w-2xl bg-[var(--surface)] rounded-2xl shadow-2xl border border-[var(--border)] flex flex-col max-h-[80vh]'
+            : 'w-full flex-1 min-h-[420px] mb-4 bg-[var(--surface)] rounded-2xl border border-[var(--border)] flex flex-col overflow-hidden'
+        }>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
                     <div>
                         <h2 className="text-lg font-bold text-[var(--text-main)] flex items-center gap-2">
@@ -117,13 +122,15 @@ export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
                         </p>
                         */}
                     </div>
-                    <button
-                        onClick={async () => { await stop(); onClose(); }}
-                        className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                        aria-label="Đóng"
-                    >
-                        <Icon name="close" />
-                    </button>
+                    {onClose && (
+                        <button
+                            onClick={async () => { await stop(); onClose(); }}
+                            className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                            aria-label="Đóng"
+                        >
+                            <Icon name="close" />
+                        </button>
+                    )}
                 </div>
 
                 {/* Status badge */}
@@ -132,7 +139,10 @@ export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
                 </div>
 
                 {/* Transcript */}
-                <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 min-h-[200px] max-h-[400px]">
+                <div ref={scrollRef} className={isModal
+                    ? 'flex-1 overflow-y-auto px-5 py-4 min-h-[200px] max-h-[400px]'
+                    : 'flex-1 overflow-y-auto px-5 py-4 min-h-[260px]'
+                }>
                     {transcripts.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center text-[var(--text-muted)]">
                             <Icon name="mic" size="xl" className="mb-3" />
@@ -197,6 +207,13 @@ export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
                 </div>
                 */}
             </div>
+    );
+
+    if (!isModal) return panel;
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            {panel}
         </div>
     );
 }

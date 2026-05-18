@@ -309,10 +309,7 @@ export default function ChatPage() {
 
     // --- Mode switch ---
     const switchMode = useCallback((newMode: 'chat' | 'conversation' | 'practice') => {
-        if (newMode === mode) {
-            if (newMode === 'conversation') setRealtimeOpen(true);
-            return;
-        }
+        if (newMode === mode) return;
         recorderRef.current?.cancel();
         stopTtsAudio();
         if (silenceTimerRef.current) {
@@ -324,7 +321,6 @@ export default function ChatPage() {
         setIsTranscribing(false);
         setTranscript('');
         setMode(newMode);
-        if (newMode === 'conversation') setRealtimeOpen(true);
     }, [mode, stopTtsAudio]);
 
     // --- Guest view ---
@@ -452,23 +448,14 @@ export default function ChatPage() {
                 ) : (
                     <>
                         {mode === 'conversation' && (
-                            <div className="flex-1 rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6 mb-4 min-h-[360px] flex flex-col items-center justify-center text-center">
-                                <div className="w-16 h-16 mb-4 rounded-full bg-[var(--primary)]/10 flex items-center justify-center">
-                                    <Icon name="record_voice_over" size="lg" className="text-[var(--primary)]" />
+                            token ? (
+                                <RealtimePanel token={token} variant="inline" />
+                            ) : (
+                                <div className="flex-1 rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6 mb-4 min-h-[360px] flex flex-col items-center justify-center text-center">
+                                    <Icon name="error" size="lg" className="text-[var(--error)] mb-3" />
+                                    <p className="text-sm text-[var(--text-secondary)]">Không tìm thấy phiên đăng nhập. Vui lòng đăng nhập lại.</p>
                                 </div>
-                                <h2 className="text-xl font-bold text-[var(--text-main)] mb-2">Hội thoại GPT Realtime</h2>
-                                <p className="text-sm text-[var(--text-secondary)] max-w-md mb-6">
-                                    Luyện nói trực tiếp với AI bằng giọng nói.
-                                </p>
-                                <button
-                                    type="button"
-                                    onClick={() => setRealtimeOpen(true)}
-                                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition-colors"
-                                >
-                                    <Icon name="play_arrow" size="sm" />
-                                    Bắt đầu hội thoại
-                                </button>
-                            </div>
+                            )
                         )}
 
                         {/* Messages Area — chat & conversation only */}
@@ -710,9 +697,12 @@ export default function ChatPage() {
 
             <Footer />
 
+            {/*
+            Legacy popup mount point kept disabled; realtime now renders inside the chat frame.
             {realtimeOpen && token && (
                 <RealtimePanel token={token} onClose={() => setRealtimeOpen(false)} />
             )}
+            */}
         </div>
     );
 }
