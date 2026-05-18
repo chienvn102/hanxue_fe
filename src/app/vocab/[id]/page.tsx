@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import CharacterSidebar from '@/components/CharacterSidebar';
+import { Icon } from '@/components/ui/Icon';
 import { fetchVocabById, fetchCharacterBreakdown, Vocabulary, Character, playAudio } from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
@@ -98,10 +99,10 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
             <div className="min-h-screen" style={{ background: 'var(--background)' }}>
                 <Header />
                 <div className="max-w-6xl mx-auto px-4 py-16 text-center">
-                    <div className="text-6xl mb-4">😢</div>
+                    <Icon name="search_off" size="xl" className="text-[var(--text-muted)] mb-4 inline-block" />
                     <p className="text-xl" style={{ color: 'var(--accent)' }}>{error || 'Không tìm thấy từ vựng'}</p>
                     <Link href="/vocab" className="btn-primary mt-6 inline-block">
-                        ← Quay lại danh sách
+                        Quay lại danh sách
                     </Link>
                 </div>
             </div>
@@ -109,9 +110,9 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
     }
 
     const tabs = [
-        { id: 'meaning', label: '📖 Câu', icon: '📖' },
-        { id: 'examples', label: '💬 Ví dụ', icon: '💬' },
-        { id: 'grammar', label: '📚 Ngữ pháp', icon: '📚' },
+        { id: 'meaning', label: 'Nghĩa' },
+        { id: 'examples', label: 'Ví dụ' },
+        { id: 'grammar', label: 'Ngữ pháp' },
     ];
 
     return (
@@ -174,11 +175,16 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
                                         onClick={() => playAudio(vocab.simplified, vocab.audioUrl)}
                                         className="btn-audio animate-pulse-glow"
                                         title="Nghe phát âm"
+                                        aria-label="Nghe phát âm"
                                     >
-                                        🔊
+                                        <Icon name="volume_up" size="md" />
                                     </button>
-                                    <button className="btn-secondary px-3 py-2" title="Thêm vào sổ tay">
-                                        ➕
+                                    <button
+                                        className="btn-secondary px-3 py-2"
+                                        title="Thêm vào sổ tay"
+                                        aria-label="Thêm vào sổ tay"
+                                    >
+                                        <Icon name="bookmark_add" size="md" />
                                     </button>
                                 </div>
                             </div>
@@ -231,8 +237,9 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
                                     ) : examples.length > 0 ? (
                                         <div className="space-y-4">
                                             {examplesSource === 'ai' && (
-                                                <div className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded inline-block mb-2">
-                                                    ✨ Được tạo bởi AI
+                                                <div className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded mb-2">
+                                                    <Icon name="auto_awesome" size="xs" />
+                                                    <span>Được tạo bởi AI</span>
                                                 </div>
                                             )}
                                             {examples.map((ex, i) => (
@@ -250,8 +257,9 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
                                                             onClick={() => playAudio(ex.zh)}
                                                             className="text-[var(--primary)] hover:scale-110 transition-transform p-1"
                                                             title="Nghe mẫu câu"
+                                                            aria-label="Nghe mẫu câu"
                                                         >
-                                                            🔊
+                                                            <Icon name="volume_up" size="sm" />
                                                         </button>
                                                     </div>
                                                     <p className="mt-1" style={{ color: 'var(--text-muted)' }}>{ex.vi}</p>

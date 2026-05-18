@@ -41,10 +41,10 @@ type GroupContent = ImageGridContent | WordBankContent | ReplyBankContent | Pass
 const DEFAULT_LABELS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 const GROUP_TYPE_LABELS: Record<GroupType, string> = {
-    image_grid: '🖼️ Lưới ảnh (Image Grid)',
-    word_bank: '📝 Ngân hàng từ (Word Bank)',
-    reply_bank: '💬 Ngân hàng câu trả lời (Reply Bank)',
-    passage: '📄 Đoạn văn (Passage)',
+    image_grid: 'Lưới ảnh (Image Grid)',
+    word_bank: 'Ngân hàng từ (Word Bank)',
+    reply_bank: 'Ngân hàng câu trả lời (Reply Bank)',
+    passage: 'Đoạn văn (Passage)',
 };
 
 interface Props {
@@ -312,7 +312,7 @@ function ImageGridEditor({ content, onChange }: { content: ImageGridContent | nu
     return (
         <div className="space-y-2">
             <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2 rounded">
-                💡 Bắt buộc 5 hoặc 6 ảnh (label A-E hoặc A-F).
+                Bắt buộc 5 hoặc 6 ảnh (label A-E hoặc A-F).
             </p>
             <div className="grid grid-cols-2 gap-3">
                 {items.map((item, idx) => (

@@ -2,6 +2,7 @@
 
 import type { QuestionFormData } from './hsk-types';
 import { SECTION_COLORS } from './hsk-types';
+import { Icon } from '@/components/ui/Icon';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -54,7 +55,7 @@ export function QuestionPreview({ form, sectionType }: QuestionPreviewProps) {
                     {/* Audio indicator */}
                     {form.question_audio && (
                         <div className="flex items-center gap-2 mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                            <span className="text-xs">🎵</span>
+                            <Icon name="music_note" size="xs" className="text-blue-500" />
                             <div className="flex-1 h-1 bg-blue-200 dark:bg-blue-700 rounded-full">
                                 <div className="w-1/3 h-full bg-blue-500 rounded-full" />
                             </div>
@@ -232,7 +233,7 @@ export function QuestionPreview({ form, sectionType }: QuestionPreviewProps) {
                     {(type === 'image_grid_match' || type === 'word_bank_fill' || type === 'reply_match') && (
                         <div className="flex-1 space-y-2">
                             <div className="text-[10px] text-purple-500 italic">
-                                🔗 Group #{form.group_id ?? '—'} (xem bên trên)
+                                Group #{form.group_id ?? '—'} (xem bên trên)
                             </div>
                             <div className="grid grid-cols-3 gap-1.5">
                                 {['A', 'B', 'C', 'D', 'E', 'F'].map(letter => (

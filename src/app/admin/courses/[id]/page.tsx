@@ -15,7 +15,6 @@ interface Course {
     title: string;
     description: string;
     hsk_level: number;
-    thumbnail_url: string;
     is_active: number | boolean;
     order_index: number;
     lesson_count?: number;
@@ -49,7 +48,7 @@ export default function AdminCourseDetailPage() {
     const [saving, setSaving] = useState(false);
 
     const [form, setForm] = useState({
-        title: '', description: '', hsk_level: 1, thumbnail_url: '',
+        title: '', description: '', hsk_level: 1,
         order_index: 0, is_active: 1,
     });
 
@@ -77,7 +76,6 @@ export default function AdminCourseDetailPage() {
                     title: cd.data.title || '',
                     description: cd.data.description || '',
                     hsk_level: cd.data.hsk_level || 1,
-                    thumbnail_url: cd.data.thumbnail_url || '',
                     order_index: cd.data.order_index || 0,
                     is_active: cd.data.is_active ? 1 : 0,
                 });
@@ -288,20 +286,6 @@ export default function AdminCourseDetailPage() {
                             value={form.description}
                             onChange={e => setForm({ ...form, description: e.target.value })}
                         />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">URL ảnh bìa</label>
-                        <input
-                            type="url"
-                            className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none"
-                            placeholder="https://"
-                            value={form.thumbnail_url}
-                            onChange={e => setForm({ ...form, thumbnail_url: e.target.value })}
-                        />
-                        {form.thumbnail_url && (
-                            <img src={form.thumbnail_url} alt="" className="mt-2 max-h-32 rounded-lg border border-[var(--border)]" />
-                        )}
                     </div>
 
                     <div className="flex gap-3 pt-2">

@@ -13,7 +13,6 @@ interface Course {
     title: string;
     description: string;
     hsk_level: number;
-    thumbnail_url: string;
     is_active: number;
     lesson_count: number;
     order_index?: number;
@@ -29,7 +28,6 @@ export default function AdminCoursesPage() {
         title: '',
         description: '',
         hsk_level: 1,
-        thumbnail_url: '',
         order_index: 0
     });
 
@@ -55,7 +53,7 @@ export default function AdminCoursesPage() {
 
     const openCreateModal = () => {
         setEditingCourse(null);
-        setFormData({ title: '', description: '', hsk_level: 1, thumbnail_url: '', order_index: 0 });
+        setFormData({ title: '', description: '', hsk_level: 1, order_index: 0 });
         setIsModalOpen(true);
     };
 
@@ -65,7 +63,6 @@ export default function AdminCoursesPage() {
             title: course.title,
             description: course.description || '',
             hsk_level: course.hsk_level,
-            thumbnail_url: course.thumbnail_url || '',
             order_index: course.order_index || 0
         });
         setIsModalOpen(true);
@@ -140,49 +137,39 @@ export default function AdminCoursesPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {courses.map(course => (
-                        <div key={course.id} className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] overflow-hidden shadow-sm hover:shadow-md transition-all group">
-                            <div className="h-40 bg-[var(--surface-secondary)] relative">
-                                {course.thumbnail_url ? (
-                                    <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
-                                        <Icon name="image" size="lg" />
-                                    </div>
-                                )}
-                                <div className="absolute top-4 right-4 px-2 py-1 bg-black/50 text-white text-xs font-bold rounded-md backdrop-blur-md">
+                        <div key={course.id} className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-md transition-all group p-5 flex flex-col">
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                                <span className="px-2 py-1 bg-[var(--primary)]/10 text-[var(--primary)] text-xs font-bold rounded-md uppercase tracking-wide">
                                     HSK {course.hsk_level}
-                                </div>
+                                </span>
+                                <span className="text-xs font-semibold text-[var(--text-muted)] uppercase">
+                                    {course.lesson_count} Bài học
+                                </span>
                             </div>
-                            <div className="p-5">
-                                <h3 className="font-bold text-lg text-[var(--text-main)] mb-2 truncate" title={course.title}>{course.title}</h3>
-                                <p className="text-sm text-[var(--text-muted)] line-clamp-2 mb-4 h-10">{course.description}</p>
 
-                                <div className="flex items-center justify-between pt-4 border-t border-[var(--border)]">
-                                    <span className="text-xs font-semibold text-[var(--text-muted)] uppercase">
-                                        {course.lesson_count} Bài học
-                                    </span>
-                                    <div className="flex gap-2">
-                                        <Link href={`/admin/courses/${course.id}`}>
-                                            <button className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors" title="Mở chi tiết & quản lý bài học">
-                                                <Icon name="open_in_new" size="sm" />
-                                            </button>
-                                        </Link>
-                                        <button
-                                            onClick={() => openEditModal(course)}
-                                            className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
-                                            title="Chỉnh sửa nhanh"
-                                        >
-                                            <Icon name="edit" size="sm" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(course)}
-                                            className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-red-500 transition-colors"
-                                            title="Xóa"
-                                        >
-                                            <Icon name="delete" size="sm" />
-                                        </button>
-                                    </div>
-                                </div>
+                            <h3 className="font-bold text-lg text-[var(--text-main)] mb-2 truncate" title={course.title}>{course.title}</h3>
+                            <p className="text-sm text-[var(--text-muted)] line-clamp-2 mb-4 h-10">{course.description}</p>
+
+                            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[var(--border)] mt-auto">
+                                <Link href={`/admin/courses/${course.id}`}>
+                                    <button className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors" title="Mở chi tiết & quản lý bài học">
+                                        <Icon name="open_in_new" size="sm" />
+                                    </button>
+                                </Link>
+                                <button
+                                    onClick={() => openEditModal(course)}
+                                    className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
+                                    title="Chỉnh sửa nhanh"
+                                >
+                                    <Icon name="edit" size="sm" />
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(course)}
+                                    className="p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                                    title="Xóa"
+                                >
+                                    <Icon name="delete" size="sm" />
+                                </button>
                             </div>
                         </div>
                     ))}
@@ -243,17 +230,6 @@ export default function AdminCoursesPage() {
                                     className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] placeholder-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all resize-none h-24"
                                     value={formData.description}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Link ảnh bìa</label>
-                                <input
-                                    type="url"
-                                    className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] placeholder-[var(--text-muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none transition-all"
-                                    placeholder="https://"
-                                    value={formData.thumbnail_url}
-                                    onChange={e => setFormData({ ...formData, thumbnail_url: e.target.value })}
                                 />
                             </div>
 

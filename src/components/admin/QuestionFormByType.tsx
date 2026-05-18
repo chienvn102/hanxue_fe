@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { QuestionFormData } from './hsk-types';
 import { UploadField } from './UploadField';
+import { Icon } from '@/components/ui/Icon';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -131,7 +132,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
             {(isListening || form.question_audio) && (
                 <div className="bg-blue-50/50 dark:bg-blue-950/20 rounded-lg p-3 space-y-3 border border-blue-200/50 dark:border-blue-800/30">
                     <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                        🎧 Cấu hình Audio
+                        Cấu hình Audio
                     </h4>
                     <UploadField
                         label="Audio câu hỏi"
@@ -195,7 +196,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
             {requiredGroupType && (
                 <div className="bg-purple-50/50 dark:bg-purple-950/20 rounded-lg p-3 border border-purple-200/50 dark:border-purple-800/30">
                     <label className="text-xs font-semibold text-purple-600 dark:text-purple-400 block mb-2">
-                        🔗 Group ({requiredGroupType}) dùng chung cho cụm câu *
+                        Group ({requiredGroupType}) dùng chung cho cụm câu *
                     </label>
                     <select
                         className="w-full px-3 py-2 border rounded-lg text-sm"
@@ -211,7 +212,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
                     </select>
                     {groupOptions.length === 0 && (
                         <p className="text-xs text-amber-600 mt-1">
-                            ⚠️ Section này chưa có group nào loại <code>{requiredGroupType}</code>. Tạo group trong panel Groups trước.
+                            Section này chưa có group nào loại <code>{requiredGroupType}</code>. Tạo group trong panel Groups trước.
                         </p>
                     )}
                 </div>
@@ -222,7 +223,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
                 <div className="space-y-2 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-lg p-3 border border-emerald-200/50 dark:border-emerald-800/30">
                     <div>
                         <label className="text-xs text-[var(--text-muted)] block mb-1">
-                            📄 Đoạn văn (passage) — dùng cho HSK 2/3 reading paragraph
+                            Đoạn văn (passage) — dùng cho HSK 2/3 reading paragraph
                         </label>
                         <textarea
                             className="w-full px-2 py-1.5 border rounded-lg text-sm hanzi"
@@ -338,7 +339,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
                                         : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--text-muted)]'
                                 }`}
                             >
-                                <span className="text-2xl block mb-1">{val === 'Đúng' ? '✅' : '❌'}</span>
+                                <Icon name={val === 'Đúng' ? 'check_circle' : 'cancel'} size="lg" className="block mb-1" />
                                 {val}
                             </button>
                         ))}
@@ -397,7 +398,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
             {type === 'fill_blank' && (
                 <div>
                     <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 p-2 rounded-lg mb-3">
-                        💡 Dùng <code className="font-mono">＿＿</code> hoặc <code className="font-mono">___</code> trong nội dung câu hỏi để đánh dấu chỗ trống
+                        Dùng <code className="font-mono">＿＿</code> hoặc <code className="font-mono">___</code> trong nội dung câu hỏi để đánh dấu chỗ trống
                     </p>
                     <label className="text-xs text-[var(--text-muted)] block mb-1">Đáp án đúng</label>
                     <input
@@ -414,7 +415,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
             {type === 'sentence_order' && (
                 <div className="space-y-3">
                     <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 p-2 rounded-lg">
-                        💡 Nhập các phương án sắp xếp (A/B/C/D). Chọn phương án đúng.
+                        Nhập các phương án sắp xếp (A/B/C/D). Chọn phương án đúng.
                     </p>
                     <div className="space-y-2">
                         {['A', 'B', 'C', 'D'].map((opt, idx) => (
@@ -482,7 +483,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
             {type === 'sentence_assembly' && (
                 <div className="space-y-3">
                     <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 p-2 rounded-lg">
-                        💡 Mỗi mẩu (chunk) là 1 từ/cụm từ để người làm bài lắp ghép thành câu hoàn chỉnh.
+                        Mỗi mẩu (chunk) là 1 từ/cụm từ để người làm bài lắp ghép thành câu hoàn chỉnh.
                     </p>
                     <div>
                         <label className="text-xs text-[var(--text-muted)] block mb-2">
@@ -541,7 +542,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
             {type === 'fill_hanzi' && (
                 <div className="space-y-3">
                     <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 p-2 rounded-lg">
-                        💡 Người làm bài viết 1 chữ Hán theo pinyin gợi ý, điền vào chỗ <code>( )</code> trong câu.
+                        Người làm bài viết 1 chữ Hán theo pinyin gợi ý, điền vào chỗ <code>( )</code> trong câu.
                     </p>
                     <div>
                         <label className="text-xs text-[var(--text-muted)] block mb-1">
