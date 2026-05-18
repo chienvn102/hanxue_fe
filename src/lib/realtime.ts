@@ -29,6 +29,13 @@ export class RealtimeClient {
     private audioEl: HTMLAudioElement | null = null;
 
     onTranscript?: (role: RealtimeRole, text: string, done: boolean) => void;
+    /**
+     * Fires when the server VAD detects the user has started speaking, BEFORE
+     * the transcription stream begins. The UI should reserve a placeholder
+     * "user" slot here so messages don't end up out of chronological order
+     * (AI reply often starts streaming before Whisper finalises the user text).
+     */
+    onUserSpeechStarted?: () => void;
     onStatus?: (status: RealtimeStatus) => void;
     onError?: (err: Error) => void;
 
@@ -134,6 +141,12 @@ export class RealtimeClient {
 
     private handleEvent(event: OpenAiRealtimeEvent) {
         switch (event.type) {
+            // VAD says user started speaking — reserve a placeholder slot
+            // BEFORE the AI starts streaming back, so chronological order holds.
+            case 'input_audio_buffer.speech_started': {
+                this.onUserSpeechStarted?.();
+                break;
+            }
             // GA: assistant audio transcript stream
             case 'response.output_audio_transcript.delta':
             // Beta alias kept for safety in case OpenAI dual-emits

@@ -229,10 +229,40 @@ export default function PracticePanel({ hskLevel, onPracticeComplete }: Practice
         };
     }, []);
 
-    // Load initial text
-    useEffect(() => {
-        loadNewText();
-    }, [loadNewText]);
+    // No auto-load — user clicks "Bắt đầu" to fetch first practice text.
+    // Avoids consuming Groq quota when user just glances at the tab.
+
+    // Lazy-init state — show start screen until user opts in.
+    // Avoids burning AI quota when user accidentally switches to this tab.
+    const [started, setStarted] = useState(false);
+
+    const handleStart = async () => {
+        setStarted(true);
+        await loadNewText();
+    };
+
+    if (!started && !practiceText) {
+        return (
+            <div className="flex flex-col items-center justify-center gap-4 p-8 min-h-[300px]">
+                <div className="w-16 h-16 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center">
+                    <Icon name="mic" size="xl" />
+                </div>
+                <div className="text-center max-w-sm">
+                    <h3 className="text-lg font-bold text-[var(--text-main)] mb-1">Luyện phát âm</h3>
+                    <p className="text-sm text-[var(--text-muted)]">
+                        AI sẽ chọn 1 câu HSK {hskLevel} cho bạn đọc, sau đó chấm phát âm chi tiết.
+                    </p>
+                </div>
+                <button
+                    onClick={handleStart}
+                    className="px-6 py-2.5 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition-colors inline-flex items-center gap-2"
+                >
+                    <Icon name="play_arrow" size="sm" />
+                    Bắt đầu luyện
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col items-center gap-4 p-4">

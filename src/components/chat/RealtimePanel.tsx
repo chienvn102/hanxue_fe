@@ -36,15 +36,35 @@ export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
 
     const handleTranscript = (role: 'user' | 'assistant', text: string, done: boolean) => {
         setTranscripts(prev => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === role && !last.done) {
-                // Streaming: append delta or replace with final
-                const updated = { ...last, text: done ? text : last.text + text, done };
-                return [...prev.slice(0, -1), updated];
+            // Find the LAST entry with this role that's still streaming (not done).
+            // For user: this hits the placeholder we reserved on speech_started.
+            // For assistant: this hits the current AI message being streamed.
+            for (let i = prev.length - 1; i >= 0; i--) {
+                if (prev[i].role === role && !prev[i].done) {
+                    const updated = [...prev];
+                    updated[i] = {
+                        ...updated[i],
+                        text: done ? text : updated[i].text + text,
+                        done,
+                    };
+                    return updated;
+                }
             }
-            // New entry
+            // No matching open slot — append a fresh entry (rare fallback)
             transcriptIdRef.current += 1;
             return [...prev, { id: transcriptIdRef.current, role, text, done }];
+        });
+    };
+
+    const handleUserSpeechStarted = () => {
+        // Reserve a placeholder user bubble immediately so it appears BEFORE
+        // any AI reply (which often starts streaming before Whisper finalises).
+        setTranscripts(prev => {
+            // Avoid duplicate placeholders if multiple speech_started fire in a row
+            const last = prev[prev.length - 1];
+            if (last && last.role === 'user' && !last.done && last.text === '') return prev;
+            transcriptIdRef.current += 1;
+            return [...prev, { id: transcriptIdRef.current, role: 'user', text: '', done: false }];
         });
     };
 
@@ -55,6 +75,7 @@ export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
             const session = await mintRealtimeSession(API_BASE, token);
             const client = new RealtimeClient();
             client.onTranscript = handleTranscript;
+            client.onUserSpeechStarted = handleUserSpeechStarted;
             client.onStatus = setStatus;
             client.onError = (e) => setError(e.message);
             clientRef.current = client;
@@ -136,7 +157,11 @@ export function RealtimePanel({ token, onClose }: RealtimePanelProps) {
                                             {t.role === 'user' ? 'Bạn' : 'AI'}
                                             {!t.done && <span className="ml-1 animate-pulse">·</span>}
                                         </p>
-                                        <p className="hanzi text-sm leading-relaxed">{t.text || '…'}</p>
+                                        <p className="hanzi text-sm leading-relaxed">
+                                            {t.text || (t.role === 'user' && !t.done
+                                                ? <span className="opacity-60 italic text-xs not-italic">Đang nghe…</span>
+                                                : '…')}
+                                        </p>
                                     </div>
                                 </div>
                             ))}
