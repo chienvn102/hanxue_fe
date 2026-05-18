@@ -5,17 +5,29 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import CharacterSidebar from '@/components/CharacterSidebar';
 import { Icon } from '@/components/ui/Icon';
-import { fetchVocabById, fetchCharacterBreakdown, Vocabulary, Character, playAudio } from '@/lib/api';
+import { useAuth } from '@/components/AuthContext';
+import {
+    fetchVocabById,
+    fetchCharacterBreakdown,
+    fetchSavedVocabIds,
+    toggleSaveVocab,
+    Vocabulary,
+    Character,
+    playAudio,
+} from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
 export default function VocabDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = use(params);
+    const { isAuthenticated } = useAuth();
     const [vocab, setVocab] = useState<Vocabulary | null>(null);
     const [characters, setCharacters] = useState<Character[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'meaning' | 'examples' | 'grammar'>('meaning');
+    const [activeTab, setActiveTab] = useState<'meaning' | 'examples'>('meaning');
+    const [isSaved, setIsSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     // Examples state - now includes pinyin
     const [examples, setExamples] = useState<Array<{ zh: string, pinyin?: string, vi: string }>>([]);
@@ -46,6 +58,39 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
             .catch((err) => setError(err.message))
             .finally(() => setLoading(false));
     }, [resolvedParams.id]);
+
+    // Fetch saved state for authenticated users
+    useEffect(() => {
+        if (!isAuthenticated) {
+            setIsSaved(false);
+            return;
+        }
+        const id = parseInt(resolvedParams.id);
+        if (isNaN(id)) return;
+        fetchSavedVocabIds()
+            .then((ids) => setIsSaved(ids.includes(id)))
+            .catch(() => { /* silent — UI default to false */ });
+    }, [isAuthenticated, resolvedParams.id]);
+
+    const handleToggleSave = async () => {
+        if (!vocab || saving) return;
+        if (!isAuthenticated) {
+            alert('Vui lòng đăng nhập để lưu từ vựng.');
+            return;
+        }
+        const next = !isSaved;
+        setSaving(true);
+        setIsSaved(next); // optimistic
+        try {
+            await toggleSaveVocab(vocab.id, next);
+        } catch (err) {
+            console.error('Failed to toggle save vocab', err);
+            setIsSaved(!next); // rollback
+            alert('Không thể cập nhật sổ tay, vui lòng thử lại.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     // Fetch examples when clicking examples tab (if not already loaded)
     const loadExamples = async () => {
@@ -112,7 +157,6 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
     const tabs = [
         { id: 'meaning', label: 'Nghĩa' },
         { id: 'examples', label: 'Ví dụ' },
-        { id: 'grammar', label: 'Ngữ pháp' },
     ];
 
     return (
@@ -180,11 +224,14 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
                                         <Icon name="volume_up" size="md" />
                                     </button>
                                     <button
-                                        className="btn-secondary px-3 py-2"
-                                        title="Thêm vào sổ tay"
-                                        aria-label="Thêm vào sổ tay"
+                                        onClick={handleToggleSave}
+                                        disabled={saving}
+                                        className="btn-secondary px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                                        title={isSaved ? 'Đã có trong sổ tay — bấm để bỏ' : 'Thêm vào sổ tay'}
+                                        aria-label={isSaved ? 'Bỏ khỏi sổ tay' : 'Thêm vào sổ tay'}
+                                        aria-pressed={isSaved}
                                     >
-                                        <Icon name="bookmark_add" size="md" />
+                                        <Icon name={isSaved ? 'bookmark' : 'bookmark_add'} filled={isSaved} size="md" />
                                     </button>
                                 </div>
                             </div>
@@ -272,22 +319,17 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
                                 </div>
                             )}
 
-                            {activeTab === 'grammar' && (
-                                <div>
-                                    <p style={{ color: 'var(--text-muted)' }}>
-                                        Tính năng ngữ pháp đang được phát triển...
-                                    </p>
-                                </div>
-                            )}
                         </div>
 
-                        {/* Word Type */}
-                        {vocab.wordType && (
-                            <div className="card">
-                                <div className="flex gap-4">
-                                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Loại từ:</span>
-                                    <span className="text-sm font-medium">{vocab.wordType}</span>
-                                </div>
+                        {vocab.hskLevel && (
+                            <div className="text-sm text-right">
+                                <Link
+                                    href={`/grammar?hsk=${vocab.hskLevel}`}
+                                    className="text-[var(--primary)] hover:underline inline-flex items-center gap-1"
+                                >
+                                    Xem ngữ pháp HSK {vocab.hskLevel}
+                                    <Icon name="arrow_forward" size="xs" />
+                                </Link>
                             </div>
                         )}
                     </div>

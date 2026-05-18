@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthContext';
 import { Icon } from './ui/Icon';
+import { SfxToggle } from './SfxToggle';
+import { NotificationBell } from './NotificationBell';
 
 interface NavItem {
     href: string;
@@ -141,6 +143,12 @@ export default function Header() {
                         >
                             <Icon name={resolvedTheme === 'dark' ? 'light_mode' : 'dark_mode'} />
                         </button>
+
+                        {/* SFX Toggle */}
+                        <SfxToggle className="hidden sm:inline-flex w-9 h-9 sm:w-10 sm:h-10 items-center justify-center rounded-xl" />
+
+                        {/* Notifications */}
+                        <NotificationBell />
 
                         {/* Notebook Link */}
                         {isAuthenticated && (

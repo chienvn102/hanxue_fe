@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { fetchFlashcardSession, submitReview } from '@/lib/api';
+import { playSfx } from '@/lib/sound';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
@@ -179,6 +180,7 @@ function FlashcardSessionContent() {
         setIsCorrect(correct);
         setShowResult(true);
         setTotalAttempts(prev => prev + 1);
+        playSfx(correct ? 'correct' : 'wrong');
 
         if (correct) {
             setCorrectCount(prev => prev + 1);
@@ -209,6 +211,7 @@ function FlashcardSessionContent() {
                 setCurrentIndex(0);
             } else {
                 setCompleted(true);
+                playSfx('complete');
             }
         } else {
             setCurrentIndex(nextIdx);

@@ -176,6 +176,85 @@ export async function subscribePush(subscription: PushSubscription): Promise<voi
     if (!res.ok) throw new Error('Failed to subscribe push notifications');
 }
 
+// ============================================================
+// Notification feed (in-app bell)
+// ============================================================
+
+export interface NotificationItem {
+    id: number;
+    title: string;
+    body: string;
+    url: string | null;
+    tag: string | null;
+    type?: string;
+    icon?: string | null;
+    read_at: string | null;
+    created_at: string;
+}
+
+export async function fetchPendingNotifications(): Promise<NotificationItem[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/notifications/pending`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.success ? (data.data as NotificationItem[]) : [];
+}
+
+export async function fetchUnreadCount(): Promise<number> {
+    const res = await authFetch(`${API_BASE_URL}/api/notifications/unread-count`);
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data.success ? (data.data?.count || 0) : 0;
+}
+
+export async function markNotificationRead(id: number): Promise<void> {
+    await authFetch(`${API_BASE_URL}/api/notifications/${id}/read`, { method: 'PUT' });
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+    await authFetch(`${API_BASE_URL}/api/notifications/read-all`, { method: 'PUT' });
+}
+
+// ============================================================
+// Activity log
+// ============================================================
+
+export interface ActivityItem {
+    id: number;
+    eventType: string;
+    title: string | null;
+    icon: string | null;
+    payload: Record<string, unknown> | null;
+    createdAt: string;
+}
+
+export async function fetchRecentActivity(limit = 20): Promise<ActivityItem[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/activity/recent?limit=${limit}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.success ? (data.data as ActivityItem[]) : [];
+}
+
+// ============================================================
+// Achievements
+// ============================================================
+
+export interface AchievementItem {
+    key: string;
+    name: string;
+    target: number;
+    icon: string;
+    earned: boolean;
+    earnedAt: string | null;
+    metricValue: number | null;
+}
+
+export async function fetchAchievements(): Promise<AchievementItem[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/achievements`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.success ? (data.data as AchievementItem[]) : [];
+}
+
 export async function fetchFlashcardDecks(): Promise<FlashcardDeck[]> {
     const res = await authFetch(`${API_BASE_URL}/api/flashcard/decks`);
     if (!res.ok) throw new Error('Failed to fetch flashcard decks');
@@ -573,12 +652,41 @@ export interface TranslatePrompt {
     hsk: number;
 }
 
+export interface TranslateGrammarIssue {
+    type: string;
+    found: string;
+    shouldBe: string;
+    explanationVi: string;
+}
+
+export interface TranslateVocabSuggestion {
+    yourWord: string;
+    betterWord: string;
+    reasonVi: string;
+}
+
+export interface TranslateBreakdown {
+    meaningAccuracy: { score: number; commentVi: string };
+    grammar: { score: number; commentVi: string; issues: TranslateGrammarIssue[] };
+    vocabulary: { score: number; commentVi: string; suggestions: TranslateVocabSuggestion[] };
+    fluency: { score: number; commentVi: string };
+}
+
+export interface TranslateHighlight {
+    type: 'good' | 'warn';
+    textVi: string;
+}
+
 export interface TranslateGrade {
     score: number;
     feedbackVi: string;
     correctZh: string;
     expectedPinyin?: string;
+    correctPinyin?: string;
     xpEarned: number;
+    breakdown?: TranslateBreakdown | null;
+    highlights?: TranslateHighlight[];
+    nextPracticeHintVi?: string;
 }
 
 // Map upstream HTTP errors (502/503/504 từ nginx/Cloudflare) sang message
@@ -692,6 +800,22 @@ export async function updateProfile(data: ProfileUpdatePayload): Promise<User> {
         throw new Error('Failed to update profile');
     }
     return res.json();
+}
+
+export async function uploadAvatar(file: File): Promise<string> {
+    const form = new FormData();
+    form.append('image', file);
+    const res = await authFetch(`${API_BASE_URL}/api/upload/avatar`, {
+        method: 'POST',
+        body: form,
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Tải ảnh đại diện thất bại');
+    }
+    const data = await res.json();
+    if (!data.success || !data.url) throw new Error('Phản hồi không hợp lệ từ server');
+    return data.url as string;
 }
 
 // ============================================================

@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { fetchTranslatePrompt, gradeTranslate, TranslatePrompt, TranslateGrade } from '@/lib/api';
 import { useAuth } from '@/components/AuthContext';
+import { playSfx } from '@/lib/sound';
+import { ScoreBreakdown } from '@/components/practice/ScoreBreakdown';
 
 type Phase = 'loading' | 'answering' | 'grading' | 'graded' | 'error';
 
@@ -95,13 +97,15 @@ function TranslateGameContent() {
             setGrade(result);
             setTotalXp(prev => prev + (result.xpEarned || 0));
             setPhase('graded');
+            if (typeof result.score === 'number') {
+                if (result.score >= 80) playSfx('correct');
+                else if (result.score < 50) playSfx('wrong');
+            }
         } catch (e) {
             setErrMsg(friendlyErr(e));
             setPhase('answering'); // cho user thử submit lại
         }
     };
-
-    const scoreColor = (s: number) => s >= 80 ? 'text-emerald-500' : s >= 50 ? 'text-amber-500' : 'text-red-500';
 
     return (
         <div className="min-h-screen flex flex-col bg-[var(--background)]">
@@ -207,37 +211,27 @@ function TranslateGameContent() {
                         {/* Kết quả */}
                         {phase === 'graded' && grade && (
                             <div className="p-5 rounded-2xl bg-[var(--surface)] border-2 border-[var(--border)]">
-                                <div className="flex items-baseline justify-between mb-3">
+                                <div className="flex items-baseline justify-between mb-4">
                                     <h3 className="text-sm uppercase tracking-wider font-semibold text-[var(--text-muted)]">
-                                        Kết quả
+                                        Kết quả chấm
                                     </h3>
-                                    <div className="flex items-baseline gap-3">
-                                        <span className={`text-3xl font-bold ${scoreColor(grade.score)}`}>
-                                            {grade.score}
+                                    {grade.xpEarned > 0 && (
+                                        <span className="text-xs text-yellow-500 font-semibold inline-flex items-center gap-1">
+                                            <Icon name="bolt" size="xs" />
+                                            +{grade.xpEarned} XP
                                         </span>
-                                        <span className="text-sm text-[var(--text-muted)]">/100</span>
-                                        {grade.xpEarned > 0 && (
-                                            <span className="text-xs text-yellow-500 font-semibold">
-                                                +{grade.xpEarned} XP
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="mb-3 p-3 rounded-lg bg-[var(--surface-secondary)]">
-                                    <div className="text-xs uppercase font-semibold text-[var(--text-muted)] mb-1">Bản dịch khuyên dùng</div>
-                                    <div className="hanzi text-lg text-[var(--text-main)]">{grade.correctZh}</div>
-                                    {grade.expectedPinyin && (
-                                        <div className="text-xs text-[var(--text-muted)] mt-1">{grade.expectedPinyin}</div>
                                     )}
                                 </div>
 
-                                {grade.feedbackVi && (
-                                    <div className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                                        <Icon name="lightbulb" size="xs" className="text-amber-500 inline mr-1" />
-                                        {grade.feedbackVi}
-                                    </div>
-                                )}
+                                <ScoreBreakdown
+                                    overallScore={grade.score}
+                                    feedbackVi={grade.feedbackVi}
+                                    correctZh={grade.correctZh}
+                                    correctPinyin={grade.correctPinyin || grade.expectedPinyin}
+                                    breakdown={grade.breakdown}
+                                    highlights={grade.highlights}
+                                    nextPracticeHintVi={grade.nextPracticeHintVi}
+                                />
                             </div>
                         )}
                     </div>

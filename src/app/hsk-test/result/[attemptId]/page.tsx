@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
 import { fetchHskExamResult, getMediaUrl, type HskExamResult, type HskResultQuestion } from '@/lib/api';
+import { playSfx } from '@/lib/sound';
 
 const SECTION_TYPE_LABELS: Record<string, string> = {
     listening: 'Nghe hiểu',
@@ -206,6 +207,7 @@ export default function ExamResultPage() {
                 setLoading(true);
                 const data = await fetchHskExamResult(attemptId);
                 setResult(data);
+                playSfx(data.attempt?.is_passed ? 'complete' : 'wrong');
             } catch (err: unknown) {
                 const message = err instanceof Error ? err.message : 'Failed to load result';
                 setError(message);

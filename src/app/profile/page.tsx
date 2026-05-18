@@ -1,11 +1,47 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import { useAuth } from '@/components/AuthContext';
-import { fetchProfile, fetchLearningStats, User, LearningStats } from '@/lib/api';
+import {
+    fetchProfile,
+    fetchLearningStats,
+    fetchRecentActivity,
+    uploadAvatar,
+    updateProfile,
+    User,
+    LearningStats,
+    ActivityItem,
+} from '@/lib/api';
 import { Icon } from '@/components/ui/Icon';
 import Link from 'next/link';
+
+function activityRelativeTime(iso: string): string {
+    const ms = Date.now() - new Date(iso).getTime();
+    if (ms < 60_000) return 'Vừa xong';
+    const min = Math.floor(ms / 60_000);
+    if (min < 60) return `${min} phút trước`;
+    const h = Math.floor(min / 60);
+    if (h < 24) return `${h} giờ trước`;
+    const d = Math.floor(h / 24);
+    if (d < 7) return `${d} ngày trước`;
+    return new Date(iso).toLocaleDateString('vi-VN');
+}
+
+function activityColors(eventType: string): { color: string; bg: string } {
+    const map: Record<string, { color: string; bg: string }> = {
+        lesson_complete: { color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+        exam_submit: { color: 'text-blue-500', bg: 'bg-blue-500/10' },
+        vocab_mastered: { color: 'text-purple-500', bg: 'bg-purple-500/10' },
+        streak_milestone: { color: 'text-orange-500', bg: 'bg-orange-500/10' },
+        xp_milestone: { color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
+        level_up: { color: 'text-amber-500', bg: 'bg-amber-500/10' },
+        notebook_add: { color: 'text-pink-500', bg: 'bg-pink-500/10' },
+        pronunciation_session: { color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
+        achievement_unlocked: { color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    };
+    return map[eventType] || { color: 'text-[var(--primary)]', bg: 'bg-[var(--primary)]/10' };
+}
 
 // HSK level vocabulary counts (standard)
 const HSK_VOCAB_COUNTS: Record<number, number> = {
@@ -18,17 +54,21 @@ const HSK_VOCAB_COUNTS: Record<number, number> = {
 };
 
 export default function ProfilePage() {
-    const { user: authUser, logout } = useAuth();
+    const { user: authUser, updateUser, logout } = useAuth();
     const [profile, setProfile] = useState<User | null>(null);
     const [stats, setStats] = useState<LearningStats | null>(null);
+    const [activity, setActivity] = useState<ActivityItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [profileData, statsData] = await Promise.all([
+                const [profileData, statsData, activityData] = await Promise.all([
                     fetchProfile().catch(() => null),
-                    fetchLearningStats().catch(() => null)
+                    fetchLearningStats().catch(() => null),
+                    fetchRecentActivity(10).catch(() => []),
                 ]);
 
                 if (profileData) {
@@ -37,9 +77,8 @@ export default function ProfilePage() {
                     setProfile(authUser);
                 }
 
-                if (statsData) {
-                    setStats(statsData);
-                }
+                if (statsData) setStats(statsData);
+                setActivity(activityData);
             } catch (err) {
                 console.error('Failed to load profile:', err);
                 if (authUser) setProfile(authUser);
@@ -52,6 +91,30 @@ export default function ProfilePage() {
             loadData();
         }
     }, [authUser]);
+
+    const handleAvatarClick = () => fileInputRef.current?.click();
+
+    const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = ''; // reset so re-selecting same file fires onChange
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Ảnh quá lớn (tối đa 2MB).');
+            return;
+        }
+        setUploadingAvatar(true);
+        try {
+            const url = await uploadAvatar(file);
+            await updateProfile({ avatarUrl: url });
+            setProfile(prev => prev ? { ...prev, avatarUrl: url } : prev);
+            if (authUser) updateUser({ ...authUser, avatarUrl: url });
+        } catch (err) {
+            console.error('Avatar upload failed', err);
+            alert(err instanceof Error ? err.message : 'Tải ảnh thất bại');
+        } finally {
+            setUploadingAvatar(false);
+        }
+    };
 
     // Calculate HSK progress from stats
     const getHskProgress = (level: number): { learned: number; total: number; percent: number } => {
@@ -101,8 +164,27 @@ export default function ProfilePage() {
                                     ) : (
                                         profile.displayName?.charAt(0).toUpperCase()
                                     )}
+                                    {uploadingAvatar && (
+                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                                        </div>
+                                    )}
                                 </div>
-                                <button className="absolute bottom-0 right-0 bg-[var(--surface)] p-1.5 rounded-full border border-[var(--border)] shadow-sm cursor-pointer hover:text-[var(--primary)] transition-colors text-[var(--text-secondary)]">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    className="hidden"
+                                    onChange={handleAvatarFile}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleAvatarClick}
+                                    disabled={uploadingAvatar}
+                                    className="absolute bottom-0 right-0 bg-[var(--surface)] p-1.5 rounded-full border border-[var(--border)] shadow-sm cursor-pointer hover:text-[var(--primary)] transition-colors text-[var(--text-secondary)] disabled:opacity-60 disabled:cursor-not-allowed"
+                                    title="Đổi ảnh đại diện"
+                                    aria-label="Đổi ảnh đại diện"
+                                >
                                     <Icon name="photo_camera" size="xs" />
                                 </button>
                             </div>
@@ -317,35 +399,44 @@ export default function ProfilePage() {
                                     <Icon name="schedule" className="text-[var(--primary)]" />
                                     Hoạt động gần đây
                                 </h3>
-                                <button className="text-xs font-bold text-[var(--primary)] hover:underline">Xem tất cả</button>
+                                <Link href="/notifications" className="text-xs font-bold text-[var(--primary)] hover:underline">Xem tất cả</Link>
                             </div>
 
-                            <div className="flex flex-col gap-4">
-                                {/* Mock Data */}
-                                {[
-                                    { icon: 'check_circle', color: 'text-green-500', bg: 'bg-green-500/10', title: 'Hoàn thành bài học: Gia đình', exp: '+25 XP', time: '2 giờ trước' },
-                                    { icon: 'local_fire_department', color: 'text-orange-500', bg: 'bg-orange-500/10', title: 'Đạt chuỗi 3 ngày liên tiếp', exp: 'Badge', time: 'Hôm qua' },
-                                    { icon: 'style', color: 'text-blue-500', bg: 'bg-blue-500/10', title: 'Ôn tập 20 từ vựng', exp: '100%', time: 'Hôm qua' },
-                                ].map((item, index) => (
-                                    <div key={index} className="flex items-start gap-4 p-4 rounded-xl hover:bg-[var(--surface-secondary)] transition-colors border border-transparent hover:border-[var(--border)] cursor-pointer group">
-                                        <div className="flex-shrink-0 mt-1">
-                                            <div className={`h-10 w-10 rounded-full ${item.bg} ${item.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                                                <Icon name={item.icon} filled className="text-xl" />
-                                            </div>
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between">
-                                                <h4 className="text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--primary)] transition-colors">{item.title}</h4>
-                                                <span className="text-xs text-[var(--text-muted)]">{item.time}</span>
-                                            </div>
-                                            <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">{item.exp}</p>
-                                        </div>
+                            <div className="flex flex-col gap-3">
+                                {activity.length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <Icon name="hourglass_empty" size="lg" className="text-[var(--text-muted)] mb-2 inline-block" />
+                                        <p className="text-sm text-[var(--text-muted)]">Chưa có hoạt động nào — hãy bắt đầu học!</p>
                                     </div>
-                                ))}
-
-                                <div className="text-center pt-2">
-                                    <p className="text-xs text-[var(--text-muted)] italic">Chưa có nhiều hoạt động để hiển thị.</p>
-                                </div>
+                                ) : (
+                                    activity.map((item) => {
+                                        const colors = activityColors(item.eventType);
+                                        return (
+                                            <div key={item.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-[var(--surface-secondary)] transition-colors border border-transparent hover:border-[var(--border)] group">
+                                                <div className="flex-shrink-0 mt-0.5">
+                                                    <div className={`h-10 w-10 rounded-full ${colors.bg} ${colors.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                                                        <Icon name={item.icon || 'history'} filled className="text-xl" />
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between gap-2">
+                                                        <h4 className="text-sm font-semibold text-[var(--text-main)] truncate">{item.title || item.eventType}</h4>
+                                                        <span className="text-xs text-[var(--text-muted)] shrink-0">{activityRelativeTime(item.createdAt)}</span>
+                                                    </div>
+                                                    {item.payload && typeof item.payload === 'object' && Object.keys(item.payload).length > 0 && (
+                                                        <p className="text-xs text-[var(--text-secondary)] mt-1">
+                                                            {Object.entries(item.payload)
+                                                                .filter(([k]) => k !== 'title' && k !== 'icon')
+                                                                .slice(0, 2)
+                                                                .map(([k, v]) => `${k}: ${String(v)}`)
+                                                                .join(' · ')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
                         </section>
                     </div>

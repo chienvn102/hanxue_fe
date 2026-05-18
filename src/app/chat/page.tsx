@@ -8,6 +8,7 @@ import { useAuth } from '@/components/AuthContext';
 import { sendChatMessage, fetchChatUsage, playAudio, transcribeAudio, synthesizeSpeech } from '@/lib/api';
 import { isRecordingSupported, requestMicPermission, startRecording } from '@/lib/audioRecorder';
 import PracticePanel from '@/components/PracticePanel';
+import { RealtimePanel } from '@/components/chat/RealtimePanel';
 import Link from 'next/link';
 
 
@@ -40,7 +41,8 @@ const TUTOR = {
 } as const;
 
 export default function ChatPage() {
-    const { user, isAuthenticated, logout } = useAuth();
+    const { user, token, isAuthenticated, logout } = useAuth();
+    const [realtimeOpen, setRealtimeOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -604,6 +606,22 @@ export default function ChatPage() {
                         {/* Input Area — Conversation Mode */}
                         {mode === 'conversation' && (
                             <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
+                                {/* Realtime upgrade banner */}
+                                <button
+                                    type="button"
+                                    onClick={() => setRealtimeOpen(true)}
+                                    className="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[var(--primary)]/10 to-amber-500/10 border border-[var(--primary)]/30 hover:from-[var(--primary)]/15 hover:to-amber-500/15 transition-colors text-left group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Icon name="record_voice_over" className="text-[var(--primary)]" />
+                                        <div>
+                                            <p className="text-sm font-semibold text-[var(--text-main)]">Thử thoại realtime</p>
+                                            <p className="text-xs text-[var(--text-muted)]">Phản hồi &lt; 1s, ngắt lời được — chế độ mới (beta)</p>
+                                        </div>
+                                    </div>
+                                    <Icon name="arrow_forward" size="sm" className="text-[var(--primary)] group-hover:translate-x-1 transition-transform" />
+                                </button>
+
                                 {(transcript || isTranscribing) && (
                                     <div className={`w-full px-4 py-2 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border)] text-sm text-center min-h-[36px] ${isTranscribing ? 'text-[var(--text-muted)] animate-pulse' : 'text-[var(--text-main)]'}`}>
                                         {transcript || 'Đang nhận diện...'}
@@ -672,6 +690,10 @@ export default function ChatPage() {
             </main>
 
             <Footer />
+
+            {realtimeOpen && token && (
+                <RealtimePanel token={token} onClose={() => setRealtimeOpen(false)} />
+            )}
         </div>
     );
 }
