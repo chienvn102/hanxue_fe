@@ -233,6 +233,14 @@ export default function VocabDetailPage({ params }: { params: Promise<{ id: stri
                                     >
                                         <Icon name={isSaved ? 'bookmark' : 'bookmark_add'} filled={isSaved} size="md" />
                                     </button>
+                                    <Link
+                                        href={`/practice/write?word=${encodeURIComponent(vocab.simplified)}`}
+                                        className="btn-secondary px-3 py-2 inline-flex items-center"
+                                        title="Luyện viết từ này"
+                                        aria-label="Luyện viết từ này"
+                                    >
+                                        <Icon name="edit" size="md" />
+                                    </Link>
                                 </div>
                             </div>
                         </div>

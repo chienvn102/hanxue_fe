@@ -308,6 +308,96 @@ export async function completeWritePractice(stats: {
     return res.json();
 }
 
+// ============================================================
+// Writing SRS Practice (Feature 2 — 3-stage per character)
+// ============================================================
+
+export type WritingStage = 1 | 2 | 3;
+
+export interface WritingCharacter {
+    hanzi: string;
+    strokeCount: number;
+    strokeOrder: string[];
+    pinyin: string;
+    meaningVi: string;
+    currentStage: WritingStage;
+    masteryLevel: number;
+    totalAttempts: number;
+    nextReviewAt: string | null;
+}
+
+export interface WritingWordResponse {
+    simplified: string;
+    wordMeta: {
+        simplified: string;
+        traditional: string | null;
+        pinyin: string;
+        meaningVi: string;
+        audioUrl: string | null;
+        vocabId: number;
+    } | null;
+    characters: WritingCharacter[];
+}
+
+export interface WritingDueItem {
+    hanzi: string;
+    pinyin: string;
+    meaningVi: string;
+    currentStage: WritingStage;
+    masteryLevel: number;
+    nextReviewAt: string | null;
+    totalAttempts: number;
+    totalMistakes: number;
+}
+
+export interface WritingSubmitResponse {
+    character: string;
+    currentStage: WritingStage;
+    masteryLevel: number;
+    easeFactor: number;
+    intervalDays: number;
+    nextReviewAt: string;
+    scoreLabel: 'perfect' | 'pass' | 'fail';
+    graduated: boolean;
+    xpEarned: number;
+}
+
+export async function fetchWritingWord(simplified: string): Promise<WritingWordResponse> {
+    const res = await authFetch(`${API_BASE_URL}/api/writing/word?simplified=${encodeURIComponent(simplified)}`);
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không lấy được dữ liệu chữ');
+    }
+    const data = await res.json();
+    return data.data as WritingWordResponse;
+}
+
+export async function fetchWritingDue(limit = 10): Promise<WritingDueItem[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/writing/due?limit=${limit}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.success ? data.data : []) as WritingDueItem[];
+}
+
+export async function submitWritingAttempt(payload: {
+    character: string;
+    stage: WritingStage;
+    mistakes: number;
+    strokeCount: number;
+}): Promise<WritingSubmitResponse> {
+    const res = await authFetch(`${API_BASE_URL}/api/writing/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không gửi được kết quả');
+    }
+    const data = await res.json();
+    return data.data as WritingSubmitResponse;
+}
+
 export async function googleLogin(credential: string): Promise<AuthResponse> {
     const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
         method: 'POST',
@@ -1491,4 +1581,127 @@ export async function fetchPracticeText(level: number, forceCorpus = false): Pro
     }
     const data = await res.json();
     return data.data;
+}
+
+// ============================================================
+// Lesson feedback / discussion (Feature 1)
+// ============================================================
+
+export type LessonFeedbackKind = 'comment' | 'feedback' | 'bug';
+export type LessonSectionType = 'vocab' | 'passage' | 'grammar' | 'writing';
+
+export interface LessonFeedbackItem {
+    id: number;
+    lesson_id: number;
+    user_id: number;
+    kind: LessonFeedbackKind;
+    section_type: LessonSectionType | null;
+    content: string;
+    rating: number | null;
+    parent_id: number | null;
+    depth: number;
+    is_resolved: 0 | 1;
+    is_hidden: 0 | 1;
+    is_admin_reply: 0 | 1;
+    created_at: string;
+    updated_at: string;
+    display_name: string;
+    avatar_url: string | null;
+    role: string;
+}
+
+export interface LessonFeedbackAdminItem extends Omit<LessonFeedbackItem, 'updated_at' | 'is_hidden' | 'is_admin_reply' | 'depth'> {
+    lesson_title: string;
+}
+
+export async function fetchLessonFeedback(lessonId: number): Promise<LessonFeedbackItem[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/${lessonId}/feedback`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.success ? (data.data as LessonFeedbackItem[]) : [];
+}
+
+export async function postLessonFeedback(lessonId: number, payload: {
+    kind: LessonFeedbackKind;
+    content: string;
+    sectionType?: LessonSectionType | null;
+    rating?: number | null;
+    parentId?: number | null;
+}): Promise<number> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/${lessonId}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không gửi được phản hồi');
+    }
+    const data = await res.json();
+    return data.data?.id || 0;
+}
+
+export async function updateLessonFeedback(fid: number, content: string): Promise<void> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/feedback/${fid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+    });
+    if (!res.ok) throw new Error('Không sửa được');
+}
+
+export async function deleteLessonFeedback(fid: number): Promise<void> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/feedback/${fid}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Không xoá được');
+}
+
+// Admin
+export async function fetchAdminFeedback(params: { status?: string; kind?: string; limit?: number } = {}): Promise<LessonFeedbackAdminItem[]> {
+    const sp = new URLSearchParams();
+    if (params.status) sp.set('status', params.status);
+    if (params.kind) sp.set('kind', params.kind);
+    if (params.limit) sp.set('limit', String(params.limit));
+    const res = await authFetch(`${API_BASE_URL}/api/admin/feedback?${sp.toString()}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.success ? (data.data as LessonFeedbackAdminItem[]) : [];
+}
+
+export async function adminFeedbackBugCount(): Promise<number> {
+    const res = await authFetch(`${API_BASE_URL}/api/admin/feedback/bug-count`);
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data.success ? (data.data?.count || 0) : 0;
+}
+
+export async function adminResolveFeedback(fid: number, resolved = true): Promise<void> {
+    await authFetch(`${API_BASE_URL}/api/admin/feedback/${fid}/resolve`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolved }),
+    });
+}
+
+export async function adminHideFeedback(fid: number, hidden = true): Promise<void> {
+    await authFetch(`${API_BASE_URL}/api/admin/feedback/${fid}/hide`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden }),
+    });
+}
+
+export async function adminReplyFeedback(fid: number, content: string): Promise<number> {
+    const res = await authFetch(`${API_BASE_URL}/api/admin/feedback/${fid}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không trả lời được');
+    }
+    const data = await res.json();
+    return data.data?.id || 0;
 }

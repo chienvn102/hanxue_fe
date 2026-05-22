@@ -9,6 +9,7 @@ import {
     type TextbookLessonPayload, type TextbookVocab, type TextbookGrammar,
     type TextbookWritingExercise, type LessonSection,
 } from '@/lib/api';
+import { LessonFeedbackPanel } from './LessonFeedbackPanel';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
@@ -154,6 +155,9 @@ export default function TextbookLesson({ lessonId }: Props) {
                     onMarkDone={() => markDone('exercise')}
                 />
             )}
+
+            {/* Discussion / feedback panel — always visible regardless of active tab */}
+            <LessonFeedbackPanel lessonId={Number(lessonId)} />
         </div>
     );
 }
