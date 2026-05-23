@@ -8,6 +8,7 @@ import {
     fetchLessonFeedback,
     postLessonFeedback,
     deleteLessonFeedback,
+    getMediaUrl,
     type LessonFeedbackItem,
     type LessonFeedbackKind,
     type LessonSectionType,
@@ -282,13 +283,16 @@ function FeedbackThread({ node, currentUserId, onReply, onDelete, depth }: Threa
         <div className={depth > 0 ? `pl-3 border-l-2 ${isAdminReply ? 'border-emerald-500/40' : 'border-[var(--border)]'}` : ''}>
             <div className={`p-3 rounded-xl ${isAdminReply ? 'bg-emerald-500/5' : 'bg-[var(--surface-secondary)]/50'}`}>
                 <div className="flex items-start gap-3">
-                    {item.avatar_url ? (
-                        <img src={item.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                    ) : (
-                        <div className="w-8 h-8 rounded-full bg-[var(--primary)]/15 text-[var(--primary)] flex items-center justify-center font-bold text-sm shrink-0">
-                            {item.display_name?.charAt(0).toUpperCase() || 'U'}
-                        </div>
-                    )}
+                    {(() => {
+                        const avatarSrc = getMediaUrl(item.avatar_url);
+                        return avatarSrc ? (
+                            <img src={avatarSrc} alt="" className="w-8 h-8 rounded-full object-cover" />
+                        ) : (
+                            <div className="w-8 h-8 rounded-full bg-[var(--primary)]/15 text-[var(--primary)] flex items-center justify-center font-bold text-sm shrink-0">
+                                {item.display_name?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                        );
+                    })()}
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className="text-sm font-semibold text-[var(--text-main)]">{item.display_name || 'Người dùng'}</span>

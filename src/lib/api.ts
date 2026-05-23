@@ -513,11 +513,15 @@ export function getAudioUrl(audioPath: string): string {
     return `${API_BASE_URL}${audioPath}`;
 }
 
-// Media URL helper — normalizes relative paths from BE to absolute URLs
+// Media URL helper — normalizes relative paths from BE to absolute URLs.
+// Returns '' for gs:// or other non-HTTP refs so callers can fall back to placeholder UI
+// (the resolver lives on BE — gs:// values should be resolved server-side before reaching FE).
 export function getMediaUrl(path: string | null | undefined): string {
     if (!path) return '';
-    if (path.startsWith('http')) return path;
-    return `${API_BASE_URL}${path}`;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    if (path.startsWith('/')) return `${API_BASE_URL}${path}`;
+    // Unknown scheme (gs://, etc.) → don't construct a broken URL
+    return '';
 }
 
 /**
@@ -892,7 +896,14 @@ export async function updateProfile(data: ProfileUpdatePayload): Promise<User> {
     return res.json();
 }
 
-export async function uploadAvatar(file: File): Promise<string> {
+export interface AvatarUploadResult {
+    /** Canonical reference for DB storage (`gs://bucket/object` for GCS, `/uploads/...` for local). */
+    ref: string;
+    /** Immediately-usable URL for FE display (signed URL for GCS, same path for local). */
+    url: string;
+}
+
+export async function uploadAvatar(file: File): Promise<AvatarUploadResult> {
     const form = new FormData();
     form.append('image', file);
     const res = await authFetch(`${API_BASE_URL}/api/upload/avatar`, {
@@ -905,7 +916,10 @@ export async function uploadAvatar(file: File): Promise<string> {
     }
     const data = await res.json();
     if (!data.success || !data.url) throw new Error('Phản hồi không hợp lệ từ server');
-    return data.url as string;
+    return {
+        ref: (data.ref || data.url) as string,
+        url: data.url as string,
+    };
 }
 
 // ============================================================

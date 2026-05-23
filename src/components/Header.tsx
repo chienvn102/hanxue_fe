@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthContext';
+import { getMediaUrl } from '@/lib/api';
 import { Icon } from './ui/Icon';
 import { SfxToggle } from './SfxToggle';
 import { NotificationBell } from './NotificationBell';
@@ -188,7 +189,7 @@ export default function Header() {
                                     {/* Avatar */}
                                     <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[var(--primary)] text-white flex items-center justify-center font-bold text-lg border-2 border-[var(--surface)] shadow-sm group-hover:shadow-md transition-all overflow-hidden">
                                         {user.avatarUrl ? (
-                                            <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
+                                            <img src={getMediaUrl(user.avatarUrl)} alt={user.displayName} className="w-full h-full object-cover" />
                                         ) : (
                                             (user.displayName || '?').charAt(0).toUpperCase()
                                         )}
@@ -206,7 +207,7 @@ export default function Header() {
                                             <div className="flex items-center gap-4">
                                                 <div className="w-14 h-14 rounded-full bg-[var(--primary)] text-white flex items-center justify-center font-bold text-2xl border-4 border-[var(--surface)] shadow-md overflow-hidden">
                                                     {user.avatarUrl ? (
-                                                        <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
+                                                        <img src={getMediaUrl(user.avatarUrl)} alt={user.displayName} className="w-full h-full object-cover" />
                                                     ) : (
                                                         (user.displayName || '?').charAt(0).toUpperCase()
                                                     )}

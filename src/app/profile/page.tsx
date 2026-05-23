@@ -9,6 +9,7 @@ import {
     fetchRecentActivity,
     uploadAvatar,
     updateProfile,
+    getMediaUrl,
     User,
     LearningStats,
     ActivityItem,
@@ -104,8 +105,10 @@ export default function ProfilePage() {
         }
         setUploadingAvatar(true);
         try {
-            const url = await uploadAvatar(file);
-            await updateProfile({ avatarUrl: url });
+            const { ref, url } = await uploadAvatar(file);
+            // Store the canonical reference (gs:// or /uploads/...) in DB.
+            // `url` is just the immediate signed URL for display — would expire if persisted.
+            await updateProfile({ avatarUrl: ref });
             setProfile(prev => prev ? { ...prev, avatarUrl: url } : prev);
             if (authUser) updateUser({ ...authUser, avatarUrl: url });
         } catch (err) {
@@ -159,7 +162,7 @@ export default function ProfilePage() {
                                         <img
                                             alt={profile.displayName}
                                             className="w-full h-full object-cover"
-                                            src={profile.avatarUrl}
+                                            src={getMediaUrl(profile.avatarUrl)}
                                         />
                                     ) : (
                                         profile.displayName?.charAt(0).toUpperCase()
