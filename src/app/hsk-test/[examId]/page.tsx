@@ -63,6 +63,66 @@ function isTextEntryType(qt?: string) {
     return !!qt && TEXT_ENTRY_TYPES.has(qt);
 }
 
+/**
+ * Auto-generate prompt "第 X-Y 题：<chỉ dẫn>" từ question_type của cluster.
+ * Khớp với cách đề HSK gốc in trên giấy (xem hsk4_test/H41008.pdf).
+ */
+const PART_PROMPT_BY_TYPE: Record<string, string> = {
+    true_false: '判断对错',
+    multiple_choice: '请选出正确答案',
+    sentence_order: '排列顺序',
+    sentence_assembly: '完成句子',
+    fill_hanzi: '看拼音写汉字',
+    image_keyword_sentence: '看图，用词造句',
+    short_essay: '写短文',
+    summary_essay: '缩写',
+    fill_blank: '选词填空',
+    word_bank_fill: '选词填空',
+    image_match: '看图选项',
+    image_grid_match: '看图选项',
+    reply_match: '问答匹配',
+};
+
+function makePartPrompt(qType: string | undefined, fromN: number, toN: number): string {
+    const promptZh = qType ? (PART_PROMPT_BY_TYPE[qType] || '') : '';
+    const range = fromN === toN ? `第 ${fromN} 题` : `第 ${fromN}-${toN} 题`;
+    return promptZh ? `${range}：${promptZh}。` : range;
+}
+
+interface PartCluster {
+    groupId: number | null | undefined;
+    questionType: string | undefined;
+    firstQuestionId: number;
+    firstNumber: number;
+    lastNumber: number;
+}
+
+function computePartClusters(sectionQs: FlatQuestion[]): Map<number, PartCluster> {
+    /* Map<questionId, partCluster> để lookup nhanh.
+     * Cluster mới khi: đổi groupId, hoặc cả 2 standalone nhưng đổi questionType. */
+    const result = new Map<number, PartCluster>();
+    let cluster: PartCluster | null = null;
+    for (const q of sectionQs) {
+        const isSame = cluster && (
+            (!cluster.groupId && !q.groupId && cluster.questionType === q.questionType) ||
+            (cluster.groupId && cluster.groupId === q.groupId)
+        );
+        if (!isSame) {
+            cluster = {
+                groupId: q.groupId,
+                questionType: q.questionType,
+                firstQuestionId: q.id,
+                firstNumber: q.questionNumber,
+                lastNumber: q.questionNumber,
+            };
+        } else if (cluster) {
+            cluster.lastNumber = q.questionNumber;
+        }
+        if (cluster) result.set(q.id, cluster);
+    }
+    return result;
+}
+
 export default function ExamTakingPage() {
     return (
         <Suspense fallback={
@@ -706,6 +766,28 @@ function ExamTakingPageContent() {
                                 <Icon name="flag" size="sm" filled={flagged.has(currentQuestion.id)} />
                             </button>
                         </div>
+
+                        {/* Part header "第 X-Y 题：<chỉ dẫn>" — render trước câu đầu của mỗi
+                            cluster (theo định dạng đề HSK gốc). Bao gồm cả standalone clusters
+                            (không có group_id) — vd câu 1-10 true_false, câu 56-65 sentence_order. */}
+                        {(() => {
+                            const section = exam.sections[currentQuestion.sectionIndex];
+                            const sectionQs = questions.filter(q => q.sectionIndex === currentQuestion.sectionIndex);
+                            const partMap = computePartClusters(sectionQs);
+                            const part = partMap.get(currentQuestion.id);
+                            if (!part || part.firstQuestionId !== currentQuestion.id) return null;
+                            return (
+                                <div className="mb-4 p-3 rounded-lg bg-[var(--primary)]/5 border-l-4 border-[var(--primary)]">
+                                    <p className="text-sm font-semibold text-[var(--primary)] hanzi">
+                                        {makePartPrompt(part.questionType, part.firstNumber, part.lastNumber)}
+                                    </p>
+                                    {/* Section instructions nếu là part đầu tiên của section */}
+                                    {sectionQs[0]?.id === currentQuestion.id && section.instructions && (
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">{section.instructions}</p>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         {/* Group header (image grid / word bank / reply bank / passage) — chỉ render trước câu đầu của cụm cùng group */}
                         {(() => {

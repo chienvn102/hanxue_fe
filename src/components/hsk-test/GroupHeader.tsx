@@ -49,18 +49,27 @@ export function GroupHeader({ group }: Props) {
     }
 
     if (group.group_type === 'word_bank') {
-        const items = (content.items as { label: string; word: string; pinyin?: string }[]) || [];
+        // Defensive: hỗ trợ cả schema cũ ({word}) và schema seed mới ({text})
+        const rawItems = (content.items as { label: string; word?: string; text?: string; pinyin?: string }[]) || [];
+        const items = rawItems.map(it => ({
+            label: it.label,
+            word: it.word || it.text || '',
+            pinyin: it.pinyin,
+        }));
         const example = content.example as { label: string; sentence_zh: string; sentence_pinyin?: string } | undefined;
         return (
             <div className="mb-6 p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                {group.title_vi && (
+                    <h3 className="text-sm font-semibold text-[var(--text-main)] mb-2">{group.title_vi}</h3>
+                )}
                 {group.instructions_vi && (
                     <p className="text-xs text-[var(--text-muted)] italic mb-3">{group.instructions_vi}</p>
                 )}
-                <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
                     {items.map(item => (
-                        <div key={item.label} className="flex items-baseline gap-3">
-                            <span className="text-sm font-bold text-[var(--text-secondary)] w-6">{item.label}</span>
-                            <PinyinRuby zh={item.word} pinyin={item.pinyin} show={showPinyin} fontSize="lg" />
+                        <div key={item.label} className="flex items-baseline gap-2">
+                            <span className="text-sm font-bold text-[var(--primary)] w-5 shrink-0">{item.label}</span>
+                            <PinyinRuby zh={item.word} pinyin={item.pinyin} show={showPinyin} fontSize="base" />
                         </div>
                     ))}
                 </div>
@@ -99,6 +108,32 @@ export function GroupHeader({ group }: Props) {
                         <PinyinRuby zh={example.prompt_zh} pinyin={example.prompt_pinyin} show={showPinyin} fontSize="sm" />
                         <span className="ml-2 font-bold">({example.label})</span>
                     </div>
+                )}
+            </div>
+        );
+    }
+
+    // passage_multi: 1 đoạn văn dùng cho nhiều câu (HSK 4 câu 80-85, HSK 5/6 long passages).
+    // Schema seed dùng `content.passage` (string đơn) khác với 'passage' group_type cũ dùng `passage_zh`.
+    if (group.group_type === 'passage_multi') {
+        const passage = (content.passage as string) || '';
+        const passage_pinyin = content.passage_pinyin as string | undefined;
+        const passage_vi = content.passage_vi as string | undefined;
+        return (
+            <div className="mb-6 p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                {group.title_vi && (
+                    <h3 className="text-sm font-semibold text-[var(--text-main)] mb-2">{group.title_vi}</h3>
+                )}
+                {group.instructions_vi && (
+                    <p className="text-xs text-[var(--text-muted)] italic mb-3">{group.instructions_vi}</p>
+                )}
+                <div className="leading-relaxed">
+                    <PinyinRuby zh={passage} pinyin={passage_pinyin} show={showPinyin} fontSize="base" />
+                </div>
+                {passage_vi && (
+                    <p className="mt-3 pt-3 border-t border-[var(--border)] text-xs text-[var(--text-muted)] italic">
+                        {passage_vi}
+                    </p>
                 )}
             </div>
         );
