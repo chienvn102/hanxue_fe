@@ -22,8 +22,10 @@ const HSK_COLORS: Record<number, { bg: string; text: string; border: string }> =
 
 const EXAM_TYPE_LABELS: Record<string, string> = {
     practice: 'Luyện tập',
-    mock: 'Thi thử',
-    official: 'Chính thức',
+    exam: 'Thi',
+    // Legacy fallback (migration 022 đã collapse, nhưng giữ cho safety)
+    mock: 'Thi',
+    official: 'Thi',
 };
 
 export default function HskTestPage() {
@@ -167,11 +169,9 @@ export default function HskTestPage() {
                                             HSK {exam.hskLevel}
                                         </span>
                                         <span className={`text-[10px] font-medium uppercase px-2 py-0.5 rounded-full ${
-                                            exam.examType === 'mock'
+                                            exam.examType === 'exam'
                                                 ? 'bg-amber-500/10 text-amber-500'
-                                                : exam.examType === 'official'
-                                                    ? 'bg-red-500/10 text-red-500'
-                                                    : 'bg-blue-500/10 text-blue-500'
+                                                : 'bg-blue-500/10 text-blue-500'
                                         }`}>
                                             {EXAM_TYPE_LABELS[exam.examType] || exam.examType}
                                         </span>
@@ -203,15 +203,12 @@ export default function HskTestPage() {
                                         </span>
                                     </div>
 
-                                    {/* Status badge */}
-                                    {status ? (
-                                        <div className={`flex items-center justify-between pt-4 mt-1 border-t border-[var(--border)]`}>
-                                            {status.inProgress ? (
-                                                <span className="flex items-center gap-1.5 text-sm font-medium text-amber-500">
-                                                    <Icon name="pending" size="xs" />
-                                                    Đang làm dở
-                                                </span>
-                                            ) : status.bestPassed ? (
+                                    {/* Status badge — bỏ branch "Đang làm dở" sau khi
+                                        migration 022 bỏ resume. Attempt in_progress
+                                        chưa nộp sẽ bị xóa khi user start lại đề. */}
+                                    {status && status.completed > 0 ? (
+                                        <div className="flex items-center justify-between pt-4 mt-1 border-t border-[var(--border)]">
+                                            {status.bestPassed ? (
                                                 <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-500">
                                                     <Icon name="check_circle" size="xs" filled />
                                                     Đạt
@@ -223,9 +220,7 @@ export default function HskTestPage() {
                                                 </span>
                                             )}
                                             <span className="text-xs text-[var(--text-muted)]">
-                                                {status.completed > 0
-                                                    ? `${status.completed} lần • Cao nhất: ${status.bestScore}/${status.bestMaxScore}`
-                                                    : 'Chưa hoàn thành'}
+                                                {status.completed} lần • Cao nhất: {status.bestScore}/{status.bestMaxScore}
                                             </span>
                                         </div>
                                     ) : (
@@ -239,10 +234,10 @@ export default function HskTestPage() {
                                         <button
                                             onClick={() => handleStartTest(exam)}
                                             className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl bg-[var(--primary)] text-white text-xs font-semibold hover:bg-[var(--primary-hover)] transition-colors"
-                                            title="Làm test có đếm giờ, audio merged theo phần"
+                                            title="Làm bài có đếm giờ, audio liên tục, không lưu kết quả nếu thoát giữa chừng"
                                         >
                                             <Icon name="schedule" size="sm" />
-                                            Làm test
+                                            Làm thi
                                         </button>
                                         <button
                                             onClick={() => handleStartPractice(exam)}

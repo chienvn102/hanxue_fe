@@ -2,33 +2,25 @@
 
 import { useState } from 'react';
 import { AudioPlayer } from './AudioPlayer';
-import type { HskQuestion } from '@/lib/api';
 
 interface Props {
     audioUrl: string;
-    questions: HskQuestion[];
     sectionTitle?: string;
 }
 
 /**
- * FullTestAudio — section-level merged audio cho mock/official mode.
+ * FullTestAudio — section-level audio liên tục cho chế độ Thi.
+ *
  * - Auto-play 1 lần.
  * - Seek locked.
- * - Hiển thị "Đang ở: Câu X" dựa vào audio_start_time/audio_end_time
- *   của các question trong section.
+ * - Không track per-question — chỉ là 1 file audio liên tục từ đầu đến cuối,
+ *   user nghe + tự note đáp án theo thứ tự câu.
+ *
+ * (Trước migration 022, component này còn marker "Đang ở câu X" dựa vào
+ * audio_start_time/audio_end_time. Đã bỏ — exam mode giờ không cần timestamp.)
  */
-export function FullTestAudio({ audioUrl, questions, sectionTitle }: Props) {
-    const [currentQ, setCurrentQ] = useState<HskQuestion | null>(null);
+export function FullTestAudio({ audioUrl, sectionTitle }: Props) {
     const [ended, setEnded] = useState(false);
-
-    const onTime = (t: number) => {
-        const found = questions.find(q => {
-            const s = q.audioStartTime ?? -1;
-            const e = q.audioEndTime ?? -1;
-            return s >= 0 && e > s && t >= s && t < e;
-        });
-        if (found && found.id !== currentQ?.id) setCurrentQ(found);
-    };
 
     return (
         <div className="sticky top-[57px] z-20 bg-amber-500/10 border-b-2 border-amber-500/30 px-4 py-3">
@@ -43,13 +35,7 @@ export function FullTestAudio({ audioUrl, questions, sectionTitle }: Props) {
                         )}
                     </div>
                     <div className="text-xs text-amber-600 dark:text-amber-400 font-mono shrink-0 tabular-nums">
-                        {ended ? (
-                            <span>✓ Đã hết audio</span>
-                        ) : currentQ ? (
-                            <span>Đang ở: <span className="font-bold">Câu {currentQ.questionNumber}</span></span>
-                        ) : (
-                            <span>Chuẩn bị...</span>
-                        )}
+                        {ended ? <span>✓ Đã hết audio</span> : <span>Đang phát...</span>}
                     </div>
                 </div>
                 <AudioPlayer
@@ -58,7 +44,6 @@ export function FullTestAudio({ audioUrl, questions, sectionTitle }: Props) {
                     mode="full"
                     autoPlay
                     maxPlays={1}
-                    onTime={onTime}
                     onEnded={() => setEnded(true)}
                 />
             </div>

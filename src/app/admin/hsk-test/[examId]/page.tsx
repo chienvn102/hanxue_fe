@@ -67,7 +67,7 @@ interface ExamDetail {
     id: number;
     title: string;
     hsk_level: number;
-    exam_type: string;
+    exam_type: 'practice' | 'exam';
     duration_minutes: number;
     passing_score: number;
     description?: string;
@@ -404,7 +404,7 @@ export default function HskExamDetailAdminPage() {
                         </div>
 
                         <div className="max-h-[70vh] overflow-y-auto pr-2">
-                            {editing.section_type === 'listening' && (
+                            {editing.section_type === 'listening' && exam.exam_type === 'practice' && (
                                 <div className="mb-4 flex justify-end">
                                     <Button
                                         variant="outline"
@@ -417,12 +417,14 @@ export default function HskExamDetailAdminPage() {
                                 </div>
                             )}
                             {/* Reuse form, nhưng KHÔNG render QuestionTypePicker → loại bỏ
-                                khả năng admin đổi loại câu. group_id giữ nguyên. */}
+                                khả năng admin đổi loại câu. group_id giữ nguyên.
+                                examType quyết định form có hiện audio per câu hay không. */}
                             <QuestionFormByType
                                 form={editForm}
                                 onChange={setEditForm}
                                 sectionType={editing.section_type}
                                 sectionId={editing.section_id}
+                                examType={exam.exam_type}
                             />
                         </div>
 

@@ -9,11 +9,20 @@ export const HSK_COLORS: Record<number, string> = {
     6: 'bg-red-500',
 };
 
+/**
+ * 2 chế độ giao bài (migration 022):
+ *   - practice : audio per câu, feedback ngay, replay không giới hạn.
+ *   - exam     : 1 file audio liên tục cho cả section, không feedback,
+ *                không tua, audio chỉ phát 1 lần.
+ *
+ * Legacy values 'mock'/'official' đã được migration thu về 'exam'.
+ */
 export const EXAM_TYPES = [
-    { value: 'practice', label: 'Luyện tập' },
-    { value: 'mock', label: 'Đề mẫu' },
-    { value: 'official', label: 'Đề chính thức' },
+    { value: 'practice', label: 'Luyện tập (audio từng câu)' },
+    { value: 'exam', label: 'Thi (1 file audio liên tục)' },
 ];
+
+export type ExamType = 'practice' | 'exam';
 
 export const SECTION_TYPES = [
     { value: 'listening', label: 'Nghe hiểu' },

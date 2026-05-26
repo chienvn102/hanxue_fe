@@ -34,7 +34,9 @@ function relTime(iso: string): string {
 }
 
 export default function AdminFeedbackPage() {
-    const [status, setStatus] = useState<Filter>('pending');
+    // Default 'all' để admin nhìn thấy mọi comment kể cả đã resolved (reply
+    // tự auto-resolve parent → tab 'pending' sẽ trống một cách gây hiểu lầm).
+    const [status, setStatus] = useState<Filter>('all');
     const [kind, setKind] = useState<KindFilter>('');
     const [items, setItems] = useState<LessonFeedbackAdminItem[]>([]);
     const [loading, setLoading] = useState(true);

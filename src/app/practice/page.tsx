@@ -28,7 +28,7 @@ const GAMES: GameTile[] = [
     { id: 'flashcard',  label: 'Flashcard',     sub: 'Trắc nghiệm A/B/C/D',     icon: 'style',          accent: 'text-pink-500',    bg: 'bg-pink-500/10',    available: true },
     { id: 'quiz',       label: 'Trắc nghiệm',   sub: 'Chọn nghĩa đúng',         icon: 'check_box',      accent: 'text-emerald-500', bg: 'bg-emerald-500/10', available: true },
     { id: 'match',      label: 'Nối từ',        sub: 'Ghép Hán ↔ nghĩa',        icon: 'compare_arrows', accent: 'text-amber-500',   bg: 'bg-amber-500/10',   available: true },
-    { id: 'write',      label: 'Viết chữ',      sub: 'Vẽ Hán theo nét',         icon: 'draw',           accent: 'text-orange-500',  bg: 'bg-orange-500/10',  available: false },
+    { id: 'write',      label: 'Viết chữ',      sub: 'Vẽ Hán theo nét',   icon: 'draw',           accent: 'text-orange-500',  bg: 'bg-orange-500/10',  available: true },
     { id: 'type',       label: 'Gõ từ',         sub: 'Gõ nghĩa tiếng Việt',     icon: 'keyboard',       accent: 'text-sky-500',     bg: 'bg-sky-500/10',     available: true },
     { id: 'dictation',  label: 'Nghe viết',     sub: 'Nghe → gõ Hán',           icon: 'hearing',        accent: 'text-purple-500',  bg: 'bg-purple-500/10',  available: true },
     { id: 'translate',  label: 'Dịch câu',      sub: 'AI sinh câu, bạn dịch',    icon: 'translate',      accent: 'text-indigo-500',  bg: 'bg-indigo-500/10',  available: true },

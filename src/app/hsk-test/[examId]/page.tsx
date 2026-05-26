@@ -98,6 +98,7 @@ function ExamTakingPageContent() {
     const [submitError, setSubmitError] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
+    const [showConfirmExit, setShowConfirmExit] = useState(false);
     const [showGrid, setShowGrid] = useState(false);
 
     // Practice mode: lookup correct answers + explanations để show feedback ngay
@@ -155,18 +156,12 @@ function ExamTakingPageContent() {
                     // Practice không có timer
                     setTimeLeft(0);
                 } else {
+                    // Test mode: BE đã discard in-progress cũ + tạo attempt mới.
+                    // FE bắt đầu fresh — không restore savedAnswers nữa (UX yêu cầu:
+                    // thoát = mất kết quả, có dialog confirm bên dưới).
                     const data = await startHskExam(examId);
                     setExam(data);
                     setQuestions(flattenQuestions(data.sections));
-
-                    // Restore saved answers (resume support)
-                    if (data.savedAnswers && data.savedAnswers.length > 0) {
-                        const restored: Record<number, string> = {};
-                        data.savedAnswers.forEach(sa => {
-                            restored[sa.questionId] = sa.answer;
-                        });
-                        setAnswers(restored);
-                    }
 
                     // Calculate remaining time
                     const totalSeconds = data.duration_minutes * 60;
@@ -310,6 +305,31 @@ function ExamTakingPageContent() {
         }
     }, [exam, router, mode]);
 
+    // Exit khỏi bài thi — KHÔNG nộp, KHÔNG lưu kết quả. Confirm dialog đã
+    // bao bọc bên ngoài, hàm này chỉ navigate về list. submittingRef = true
+    // để vô hiệu hóa beforeunload guard khi cố tình rời trang.
+    const handleExit = useCallback(() => {
+        submittingRef.current = true;
+        if (timerRef.current) clearInterval(timerRef.current);
+        router.push('/hsk-test');
+    }, [router]);
+
+    // beforeunload guard — chỉ active trong test mode, attempt chưa hoàn tất.
+    // Trình duyệt sẽ hiện native confirm khi user đóng tab/reload/back.
+    // (Modal "Thoát" của FE chỉ chặn được nút Thoát trong app, không chặn được
+    // nút back của browser → cần thêm guard này.)
+    useEffect(() => {
+        if (mode !== 'test') return;
+        if (!exam) return;
+        const handler = (e: BeforeUnloadEvent) => {
+            if (submittingRef.current) return;  // đang nộp/đang exit có chủ ý
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [mode, exam]);
+
     // Keep a ref to handleFinish so the timer interval always calls the latest version
     const handleFinishRef = useRef(handleFinish);
     useEffect(() => {
@@ -421,15 +441,26 @@ function ExamTakingPageContent() {
                         </div>
                     )}
 
-                    {/* Right - Submit / Kết thúc */}
+                    {/* Right - Thoát + Nộp bài (test) hoặc Kết thúc (practice) */}
                     {mode === 'test' ? (
-                        <button
-                            onClick={() => setShowConfirmSubmit(true)}
-                            disabled={submitting}
-                            className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors disabled:opacity-50"
-                        >
-                            Nộp bài
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowConfirmExit(true)}
+                                disabled={submitting}
+                                className="px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-red-500/10 hover:text-red-500 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                                title="Thoát khỏi bài thi (không lưu kết quả)"
+                            >
+                                <Icon name="logout" size="xs" />
+                                <span className="hidden sm:inline">Thoát</span>
+                            </button>
+                            <button
+                                onClick={() => setShowConfirmSubmit(true)}
+                                disabled={submitting}
+                                className="px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors disabled:opacity-50"
+                            >
+                                Nộp bài
+                            </button>
+                        </div>
                     ) : (
                         <button
                             onClick={() => router.push('/hsk-test')}
@@ -569,11 +600,12 @@ function ExamTakingPageContent() {
 
                 {/* Question Area */}
                 <div className="flex-1 flex flex-col">
-                    {/* Section-level merged audio cho full test mode (mock/official) */}
+                    {/* Section-level audio liên tục cho chế độ Thi (exam_type='exam').
+                        Migration 022: audio không còn timestamp per câu — chỉ 1 file
+                        liên tục từ đầu đến cuối, user tự note đáp án theo thứ tự. */}
                     {showSectionAudio && currentSection && (
                         <FullTestAudio
                             audioUrl={currentSection.audio_url!}
-                            questions={currentSection.questions}
                             sectionTitle={currentSection.title || `Phần ${currentSection.section_order}`}
                         />
                     )}
@@ -727,6 +759,52 @@ function ExamTakingPageContent() {
                     </div>
                 </div>
             </div>
+
+            {/* Confirm Exit Modal — KHÔNG lưu kết quả, attempt cũ sẽ bị xóa khi
+                user mở lại đề thi này (BE tự discard in-progress attempts). */}
+            {showConfirmExit && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-6 max-w-md w-full shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                                <Icon name="logout" size="md" className="text-red-500" />
+                            </div>
+                            <h2 className="text-lg font-bold text-[var(--text-main)]">Thoát khỏi bài thi?</h2>
+                        </div>
+
+                        <p className="text-sm text-[var(--text-secondary)] mb-4">
+                            Nếu thoát bây giờ, <strong className="text-red-500">kết quả bài thi sẽ KHÔNG được lưu</strong>.
+                            Bạn sẽ phải làm lại từ đầu khi quay lại đề này.
+                        </p>
+
+                        <div className="space-y-2 mb-5 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-[var(--text-muted)]">Đã trả lời:</span>
+                                <span className="font-medium text-[var(--text-main)]">{answeredCount}/{totalQuestions}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-[var(--text-muted)]">Thời gian còn:</span>
+                                <span className="font-medium text-[var(--text-main)]">{formatTime(timeLeft)}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowConfirmExit(false)}
+                                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--border)] transition-colors"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleExit}
+                                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors"
+                            >
+                                Thoát ngay
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Confirm Submit Modal */}
             {showConfirmSubmit && (

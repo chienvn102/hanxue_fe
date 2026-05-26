@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { QuestionFormData } from './hsk-types';
+import type { ExamType, QuestionFormData } from './hsk-types';
 import { UploadField } from './UploadField';
 import { Icon } from '@/components/ui/Icon';
 
@@ -12,6 +12,12 @@ interface QuestionFormByTypeProps {
     onChange: (form: QuestionFormData) => void;
     sectionType: string;
     sectionId?: number;   // để fetch groups khi cần group_id
+    /**
+     * Chế độ giao bài. 'exam' = audio liên tục theo section → ẨN form
+     * upload audio per câu + ẨN start/end/play_count (chỉ giữ transcript).
+     * 'practice' (mặc định) = giữ form audio per câu như cũ.
+     */
+    examType?: ExamType;
 }
 
 interface GroupOption {
@@ -27,8 +33,9 @@ const GROUP_TYPE_REQUIRED: Record<string, 'image_grid' | 'word_bank' | 'reply_ba
     reply_match: 'reply_bank',
 };
 
-export function QuestionFormByType({ form, onChange, sectionType, sectionId }: QuestionFormByTypeProps) {
+export function QuestionFormByType({ form, onChange, sectionType, sectionId, examType = 'practice' }: QuestionFormByTypeProps) {
     const isListening = sectionType === 'listening';
+    const isExamMode = examType === 'exam';
     const type = form.question_type;
     const requiredGroupType = GROUP_TYPE_REQUIRED[type];
 
@@ -128,51 +135,64 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
                 />
             </div>
 
-            {/* ── Audio config — listening or when audio is present ── */}
+            {/* ── Audio config — listening or when audio is present ──
+                Exam mode: audio liên tục dùng section.audio_url ở cấp section.
+                Per-câu chỉ giữ transcript (hiển thị ở trang đáp án). */}
             {(isListening || form.question_audio) && (
                 <div className="bg-blue-50/50 dark:bg-blue-950/20 rounded-lg p-3 space-y-3 border border-blue-200/50 dark:border-blue-800/30">
                     <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                        Cấu hình Audio
+                        {isExamMode ? 'Transcript câu này (audio liên tục ở cấp section)' : 'Cấu hình Audio'}
                     </h4>
-                    <UploadField
-                        label="Audio câu hỏi"
-                        value={form.question_audio}
-                        onChange={v => set('question_audio', v)}
-                        type="audio"
-                        accept="audio/mpeg,audio/wav,audio/ogg,audio/webm"
-                    />
-                    <div className="grid grid-cols-3 gap-2">
-                        <div>
-                            <label className="text-xs text-[var(--text-muted)]">Bắt đầu (s)</label>
-                            <input
-                                type="number" min={0}
-                                className="w-full px-2 py-1.5 border rounded-lg text-sm"
-                                value={form.audio_start_time}
-                                onChange={e => set('audio_start_time', parseInt(e.target.value) || 0)}
+                    {!isExamMode && (
+                        <>
+                            <UploadField
+                                label="Audio câu hỏi"
+                                value={form.question_audio}
+                                onChange={v => set('question_audio', v)}
+                                type="audio"
+                                accept="audio/mpeg,audio/wav,audio/ogg,audio/webm"
                             />
-                        </div>
-                        <div>
-                            <label className="text-xs text-[var(--text-muted)]">Kết thúc (s)</label>
-                            <input
-                                type="number" min={0}
-                                className="w-full px-2 py-1.5 border rounded-lg text-sm"
-                                value={form.audio_end_time}
-                                onChange={e => set('audio_end_time', parseInt(e.target.value) || 0)}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs text-[var(--text-muted)]">Số lần phát (full test)</label>
-                            <select
-                                className="w-full px-2 py-1.5 border rounded-lg text-sm"
-                                value={form.audio_play_count}
-                                onChange={e => set('audio_play_count', parseInt(e.target.value))}
-                            >
-                                <option value={1}>1 lần</option>
-                                <option value={2}>2 lần</option>
-                                <option value={3}>3 lần</option>
-                            </select>
-                        </div>
-                    </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="text-xs text-[var(--text-muted)]">Bắt đầu (s)</label>
+                                    <input
+                                        type="number" min={0}
+                                        className="w-full px-2 py-1.5 border rounded-lg text-sm"
+                                        value={form.audio_start_time}
+                                        onChange={e => set('audio_start_time', parseInt(e.target.value) || 0)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-[var(--text-muted)]">Kết thúc (s)</label>
+                                    <input
+                                        type="number" min={0}
+                                        className="w-full px-2 py-1.5 border rounded-lg text-sm"
+                                        value={form.audio_end_time}
+                                        onChange={e => set('audio_end_time', parseInt(e.target.value) || 0)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-[var(--text-muted)]">Số lần phát</label>
+                                    <select
+                                        className="w-full px-2 py-1.5 border rounded-lg text-sm"
+                                        value={form.audio_play_count}
+                                        onChange={e => set('audio_play_count', parseInt(e.target.value))}
+                                    >
+                                        <option value={1}>1 lần</option>
+                                        <option value={2}>2 lần</option>
+                                        <option value={3}>3 lần</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                    {isExamMode && (
+                        <p className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-100/50 dark:bg-blue-900/30 rounded p-2">
+                            <Icon name="info" size="xs" className="inline mr-1" />
+                            Chế độ <strong>Thi</strong>: upload 1 file audio liên tục ở phần Section,
+                            không cần audio riêng cho từng câu. Chỉ cần transcript bên dưới.
+                        </p>
+                    )}
                     {/* Transcript — văn bản gốc, hiện trong tab "Đáp án/transcript" */}
                     <div>
                         <label className="text-xs text-[var(--text-muted)] block mb-1">
@@ -186,7 +206,8 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId }: Q
                             onChange={e => set('transcript', e.target.value)}
                         />
                         <p className="text-[10px] text-[var(--text-muted)] mt-1 italic">
-                            Sẽ hiện trong tab Đáp án/transcript. Cũng dùng để gen audio bằng edge-tts (Phase F).
+                            Sẽ hiện trong tab Đáp án/transcript.
+                            {!isExamMode && ' Cũng dùng để gen audio bằng edge-tts.'}
                         </p>
                     </div>
                 </div>

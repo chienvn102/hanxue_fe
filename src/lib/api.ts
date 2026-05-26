@@ -930,7 +930,7 @@ export interface HskExam {
     id: number;
     title: string;
     hskLevel: number;
-    examType: 'practice' | 'mock' | 'official';
+    examType: 'practice' | 'exam';
     totalQuestions: number;
     durationMinutes: number;
     passingScore: number;
@@ -1020,12 +1020,13 @@ export interface HskExamStartResponse {
     id: number;
     title: string;
     hsk_level: number;
-    exam_type: string;
+    exam_type: 'practice' | 'exam';
     total_questions: number;
     duration_minutes: number;
     passing_score: number;
     attemptId: number;
     startedAt: string;
+    /** Legacy field — luôn rỗng sau migration 022. Giữ field để FE cũ không crash. */
     savedAnswers: { questionId: number; answer: string }[];
     sections: HskSection[];
 }
@@ -1151,7 +1152,7 @@ export interface HskExamAnswersResponse {
     id: number;
     title: string;
     hsk_level: number;
-    exam_type: string;
+    exam_type: 'practice' | 'exam';
     duration_minutes: number;
     sections: HskAnswerSection[];
 }
@@ -1678,7 +1679,19 @@ export async function fetchAdminFeedback(params: { status?: string; kind?: strin
     if (params.kind) sp.set('kind', params.kind);
     if (params.limit) sp.set('limit', String(params.limit));
     const res = await authFetch(`${API_BASE_URL}/api/admin/feedback?${sp.toString()}`);
-    if (!res.ok) return [];
+    if (!res.ok) {
+        // Trước đây silent return [] → admin thấy "Không có phản hồi nào" thay vì
+        // biết lý do thật (401: chưa login / 403: thiếu role admin). Giờ throw
+        // có message rõ ràng để page hiện banner đỏ.
+        let serverMessage = '';
+        try {
+            const errBody = await res.json();
+            serverMessage = errBody?.message || '';
+        } catch { /* body không phải JSON */ }
+        if (res.status === 401) throw new Error('Cần đăng nhập để xem trang này.');
+        if (res.status === 403) throw new Error('Tài khoản chưa có quyền admin. Cập nhật role trong DB rồi đăng nhập lại.');
+        throw new Error(serverMessage || `Không tải được danh sách phản hồi (HTTP ${res.status})`);
+    }
     const data = await res.json();
     return data.success ? (data.data as LessonFeedbackAdminItem[]) : [];
 }

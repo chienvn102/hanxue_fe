@@ -770,6 +770,7 @@ export default function HskExamAdminPage() {
                                     form={questionForm}
                                     onChange={setQuestionForm}
                                     sectionType={selectedSection?.section_type || 'reading'}
+                                    examType={(exams.find(e => e.id === expandedExam)?.exam_type === 'exam') ? 'exam' : 'practice'}
                                 />
                             </div>
 
