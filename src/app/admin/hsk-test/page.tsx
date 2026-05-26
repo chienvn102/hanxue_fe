@@ -398,11 +398,18 @@ export default function HskExamAdminPage() {
                     <h1 className="text-2xl font-bold text-[var(--text-main)]">Quản lý Đề thi HSK</h1>
                     <p className="text-sm text-[var(--text-muted)] mt-1">Tổng cộng {exams.length} đề thi</p>
                 </div>
-                <Link href="/admin/hsk-test/new">
-                    <Button>
-                        <Icon name="add" size="sm" className="mr-1" /> Tạo Đề thi
-                    </Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                    <Link href="/admin/hsk-test/import">
+                        <Button variant="secondary">
+                            <Icon name="upload" size="sm" className="mr-1" /> Import OCR
+                        </Button>
+                    </Link>
+                    <Link href="/admin/hsk-test/new">
+                        <Button>
+                            <Icon name="add" size="sm" className="mr-1" /> Tạo Đề thi
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             {/* Filters */}
