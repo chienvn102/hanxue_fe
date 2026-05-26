@@ -526,11 +526,19 @@ function ExamTakingPageContent() {
                         {exam.sections.map((section, sIdx) => {
                             const sectionQuestions = questions.filter(q => q.sectionIndex === sIdx);
 
-                            // Cluster contiguous questions sharing same groupId
+                            // Cluster contiguous questions:
+                            //   - cùng groupId (non-null) → 1 cluster
+                            //   - cả 2 đều standalone (groupId null) → MERGE vào 1 cluster
+                            // (Bug cũ: mỗi standalone tạo cluster riêng → grid 5-col mỗi grid 1 item → looks 1-col)
                             const clusters: { groupId: number | null | undefined; items: typeof sectionQuestions }[] = [];
                             for (const q of sectionQuestions) {
                                 const last = clusters[clusters.length - 1];
-                                if (last && last.groupId && last.groupId === q.groupId) {
+                                const sameGroup =
+                                    last && (
+                                        (!last.groupId && !q.groupId) ||
+                                        (last.groupId && last.groupId === q.groupId)
+                                    );
+                                if (sameGroup) {
                                     last.items.push(q);
                                 } else {
                                     clusters.push({ groupId: q.groupId, items: [q] });
@@ -545,17 +553,17 @@ function ExamTakingPageContent() {
                                     <button
                                         key={q.id}
                                         onClick={() => { setCurrentIndex(q.globalIndex); setShowGrid(false); }}
-                                        className={`relative w-full aspect-square rounded-lg text-xs font-medium transition-all duration-150 ${
+                                        className={`relative aspect-square min-w-0 rounded border text-[11px] font-medium leading-none flex items-center justify-center transition-all duration-150 ${
                                             isCurrent
-                                                ? 'bg-[var(--primary)] text-white ring-2 ring-[var(--primary)] ring-offset-1 ring-offset-[var(--surface)]'
+                                                ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
                                                 : isAnswered
-                                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                                                    : 'bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:bg-[var(--border)]'
+                                                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/40'
+                                                    : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--primary)]/60'
                                         }`}
                                     >
                                         {q.questionNumber}
                                         {isFlagged && (
-                                            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500" />
+                                            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-500" />
                                         )}
                                     </button>
                                 );
