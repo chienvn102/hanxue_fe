@@ -254,6 +254,31 @@ export default function HskExamAdminPage() {
         }
     };
 
+    const handleToggleActive = async (exam: Exam) => {
+        const next = !exam.is_active;
+        const action = next ? 'Bật' : 'Tắt';
+        if (!confirm(`${action} đề "${exam.title}"? ${next ? 'Học viên sẽ thấy đề này.' : 'Học viên sẽ không truy cập được đề này.'}`)) return;
+        try {
+            const token = localStorage.getItem('adminToken');
+            const res = await fetch(`${API_BASE}/api/hsk-exams/${exam.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ is_active: next }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || `HTTP ${res.status}`);
+            }
+            fetchExams();
+        } catch (err) {
+            console.error('Failed to toggle exam active:', err);
+            alert(`Không đổi được trạng thái: ${(err as Error).message}`);
+        }
+    };
+
     // SECTION CRUD
     const openCreateSectionModal = (exam: Exam) => {
         setSelectedExam(exam);
@@ -470,9 +495,18 @@ export default function HskExamAdminPage() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className={`text-xs px-2 py-0.5 rounded ${exam.is_active ? 'bg-green-500/10 text-green-500' : 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'}`}>
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleActive(exam)}
+                                    title={exam.is_active ? 'Bấm để tắt đề thi (ẩn khỏi học viên)' : 'Bấm để bật đề thi (cho học viên thấy)'}
+                                    className={`text-xs px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                                        exam.is_active
+                                            ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20'
+                                            : 'bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:bg-[var(--surface-secondary)]/70'
+                                    }`}
+                                >
                                     {exam.is_active ? 'Đang hoạt động' : 'Tắt'}
-                                </span>
+                                </button>
                                 {/* Trang chi tiết — format locked, chỉ sửa nội dung từng câu */}
                                 <Link
                                     href={`/admin/hsk-test/${exam.id}`}
