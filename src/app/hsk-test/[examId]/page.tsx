@@ -58,6 +58,9 @@ const TEXT_ENTRY_TYPES = new Set([
     'fill_hanzi',
     'fill_blank',
     'short_answer',
+    'image_keyword_sentence',
+    'short_essay',
+    'summary_essay',
 ]);
 function isTextEntryType(qt?: string) {
     return !!qt && TEXT_ENTRY_TYPES.has(qt);

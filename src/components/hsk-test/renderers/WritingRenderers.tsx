@@ -13,35 +13,85 @@ function optionToText(option: string | HskOption): string {
     return typeof option === 'string' ? option : option.text;
 }
 
+function parseSentenceChunks(question: HskQuestion): { text: string }[] {
+    const meta = (question.meta || {}) as { chunks?: { text: string }[] };
+    if (meta.chunks && meta.chunks.length > 0) return meta.chunks;
+
+    const raw = (question.questionText || '')
+        .replace(/^\s*\d+[\.．、]\s*/, '')
+        .trim();
+    if (!raw) return [];
+
+    const parts = /[\/／]/.test(raw)
+        ? raw.split(/\s*[\/／]\s*/)
+        : raw.split(/\s+/);
+
+    return parts
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(text => ({ text }));
+}
+
+function getKeyword(question: HskQuestion): string {
+    const meta = (question.meta || {}) as { keyword?: string };
+    if (meta.keyword) return meta.keyword;
+    if (question.statement) return question.statement;
+    const match = (question.questionText || '').match(/[“"「『]?([\u3400-\u9FFF]{1,8})[”"」』]?/);
+    return match?.[1] || '';
+}
+
 /* ─────────────────────────────────────────────────────────────────────
  * SentenceAssembly — HSK 3 Writing Part 1 (Q71-75)
  * Render chunks `[a][b][c]` → user gõ câu hoàn chỉnh.
  * Chấm điểm LOOSE (BE strip whitespace + dấu câu).
  * ───────────────────────────────────────────────────────────────────── */
 export function SentenceAssembly({ question, value, onChange }: RP) {
-    const meta = (question.meta || {}) as { chunks?: { text: string }[] };
-    const chunks = meta.chunks || [];
+    /* Chunks lấy từ:
+     *   - meta.chunks: [{text:'电梯'}, ...] (schema mới, dành cho UI drag-drop tương lai)
+     *   - hoặc parse questionText nếu có dấu '/' (vd seed H41328: "电梯 / 正常 / 使用了 / 已经可以")
+     *   - hoặc whitespace-separated (fallback)
+     */
+    const chunks = parseSentenceChunks(question);
+
+    // Click chunk → append vào textarea với khoảng trắng phân cách (tiện cho mobile)
+    const appendChunk = (text: string) => {
+        const sep = value && !value.endsWith(' ') ? ' ' : '';
+        onChange(value + sep + text);
+    };
+
     return (
         <div>
             {chunks.length > 0 && (
                 <div className="my-3 flex flex-wrap gap-2">
                     {chunks.map((c, i) => (
-                        <span
+                        <button
                             key={i}
-                            className="px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-main)] border border-[var(--border)] text-base font-medium"
+                            type="button"
+                            onClick={() => appendChunk(c.text)}
+                            className="px-3 py-2 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-main)] border border-[var(--border)] text-base font-medium hsk-zh hover:bg-[var(--primary)]/10 hover:border-[var(--primary)] transition-colors"
+                            title="Bấm để thêm vào câu trả lời"
                         >
-                            [{c.text}]
-                        </span>
+                            {c.text}
+                        </button>
                     ))}
                 </div>
             )}
             <textarea
                 value={value}
                 onChange={e => onChange(e.target.value)}
-                placeholder="Sắp xếp thành câu hoàn chỉnh..."
+                placeholder="Sắp xếp thành câu hoàn chỉnh (gõ trực tiếp hoặc bấm các từ phía trên)..."
                 rows={2}
                 className="w-full px-4 py-3 mt-2 rounded-xl border-2 border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] placeholder-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none text-lg"
             />
+            {value && (
+                <button
+                    type="button"
+                    onClick={() => onChange('')}
+                    className="mt-2 text-xs text-[var(--text-muted)] hover:text-red-500"
+                >
+                    Xoá hết
+                </button>
+            )}
         </div>
     );
 }
@@ -89,7 +139,7 @@ export function FillHanzi({ question, value, onChange }: RP) {
 }
 
 export function ImageKeywordSentence({ question, value, onChange }: RP) {
-    const meta = (question.meta || {}) as { keyword?: string };
+    const keyword = getKeyword(question);
     return (
         <div className="space-y-4">
             {question.questionImage && (
@@ -99,10 +149,10 @@ export function ImageKeywordSentence({ question, value, onChange }: RP) {
                     className="max-h-72 w-full object-contain rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]"
                 />
             )}
-            {(meta.keyword || question.questionText) && (
+            {(keyword || question.questionText) && (
                 <div className="text-sm text-[var(--text-secondary)]">
                     {question.questionText}
-                    {meta.keyword && <span className="ml-2 font-semibold text-[var(--primary)]">{meta.keyword}</span>}
+                    {keyword && <span className="ml-2 font-semibold text-[var(--primary)]">{keyword}</span>}
                 </div>
             )}
             <textarea

@@ -22,6 +22,12 @@ const SECTION_TYPE_ICONS: Record<string, string> = {
     writing: 'edit_note',
 };
 
+const AI_GRADED_TYPES = new Set([
+    'image_keyword_sentence',
+    'short_essay',
+    'summary_essay',
+]);
+
 function ScoreCircle({ score, maxScore, passed }: { score: number; maxScore: number; passed: boolean }) {
     const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
     const circumference = 2 * Math.PI * 58;
@@ -53,6 +59,8 @@ function ScoreCircle({ score, maxScore, passed }: { score: number; maxScore: num
 
 function QuestionReview({ question, index }: { question: HskResultQuestion; index: number }) {
     const [expanded, setExpanded] = useState(false);
+    const isAiGraded = AI_GRADED_TYPES.has(question.questionType);
+    const suggestedAnswer = question.aiFeedback?.suggestedAnswer || question.correctAnswer;
 
     return (
         <div className={`border rounded-xl overflow-hidden transition-colors ${
@@ -192,7 +200,7 @@ function QuestionReview({ question, index }: { question: HskResultQuestion; inde
                             </div>
                         )}
 
-                        {/* For fill_blank / short_answer - show user answer vs correct */}
+                        {/* For fill_blank / short_answer / AI writing - show user answer vs correct */}
                         {(!question.options || question.options.length === 0) && (
                             <div className="space-y-2 text-sm">
                                 <div className="flex items-center gap-2">
@@ -201,10 +209,26 @@ function QuestionReview({ question, index }: { question: HskResultQuestion; inde
                                         {question.userAnswer || '(Không trả lời)'}
                                     </span>
                                 </div>
-                                {!question.isCorrect && (
+                                {question.isCorrect === null && isAiGraded && (
+                                    <div className="text-[var(--text-muted)]">
+                                        AI chưa chấm câu này. Câu trả lời đã được lưu.
+                                    </div>
+                                )}
+                                {question.aiScore !== null && question.aiScore !== undefined && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[var(--text-muted)]">Điểm AI:</span>
+                                        <span className="font-semibold text-[var(--text-main)]">{question.aiScore}/100</span>
+                                    </div>
+                                )}
+                                {question.aiFeedback?.feedbackVi && (
+                                    <div className="rounded-lg bg-[var(--surface-secondary)] p-3 text-[var(--text-secondary)]">
+                                        {question.aiFeedback.feedbackVi}
+                                    </div>
+                                )}
+                                {!question.isCorrect && suggestedAnswer && (
                                     <div className="flex items-center gap-2">
                                         <span className="text-[var(--text-muted)]">Đáp án đúng:</span>
-                                        <span className="text-emerald-500 font-medium">{question.correctAnswer}</span>
+                                        <span className="text-emerald-500 font-medium">{suggestedAnswer}</span>
                                     </div>
                                 )}
                             </div>

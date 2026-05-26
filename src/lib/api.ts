@@ -94,6 +94,17 @@ export interface FlashcardDeck {
     last_studied_at?: string | null;
 }
 
+export interface FlashcardSessionCard {
+    id: number;
+    simplified: string;
+    traditional: string;
+    pinyin: string;
+    hanViet: string;
+    meaningVi: string;
+    meaningEn: string;
+    hskLevel: number;
+}
+
 // API Functions
 export async function fetchVocab(params: {
     limit?: number;
@@ -346,7 +357,7 @@ export async function fetchFlashcardSession(params: {
     deck?: string;
     hsk?: string;
     limit?: string;
-}): Promise<{ count: number; flashcards: any[] }> {
+}): Promise<{ count: number; flashcards: FlashcardSessionCard[] }> {
     const qs = new URLSearchParams({ limit: params.limit || '20' });
     if (params.deck) {
         const res = await authFetch(`${API_BASE_URL}/api/flashcard/decks/${params.deck}/session?${qs.toString()}`);
@@ -1134,6 +1145,23 @@ export interface HskResultQuestion {
     userAnswer: string | null;
     isCorrect: boolean | null;
     pointsEarned: number;
+    aiScore?: number | null;
+    aiFeedback?: {
+        score?: number;
+        passScore?: number;
+        feedbackVi?: string;
+        feedbackZh?: string;
+        suggestedAnswer?: string;
+        criteria?: {
+            task?: number;
+            grammar?: number;
+            vocabulary?: number;
+            fluency?: number;
+        };
+        strengths?: string[];
+        issues?: string[];
+    } | null;
+    aiGradedAt?: string | null;
 }
 
 export interface HskResultSection {
@@ -1192,7 +1220,7 @@ export async function submitHskAnswer(attemptId: number, questionId: number, ans
     }
 }
 
-export async function finishHskExam(attemptId: number): Promise<{ success: boolean; result: { listeningScore: number; readingScore: number; writingScore: number; totalScore: number; maxScore: number; isPassed: boolean; correctCount: number; wrongCount: number; unansweredCount: number } }> {
+export async function finishHskExam(attemptId: number): Promise<{ success: boolean; result: { listeningScore: number; readingScore: number; writingScore: number; totalScore: number; maxScore: number; isPassed: boolean; correctCount: number; wrongCount: number; unansweredCount: number; aiPendingCount?: number; requiresAiGrading?: boolean } }> {
     const res = await authFetch(`${API_BASE_URL}/api/hsk-exams/attempts/${attemptId}/finish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
