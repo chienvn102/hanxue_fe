@@ -1118,9 +1118,13 @@ export interface HskExamAttempt {
 
 export interface HskResultQuestion {
     id: number;
+    groupId?: number | null;
     questionNumber: number;
     questionType: string;
     questionText?: string;
+    statement?: string;
+    passage?: string;
+    transcript?: string;
     questionImage?: string;
     options: string[];
     optionImages?: string[];

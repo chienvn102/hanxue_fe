@@ -81,11 +81,16 @@ function QuestionReview({ question, index }: { question: HskResultQuestion; inde
                     )}
                 </span>
 
-                {/* Question text */}
+                {/* Question text — ưu tiên statement (true_false), questionText (MCQ),
+                    rồi snippet passage hoặc transcript */}
                 <div className="flex-1 min-w-0">
                     <p className="text-sm text-[var(--text-main)] truncate">
                         <span className="font-medium">Câu {index + 1}:</span>{' '}
-                        {question.questionText || '(Câu hỏi hình ảnh/âm thanh)'}
+                        {question.statement
+                            || question.questionText
+                            || (question.transcript ? `🎧 ${question.transcript.slice(0, 80)}` : null)
+                            || (question.passage ? question.passage.slice(0, 80) : null)
+                            || '(Câu hỏi hình ảnh/âm thanh)'}
                     </p>
                 </div>
 
@@ -100,6 +105,39 @@ function QuestionReview({ question, index }: { question: HskResultQuestion; inde
             {expanded && (
                 <div className="px-4 pb-4 pt-0 border-t border-[var(--border)]">
                     <div className="pt-3 space-y-3">
+                        {/* Passage (reading) */}
+                        {question.passage && (
+                            <div className="p-3 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-sm leading-relaxed">
+                                {question.passage}
+                            </div>
+                        )}
+
+                        {/* Statement (true_false / question stem) */}
+                        {question.statement && (
+                            <div className="p-3 rounded-lg bg-[var(--surface-secondary)] border-l-4 border-[var(--primary)]">
+                                <span className="text-[var(--primary)] mr-2">★</span>
+                                <span className="text-sm text-[var(--text-main)]">{question.statement}</span>
+                            </div>
+                        )}
+
+                        {/* Transcript (listening) */}
+                        {question.transcript && (
+                            <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/30">
+                                <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1">
+                                    <Icon name="record_voice_over" size="xs" />
+                                    Transcript audio
+                                </summary>
+                                <div className="px-3 pb-3 text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                                    {question.transcript}
+                                </div>
+                            </details>
+                        )}
+
+                        {/* Question text — show only if khác statement/passage */}
+                        {question.questionText && question.questionText !== question.statement && (
+                            <div className="text-sm text-[var(--text-main)]">{question.questionText}</div>
+                        )}
+
                         {/* Question image */}
                         {question.questionImage && (
                             <img
@@ -207,7 +245,9 @@ export default function ExamResultPage() {
                 setLoading(true);
                 const data = await fetchHskExamResult(attemptId);
                 setResult(data);
-                playSfx(data.attempt?.is_passed ? 'complete' : 'wrong');
+                if (data?.attempt) {
+                    playSfx(data.attempt.is_passed ? 'complete' : 'wrong');
+                }
             } catch (err: unknown) {
                 const message = err instanceof Error ? err.message : 'Failed to load result';
                 setError(message);
@@ -230,7 +270,8 @@ export default function ExamResultPage() {
         );
     }
 
-    if (error || !result) {
+    // Defensive: nếu BE trả thiếu attempt hoặc exam, hiện banner thay vì crash
+    if (error || !result || !result.attempt || !result.exam || !Array.isArray(result.exam.sections)) {
         return (
             <div className="min-h-screen flex flex-col bg-[var(--background)]">
                 <Header />
@@ -250,13 +291,14 @@ export default function ExamResultPage() {
     const timeMinutes = Math.floor(totalTime / 60);
     const timeSeconds = totalTime % 60;
 
-    // Compute section scores
+    // Compute section scores — defensive với section.questions có thể null
     const sectionScores: { type: string; score: number; total: number; correct: number; count: number }[] = [];
     exam.sections.forEach(section => {
-        const total = section.questions.reduce((sum, q) => sum + q.points, 0);
-        const score = section.questions.reduce((sum, q) => sum + q.pointsEarned, 0);
-        const correct = section.questions.filter(q => q.isCorrect).length;
-        sectionScores.push({ type: section.section_type, score, total, correct, count: section.questions.length });
+        const qs = Array.isArray(section.questions) ? section.questions : [];
+        const total = qs.reduce((sum, q) => sum + (q.points || 0), 0);
+        const score = qs.reduce((sum, q) => sum + (q.pointsEarned || 0), 0);
+        const correct = qs.filter(q => q.isCorrect).length;
+        sectionScores.push({ type: section.section_type, score, total, correct, count: qs.length });
     });
 
     // All questions flat for review
@@ -357,7 +399,7 @@ export default function ExamResultPage() {
                                         {section.title ? ` - ${section.title}` : ''}
                                     </h3>
                                 )}
-                                {section.questions.map(q => {
+                                {(Array.isArray(section.questions) ? section.questions : []).map(q => {
                                     const idx = questionIndex++;
                                     return <QuestionReview key={q.id} question={q} index={idx} />;
                                 })}

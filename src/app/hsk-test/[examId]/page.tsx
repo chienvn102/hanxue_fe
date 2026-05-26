@@ -9,6 +9,7 @@ import { HskTestProvider, useHskTest } from '@/components/hsk-test/HskTestContex
 import { QuestionRenderer } from '@/components/hsk-test/QuestionRenderer';
 import { GroupHeader } from '@/components/hsk-test/GroupHeader';
 import { FullTestAudio } from '@/components/hsk-test/FullTestAudio';
+import { AudioPlayer } from '@/components/hsk-test/AudioPlayer';
 
 // Flatten all questions across sections into a single ordered list
 interface FlatQuestion extends HskQuestion {
@@ -390,16 +391,40 @@ function ExamTakingPageContent() {
     // test mode → merged audio cho cả section, không feedback
     const testMode: 'practice' | 'full' = mode === 'practice' ? 'practice' : 'full';
     const currentSection = exam.sections[currentQuestion.sectionIndex];
-    const showSectionAudio =
-        testMode === 'full' &&
+    // Section audio (1 file liên tục) — hiện cho cả 2 mode khi exam_type='exam':
+    //   - test mode: maxPlays=1, không tua (qua FullTestAudio cũ)
+    //   - practice mode: replay không giới hạn, có seek (chỉ render audio player thuần)
+    const hasSectionAudio =
         currentSection?.section_type === 'listening' &&
-        Boolean(currentSection.audio_url);
+        Boolean(currentSection.audio_url) &&
+        exam.exam_type === 'exam';
+    const showSectionAudio = testMode === 'full' && hasSectionAudio;
+    const showPracticeSectionAudio = testMode === 'practice' && hasSectionAudio;
 
-    // Practice mode: feedback cho câu hiện tại
+    // Practice mode: feedback cho câu hiện tại.
+    // Normalize answer giống BE `gradeAnswer` để compare đúng (vd TrueFalseChoice
+    // emit 'A'/'B' nhưng DB seed 'TRUE'/'FALSE'; sentence_assembly strip dấu câu).
+    function normalizeAnswer(qType: string | undefined, raw: string): string {
+        const s = (raw || '').trim();
+        if (!s) return '';
+        if (qType === 'true_false') {
+            const t = s.toLowerCase();
+            if (t === 'a' || t === 'true' || t === 'đúng' || t === 'dung') return 'T';
+            if (t === 'b' || t === 'false' || t === 'sai') return 'F';
+            return t;
+        }
+        if (qType === 'sentence_assembly') {
+            return s.replace(/[\s　]+/g, '').replace(/[，。！？；：、,.!?;:]/g, '');
+        }
+        if (qType === 'fill_hanzi') return s;
+        return s.toLowerCase();
+    }
     const currentAnswer = answers[currentQuestion.id];
     const currentCorrect = correctAnswerMap[currentQuestion.id];
     const isRevealed = mode === 'practice' && revealed.has(currentQuestion.id);
-    const isCorrect = isRevealed && currentCorrect && currentAnswer === currentCorrect.answer;
+    const isCorrect = isRevealed && currentCorrect
+        && normalizeAnswer(currentQuestion.questionType, currentAnswer)
+            === normalizeAnswer(currentQuestion.questionType, currentCorrect.answer);
 
     return (
         <HskTestProvider testMode={testMode} allowQuestionAudio={testMode === 'practice' || !showSectionAudio}>
@@ -484,7 +509,7 @@ function ExamTakingPageContent() {
             <div className="flex-1 flex">
                 {/* Question Grid Sidebar - Desktop always, mobile toggleable */}
                 <aside className={`${showGrid ? 'fixed inset-0 z-40 bg-black/50 md:relative md:bg-transparent' : 'hidden'} md:block`}>
-                    <div className={`${showGrid ? 'absolute left-0 top-0 bottom-0 w-72' : ''} md:relative md:w-64 lg:w-72 border-r border-[var(--border)] bg-[var(--surface)] p-4 overflow-y-auto`}
+                    <div className={`${showGrid ? 'absolute left-0 top-0 bottom-0 w-72' : ''} md:relative md:w-72 lg:w-80 border-r border-[var(--border)] bg-[var(--surface)] p-4 overflow-y-auto`}
                          style={{ height: showGrid ? '100vh' : 'calc(100vh - 57px)', position: showGrid ? undefined : 'sticky', top: showGrid ? undefined : '57px' }}>
                         {/* Mobile close button */}
                         {showGrid && (
@@ -558,7 +583,7 @@ function ExamTakingPageContent() {
                                                     >
                                                         🔗 {group.title_vi || group.group_type}
                                                     </p>
-                                                    <div className="grid grid-cols-5 gap-1.5">
+                                                    <div className="grid grid-cols-[repeat(5,minmax(0,1fr))] gap-1.5">
                                                         {cluster.items.map(renderQ)}
                                                     </div>
                                                 </div>
@@ -566,7 +591,7 @@ function ExamTakingPageContent() {
                                         }
                                         // Standalone questions (no group): merge into one grid block
                                         return (
-                                            <div key={cIdx} className="grid grid-cols-5 gap-1.5 mb-2">
+                                            <div key={cIdx} className="grid grid-cols-[repeat(5,minmax(0,1fr))] gap-1.5 mb-2">
                                                 {cluster.items.map(renderQ)}
                                             </div>
                                         );
@@ -608,6 +633,23 @@ function ExamTakingPageContent() {
                             audioUrl={currentSection.audio_url!}
                             sectionTitle={currentSection.title || `Phần ${currentSection.section_order}`}
                         />
+                    )}
+
+                    {/* Practice mode + exam_type='exam': cũng cần audio liên tục, nhưng
+                        cho replay/tua không giới hạn. Không dùng FullTestAudio (lock seek). */}
+                    {showPracticeSectionAudio && currentSection && (
+                        <div className="sticky top-[57px] z-20 bg-emerald-500/10 border-b-2 border-emerald-500/30 px-4 py-3">
+                            <div className="max-w-4xl mx-auto">
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2">
+                                    🎧 Luyện tập — {currentSection.title || `Phần ${currentSection.section_order}`} (audio có thể replay/tua)
+                                </p>
+                                <AudioPlayer
+                                    key={currentSection.audio_url}
+                                    src={currentSection.audio_url!}
+                                    mode="practice"
+                                />
+                            </div>
+                        </div>
                     )}
 
                     {/* Submit error banner (inline, not full-page) */}
