@@ -308,9 +308,9 @@ function FlashcardSessionContent() {
         <div className="min-h-screen bg-[var(--background)]">
             <Header />
 
-            <div className="max-w-[1280px] mx-auto p-4 md:p-6 lg:p-10 flex flex-col lg:flex-row gap-8 lg:gap-12">
+            <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-3 lg:py-5 grid grid-cols-1 lg:grid-cols-[minmax(0,760px)_220px] xl:grid-cols-[minmax(0,780px)_240px] gap-4 lg:gap-6">
                 {/* Main Content */}
-                <main className="flex-1 flex flex-col gap-6 max-w-3xl mx-auto w-full">
+                <main className="flex flex-col gap-3 sm:gap-4 w-full min-w-0">
                     {/* Progress Bar */}
                     <div className="flex flex-col gap-2 w-full">
                         <div className="flex justify-between items-end gap-3">
@@ -332,7 +332,7 @@ function FlashcardSessionContent() {
                             </div>
                             <p className="text-[var(--text-main)] text-sm font-bold">{progress}%</p>
                         </div>
-                        <div className="h-3 w-full rounded-full bg-[var(--border)] overflow-hidden">
+                        <div className="h-2.5 w-full rounded-full bg-[var(--border)] overflow-hidden">
                             <div
                                 className="h-full rounded-full bg-gradient-to-r from-[var(--primary)] to-red-400 transition-all duration-500 ease-out"
                                 style={{ width: `${progress}%` }}
@@ -343,25 +343,26 @@ function FlashcardSessionContent() {
                     {/* Flashcard */}
                     {currentCard && (
                         <>
-                            <Card hover={false} padding="none" className="relative w-full aspect-[4/3] md:aspect-[16/9] lg:aspect-[2/1] flex flex-col items-center justify-center p-8">
+                            <Card hover={false} padding="none" className="relative w-full h-[min(36vh,300px)] sm:h-[min(40vh,320px)] lg:h-[min(42vh,300px)] min-h-[190px] sm:min-h-[220px] flex flex-col items-center justify-center px-5 py-6 sm:px-7">
                                 {/* Audio button - prominent in listen mode */}
                                 <button
+                                    aria-label="Phát âm thanh"
                                     onClick={() => {
                                         const audioUrl = `${API_BASE}/audio/cmn-${encodeURIComponent(currentCard.simplified)}.mp3`;
                                         const audio = new Audio(audioUrl);
                                         audio.play();
                                     }}
-                                    className={`${mode === 'listen' ? 'w-24 h-24 text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20' : 'absolute top-4 right-4 w-12 h-12 text-[var(--text-muted)] hover:text-[var(--primary)] hover:bg-[var(--surface-secondary)]'} p-2 rounded-full transition-colors cursor-pointer flex items-center justify-center`}
+                                    className={`${mode === 'listen' ? 'size-20 sm:size-24 text-[var(--primary)] bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20' : 'absolute top-3 right-3 size-10 sm:size-11 text-[var(--text-muted)] hover:text-[var(--primary)] hover:bg-[var(--surface-secondary)]'} p-2 rounded-full transition-colors cursor-pointer flex items-center justify-center`}
                                 >
                                     <Icon name="volume_up" size={mode === 'listen' ? 'xl' : 'lg'} />
                                 </button>
 
                                 {/* Character Display - hidden in listen mode until answer shown */}
                                 {mode === 'listen' ? (
-                                    <div className="flex flex-col items-center gap-4 text-center z-10 mt-6">
+                                    <div className="flex flex-col items-center gap-3 text-center z-10 mt-4">
                                         {showResult ? (
                                             <>
-                                                <h1 className="hanzi text-7xl md:text-8xl font-normal text-[var(--text-main)] tracking-wide">
+                                                <h1 className="hanzi text-6xl sm:text-7xl md:text-8xl font-normal text-[var(--text-main)]">
                                                     {currentCard.simplified}
                                                 </h1>
                                                 <div className="flex flex-col gap-1 items-center">
@@ -391,24 +392,24 @@ function FlashcardSessionContent() {
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="flex flex-col items-center gap-4 text-center z-10">
-                                        <h1 className="hanzi text-7xl md:text-8xl lg:text-9xl font-normal text-[var(--text-main)] tracking-wide">
+                                    <div className="flex flex-col items-center gap-3 text-center z-10">
+                                        <h1 className="hanzi text-[4.5rem] sm:text-8xl lg:text-[6.25rem] xl:text-[6.75rem] leading-none font-normal text-[var(--text-main)]">
                                             {currentCard.simplified}
                                         </h1>
-                                        <p className="text-2xl text-[var(--primary)] font-medium">{currentCard.pinyin}</p>
+                                        <p className="text-xl sm:text-2xl text-[var(--primary)] font-medium">{currentCard.pinyin}</p>
                                     </div>
                                 )}
                             </Card>
 
                             {/* Answer Section */}
                             {mode === 'choice' ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                                     {choices.map((choice, idx) => {
                                         const letter = ['A', 'B', 'C', 'D'][idx];
                                         const isSelected = selectedChoice === choice.id;
                                         const isCorrectChoice = choice.id === currentCard.id;
 
-                                        let btnClass = 'relative flex items-center p-4 rounded-xl border transition-all duration-200 text-left cursor-pointer ';
+                                        let btnClass = 'relative flex items-center min-h-12 sm:min-h-14 px-3 sm:px-4 py-2.5 rounded-xl border transition-all duration-200 text-left cursor-pointer ';
 
                                         if (showResult) {
                                             if (isCorrectChoice) {
@@ -431,7 +432,7 @@ function FlashcardSessionContent() {
                                                 disabled={showResult}
                                                 className={btnClass}
                                             >
-                                                <div className={`w-8 h-8 rounded-lg font-bold flex items-center justify-center mr-4 transition-colors
+                                                <div className={`size-8 rounded-lg font-bold flex items-center justify-center mr-3 transition-colors shrink-0
                                                     ${showResult && isCorrectChoice
                                                         ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
                                                         : showResult && isSelected && !isCorrectChoice
@@ -442,7 +443,7 @@ function FlashcardSessionContent() {
                                                     }`}>
                                                     {letter}
                                                 </div>
-                                                <span className={`font-medium text-lg ${showResult && isCorrectChoice ? 'text-emerald-500' : 'text-[var(--text-main)]'}`}>
+                                                <span className={`font-medium text-base sm:text-lg leading-snug pr-7 ${showResult && isCorrectChoice ? 'text-emerald-500' : 'text-[var(--text-main)]'}`}>
                                                     {choice.meaningVi}
                                                 </span>
                                                 {showResult && isCorrectChoice && (
@@ -530,15 +531,13 @@ function FlashcardSessionContent() {
 
                             {/* Feedback & Next Button - Mobile only */}
                             {showResult && (
-                                <div className="lg:hidden">
-                                    <div className="flex items-center gap-2 justify-center pt-2">
-                                        <span className={`text-sm font-bold tracking-wide uppercase flex items-center gap-2 ${isCorrect ? 'text-emerald-500' : 'text-red-400'}`}>
+                                <div className="lg:hidden fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-50 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-lg p-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                        <span className={`text-xs sm:text-sm font-bold uppercase flex items-center gap-2 ${isCorrect ? 'text-emerald-500' : 'text-red-400'}`}>
                                             <Icon name={isCorrect ? 'check_circle' : 'info'} size="sm" />
                                             {isCorrect ? 'Chính xác!' : 'Chưa đúng - Từ này sẽ được lặp lại'}
                                         </span>
-                                    </div>
-                                    <div className="flex justify-center mt-2">
-                                        <Button onClick={nextCard}>
+                                        <Button onClick={nextCard} size="sm" className="self-end sm:self-auto">
                                             <span>{isCorrect ? 'Từ tiếp theo' : 'Tiếp tục'}</span>
                                             <Icon name="arrow_forward" size="sm" />
                                         </Button>
@@ -548,7 +547,7 @@ function FlashcardSessionContent() {
 
                             {/* Check Button (only for choice mode when not showing result) */}
                             {mode === 'choice' && !showResult && (
-                                <div className="flex justify-center mt-2">
+                                <div className="flex justify-center">
                                     <Button onClick={checkAnswer} disabled={selectedChoice === null}>
                                         Kiểm tra
                                     </Button>
@@ -559,14 +558,14 @@ function FlashcardSessionContent() {
                 </main>
 
                 {/* Sidebar */}
-                <aside className="w-full lg:w-72 flex flex-col gap-6 shrink-0">
+                <aside className="w-full lg:w-auto flex flex-col gap-3 shrink-0 lg:sticky lg:top-24 lg:self-start">
                     {/* Stats Cards */}
                     <div className="grid grid-cols-2 gap-3">
-                        <Card hover={false} padding="sm" className="flex flex-col gap-1 items-center justify-center">
+                        <Card hover={false} padding="sm" className="min-h-16 flex flex-col gap-1 items-center justify-center">
                             <span className="text-emerald-500 font-bold text-xl">{accuracy}%</span>
                             <span className="text-[var(--text-secondary)] text-xs">Chính xác</span>
                         </Card>
-                        <Card hover={false} padding="sm" className="flex flex-col gap-1 items-center justify-center">
+                        <Card hover={false} padding="sm" className="min-h-16 flex flex-col gap-1 items-center justify-center">
                             <span className="text-[var(--primary)] font-bold text-xl">{remaining}</span>
                             <span className="text-[var(--text-secondary)] text-xs">Còn lại</span>
                         </Card>
@@ -574,9 +573,9 @@ function FlashcardSessionContent() {
 
                     {/* Feedback & Next Button - Desktop only */}
                     {showResult && (
-                        <Card hover={false} padding="md" className="hidden lg:flex flex-col gap-4">
+                        <Card hover={false} padding="sm" className="hidden lg:flex flex-col gap-3">
                             <div className="flex items-center gap-2 justify-center">
-                                <span className={`text-sm font-bold tracking-wide uppercase flex items-center gap-2 ${isCorrect ? 'text-emerald-500' : 'text-red-400'}`}>
+                                <span className={`text-sm font-bold uppercase flex items-center gap-2 ${isCorrect ? 'text-emerald-500' : 'text-red-400'}`}>
                                     <Icon name={isCorrect ? 'check_circle' : 'info'} size="sm" />
                                     {isCorrect ? 'Chính xác!' : 'Chưa đúng'}
                                 </span>
@@ -594,7 +593,7 @@ function FlashcardSessionContent() {
                     )}
 
                     {/* Action Buttons */}
-                    <div className="mt-auto flex flex-col gap-3">
+                    <div className="flex flex-col gap-3">
                         <Link href="/flashcard">
                             <Button variant="secondary" fullWidth>
                                 <Icon name="arrow_back" size="sm" />
