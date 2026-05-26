@@ -93,6 +93,12 @@ export function QuestionRenderer({ question, group, value, onChange }: Props) {
             if (question.questionImage && question.questionText && !question.questionAudio) {
                 return <ImageCharJudge {...props} />;
             }
+            // Statement-only (no per-question audio) — exam mode dùng audio liên tục
+            // ở section level (xem FullTestAudio.tsx). AudioStatementJudge tự ẩn
+            // audio player khi questionAudio rỗng nên reuse được.
+            if (question.statement) {
+                return <AudioStatementJudge {...props} />;
+            }
             return <LegacyTrueFalse {...props} />;
 
         // ─── multiple_choice: chọn variant dựa vào fields ──────────────

@@ -66,6 +66,14 @@ export function LegacyTrueFalse({ question, value, onChange }: RP) {
                     <PinyinRuby zh={question.questionText} pinyin={meta.pinyin?.question_text} show={showPinyin} fontSize="lg" />
                 </div>
             )}
+            {/* Defensive: hiển thị statement nếu có và không trùng với questionText.
+                Trường hợp routing không match nhánh có statement. */}
+            {question.statement && !question.questionText && (
+                <div className="my-3 p-3 rounded-lg bg-[var(--surface-secondary)] border-l-4 border-[var(--primary)]">
+                    <span className="text-[var(--primary)] mr-2">★</span>
+                    <PinyinRuby zh={question.statement} show={showPinyin} fontSize="lg" />
+                </div>
+            )}
             <TrueFalseChoice value={value} onChange={onChange} style={useDS ? 'DS' : 'AB'} />
         </div>
     );
