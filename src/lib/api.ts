@@ -278,6 +278,70 @@ export async function createFlashcardDeck(input: {
     return data.data;
 }
 
+export interface FlashcardDeckItem {
+    id: number;
+    simplified: string;
+    traditional: string | null;
+    pinyin: string;
+    hanViet?: string | null;
+    meaningVi: string;
+    meaningEn?: string | null;
+    hskLevel: number;
+    addedAt?: string;
+}
+
+export async function fetchFlashcardDeckItems(deckId: number): Promise<FlashcardDeckItem[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/flashcard/decks/${deckId}/items`);
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không tải được danh sách thẻ');
+    }
+    const data = await res.json();
+    return (data.data || []) as FlashcardDeckItem[];
+}
+
+export async function updateFlashcardDeck(deckId: number, patch: { name?: string; description?: string | null }): Promise<void> {
+    const res = await authFetch(`${API_BASE_URL}/api/flashcard/decks/${deckId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không cập nhật được bộ thẻ');
+    }
+}
+
+export async function deleteFlashcardDeck(deckId: number): Promise<void> {
+    const res = await authFetch(`${API_BASE_URL}/api/flashcard/decks/${deckId}`, { method: 'DELETE' });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không xoá được bộ thẻ');
+    }
+}
+
+export async function addFlashcardDeckItem(deckId: number, vocabId: number): Promise<void> {
+    const res = await authFetch(`${API_BASE_URL}/api/flashcard/decks/${deckId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vocab_id: vocabId }),
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không thêm được thẻ');
+    }
+}
+
+export async function removeFlashcardDeckItem(deckId: number, vocabId: number): Promise<void> {
+    const res = await authFetch(`${API_BASE_URL}/api/flashcard/decks/${deckId}/items/${vocabId}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không xoá được thẻ');
+    }
+}
+
 export async function fetchFlashcardSession(params: {
     deck?: string;
     hsk?: string;
@@ -1672,24 +1736,30 @@ export async function deleteLessonFeedback(fid: number): Promise<void> {
     if (!res.ok) throw new Error('Không xoá được');
 }
 
-// Admin
+// Admin — dùng adminToken (từ `/admin/login`), KHÔNG dùng accessToken user.
+// BE route `/api/admin/feedback/*` chuyển sang adminMiddleware để thống nhất
+// auth giữa các trang admin (tránh user phải login 2 lần).
+function adminAuthHeader(): HeadersInit {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function fetchAdminFeedback(params: { status?: string; kind?: string; limit?: number } = {}): Promise<LessonFeedbackAdminItem[]> {
     const sp = new URLSearchParams();
     if (params.status) sp.set('status', params.status);
     if (params.kind) sp.set('kind', params.kind);
     if (params.limit) sp.set('limit', String(params.limit));
-    const res = await authFetch(`${API_BASE_URL}/api/admin/feedback?${sp.toString()}`);
+    const res = await fetch(`${API_BASE_URL}/api/admin/feedback?${sp.toString()}`, {
+        headers: adminAuthHeader(),
+    });
     if (!res.ok) {
-        // Trước đây silent return [] → admin thấy "Không có phản hồi nào" thay vì
-        // biết lý do thật (401: chưa login / 403: thiếu role admin). Giờ throw
-        // có message rõ ràng để page hiện banner đỏ.
         let serverMessage = '';
         try {
             const errBody = await res.json();
             serverMessage = errBody?.message || '';
         } catch { /* body không phải JSON */ }
-        if (res.status === 401) throw new Error('Cần đăng nhập để xem trang này.');
-        if (res.status === 403) throw new Error('Tài khoản chưa có quyền admin. Cập nhật role trong DB rồi đăng nhập lại.');
+        if (res.status === 401) throw new Error('Cần đăng nhập admin. Vào /admin/login.');
+        if (res.status === 403) throw new Error('Token admin không hợp lệ. Đăng nhập lại /admin/login.');
         throw new Error(serverMessage || `Không tải được danh sách phản hồi (HTTP ${res.status})`);
     }
     const data = await res.json();
@@ -1697,32 +1767,34 @@ export async function fetchAdminFeedback(params: { status?: string; kind?: strin
 }
 
 export async function adminFeedbackBugCount(): Promise<number> {
-    const res = await authFetch(`${API_BASE_URL}/api/admin/feedback/bug-count`);
+    const res = await fetch(`${API_BASE_URL}/api/admin/feedback/bug-count`, {
+        headers: adminAuthHeader(),
+    });
     if (!res.ok) return 0;
     const data = await res.json();
     return data.success ? (data.data?.count || 0) : 0;
 }
 
 export async function adminResolveFeedback(fid: number, resolved = true): Promise<void> {
-    await authFetch(`${API_BASE_URL}/api/admin/feedback/${fid}/resolve`, {
+    await fetch(`${API_BASE_URL}/api/admin/feedback/${fid}/resolve`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...adminAuthHeader() },
         body: JSON.stringify({ resolved }),
     });
 }
 
 export async function adminHideFeedback(fid: number, hidden = true): Promise<void> {
-    await authFetch(`${API_BASE_URL}/api/admin/feedback/${fid}/hide`, {
+    await fetch(`${API_BASE_URL}/api/admin/feedback/${fid}/hide`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...adminAuthHeader() },
         body: JSON.stringify({ hidden }),
     });
 }
 
 export async function adminReplyFeedback(fid: number, content: string): Promise<number> {
-    const res = await authFetch(`${API_BASE_URL}/api/admin/feedback/${fid}/reply`, {
+    const res = await fetch(`${API_BASE_URL}/api/admin/feedback/${fid}/reply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...adminAuthHeader() },
         body: JSON.stringify({ content }),
     });
     if (!res.ok) {

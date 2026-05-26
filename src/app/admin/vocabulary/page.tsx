@@ -335,9 +335,36 @@ export default function AdminVocabularyPage() {
             const data = await res.json();
             if (data.success) {
                 fetchVocabs();
-            } else {
-                alert(data.message || 'Lỗi khi xóa');
+                return;
             }
+            // 409 VOCAB_IN_USE: từ đang ở notebook / flashcard / lesson.
+            // Cho phép user confirm force delete → cascade xóa kèm reference.
+            if (res.status === 409 && data.code === 'VOCAB_IN_USE') {
+                const ref = data.data || {};
+                const parts: string[] = [];
+                if (ref.notebookCnt) parts.push(`${ref.notebookCnt} sổ tay`);
+                if (ref.flashcardCnt) parts.push(`${ref.flashcardCnt} flashcard`);
+                if (ref.lessonCnt) parts.push(`${ref.lessonCnt} bài học`);
+                const refText = parts.join(', ');
+                const forceConfirm = confirm(
+                    `Từ vựng đang được dùng ở: ${refText}.\n\n` +
+                    `Bấm OK để XOÁ KÈM (xóa luôn entry trong các nơi đang dùng).\n` +
+                    `Bấm Cancel để giữ lại.`
+                );
+                if (!forceConfirm) return;
+                const forceRes = await fetch(`${API_BASE}/api/vocab/${id}?force=true`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const forceData = await forceRes.json();
+                if (forceData.success) {
+                    fetchVocabs();
+                } else {
+                    alert(forceData.message || 'Force xóa thất bại');
+                }
+                return;
+            }
+            alert(data.message || 'Lỗi khi xóa');
         } catch (error) {
             console.error('Delete error', error);
         }
