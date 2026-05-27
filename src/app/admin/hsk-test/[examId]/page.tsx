@@ -144,6 +144,37 @@ export default function HskExamDetailAdminPage() {
     const openEdit = (q: FlatQuestion) => {
         setEditing(q);
         setSaveError('');
+        // Normalize options: BE có thể trả object {label, text, word, pinyin} từ OCR import,
+        // hoặc string thuần từ data cũ. Form expects string[].
+        const normalizeOptions = (opts: unknown): string[] => {
+            if (!Array.isArray(opts)) return ['', '', '', ''];
+            const mapped = opts.map(o => {
+                if (typeof o === 'string') return o;
+                if (o && typeof o === 'object') {
+                    const obj = o as { text?: string; word?: string; value?: string };
+                    return obj.text || obj.word || obj.value || '';
+                }
+                return '';
+            });
+            // Đảm bảo có ít nhất 4 slot cho UI MCQ
+            while (mapped.length < 4) mapped.push('');
+            return mapped;
+        };
+        const normalizePinyin = (opts: unknown, raw: unknown): string[] => {
+            if (Array.isArray(raw) && raw.length) {
+                return raw.map(v => String(v || ''));
+            }
+            // Nếu options object có .pinyin, lấy từ đó
+            if (Array.isArray(opts)) {
+                return opts.map(o => {
+                    if (o && typeof o === 'object') {
+                        return String((o as { pinyin?: string }).pinyin || '');
+                    }
+                    return '';
+                });
+            }
+            return ['', '', '', ''];
+        };
         setEditForm({
             question_number: q.question_number,
             question_type: q.question_type,
@@ -156,8 +187,8 @@ export default function HskExamDetailAdminPage() {
             audio_start_time: q.audio_start_time || 0,
             audio_end_time: q.audio_end_time || 0,
             audio_play_count: q.audio_play_count || 2,
-            options: (q.options && q.options.length >= 3) ? q.options : ['', '', '', ''],
-            options_pinyin: q.options_pinyin || ['', '', '', ''],
+            options: normalizeOptions(q.options),
+            options_pinyin: normalizePinyin(q.options, q.options_pinyin),
             option_images: (q.option_images && q.option_images.length >= 3) ? q.option_images : ['', '', '', ''],
             correct_answer: q.correct_answer || '',
             explanation: q.explanation || '',

@@ -347,6 +347,30 @@ export default function HskExamAdminPage() {
 
     const openEditQuestionModal = (question: Question) => {
         setSelectedQuestion(question);
+        // Normalize options: BE có thể trả object {label, text, word, pinyin} từ OCR import.
+        const normalizeOptions = (opts: unknown): string[] => {
+            if (!Array.isArray(opts)) return ['', '', '', ''];
+            const mapped = opts.map(o => {
+                if (typeof o === 'string') return o;
+                if (o && typeof o === 'object') {
+                    const obj = o as { text?: string; word?: string; value?: string };
+                    return obj.text || obj.word || obj.value || '';
+                }
+                return '';
+            });
+            while (mapped.length < 4) mapped.push('');
+            return mapped;
+        };
+        const normalizePinyin = (opts: unknown, raw: unknown): string[] => {
+            if (Array.isArray(raw) && raw.length) return raw.map(v => String(v || ''));
+            if (Array.isArray(opts)) {
+                return opts.map(o => {
+                    if (o && typeof o === 'object') return String((o as { pinyin?: string }).pinyin || '');
+                    return '';
+                });
+            }
+            return ['', '', '', ''];
+        };
         setQuestionForm({
             question_number: question.question_number,
             question_type: question.question_type,
@@ -359,8 +383,8 @@ export default function HskExamAdminPage() {
             audio_start_time: question.audio_start_time || 0,
             audio_end_time: question.audio_end_time || 0,
             audio_play_count: question.audio_play_count || 2,
-            options: question.options || ['', '', '', ''],
-            options_pinyin: question.options_pinyin || ['', '', '', ''],
+            options: normalizeOptions(question.options),
+            options_pinyin: normalizePinyin(question.options, question.options_pinyin),
             option_images: question.option_images || ['', '', '', ''],
             correct_answer: question.correct_answer || '',
             explanation: question.explanation || '',
