@@ -1137,7 +1137,7 @@ export interface HskResultQuestion {
     passage?: string;
     transcript?: string;
     questionImage?: string;
-    options: string[];
+    options: string[] | HskOption[];
     optionImages?: string[];
     correctAnswer: string;
     explanation?: string;

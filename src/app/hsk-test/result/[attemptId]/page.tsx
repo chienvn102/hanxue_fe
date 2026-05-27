@@ -159,7 +159,11 @@ function QuestionReview({ question, index }: { question: HskResultQuestion; inde
                         {question.options && question.options.length > 0 && (
                             <div className="space-y-2">
                                 {question.options.map((option, oIdx) => {
-                                    const label = String.fromCharCode(65 + oIdx);
+                                    const opt = option as unknown as string | { label?: string; text?: string; word?: string; pinyin?: string };
+                                    const optionText = typeof opt === 'string'
+                                        ? opt
+                                        : (opt?.text || opt?.word || '');
+                                    const label = (typeof opt === 'object' && opt?.label) || String.fromCharCode(65 + oIdx);
                                     const isUserAnswer = question.userAnswer === label;
                                     const isCorrectAnswer = question.correctAnswer === label;
 
@@ -190,7 +194,7 @@ function QuestionReview({ question, index }: { question: HskResultQuestion; inde
                                                         ? 'text-red-600 dark:text-red-400 line-through'
                                                         : 'text-[var(--text-secondary)]'
                                             }`}>
-                                                {option}
+                                                {optionText}
                                             </span>
                                             {isCorrectAnswer && <Icon name="check_circle" size="xs" className="text-emerald-500" filled />}
                                             {isUserAnswer && !isCorrectAnswer && <Icon name="cancel" size="xs" className="text-red-500" />}
