@@ -7,6 +7,7 @@ import Footer from '@/components/Footer';
 import { Icon } from '@/components/ui/Icon';
 import { HSKBadge } from '@/components/ui/Badge';
 import { useAuth } from '@/components/AuthContext';
+import { getMediaUrl } from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -176,7 +177,7 @@ export default function LeaderboardPage() {
                                 <div className="w-10 h-10 rounded-full bg-[var(--surface-secondary)] flex items-center justify-center overflow-hidden shrink-0">
                                     {r.avatarUrl ? (
                                         // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={r.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                        <img src={getMediaUrl(r.avatarUrl)} alt="" className="w-full h-full object-cover" />
                                     ) : (
                                         <Icon name="person" size="sm" className="text-[var(--text-muted)]" />
                                     )}

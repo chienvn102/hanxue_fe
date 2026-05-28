@@ -293,15 +293,26 @@ export default function CourseDetailPage() {
                                         <p className="text-[var(--text-secondary)]">Đang cập nhật nội dung...</p>
                                     </div>
                                 ) : (
-                                    lessons.map((lesson, index) => (
-                                        <LessonCard
-                                            key={lesson.id}
-                                            lesson={lesson}
-                                            index={index}
-                                            isCompleted={lesson.progress_status === 'completed'}
-                                            isLocked={index > 0 && lessons[index - 1].progress_status !== 'completed' && lesson.progress_status !== 'completed' && lesson.progress_status !== 'in_progress'}
-                                        />
-                                    ))
+                                    lessons.map((lesson, index) => {
+                                        // Gating tắt: học viên có thể vào bất kỳ bài nào không cần
+                                        // hoàn thành bài trước. Bật lại bằng env
+                                        // NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT=true.
+                                        const enforceUnlock = process.env.NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT === 'true';
+                                        const isLocked = enforceUnlock
+                                            && index > 0
+                                            && lessons[index - 1].progress_status !== 'completed'
+                                            && lesson.progress_status !== 'completed'
+                                            && lesson.progress_status !== 'in_progress';
+                                        return (
+                                            <LessonCard
+                                                key={lesson.id}
+                                                lesson={lesson}
+                                                index={index}
+                                                isCompleted={lesson.progress_status === 'completed'}
+                                                isLocked={isLocked}
+                                            />
+                                        );
+                                    })
                                 )}
                             </div>
                         </div>

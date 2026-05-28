@@ -259,7 +259,11 @@ export default function CoursesPage() {
                             const courseWithPrereqTitle: Course = prereq
                                 ? { ...course, prerequisite_title: prereq.title }
                                 : course;
-                            const isLocked = prereq
+                            // Gating tắt: học viên truy cập tự do mọi khóa, không cần
+                            // hoàn thành theo thứ tự. Bật lại bằng env
+                            // NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT=true.
+                            const enforceUnlock = process.env.NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT === 'true';
+                            const isLocked = enforceUnlock && prereq
                                 ? (() => {
                                     const prereqProgress = prereq.lesson_count > 0 && prereq.completed_lessons
                                         ? Math.round((prereq.completed_lessons / prereq.lesson_count) * 100)
