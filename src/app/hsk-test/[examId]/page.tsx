@@ -454,15 +454,47 @@ function ExamTakingPageContent() {
     // test mode → merged audio cho cả section, không feedback
     const testMode: 'practice' | 'full' = mode === 'practice' ? 'practice' : 'full';
     const currentSection = exam.sections[currentQuestion.sectionIndex];
-    // Section audio (1 file liên tục) — hiện cho cả 2 mode khi exam_type='exam':
-    //   - test mode: maxPlays=1, không tua (qua FullTestAudio cũ)
-    //   - practice mode: replay không giới hạn, có seek (chỉ render audio player thuần)
-    const hasSectionAudio =
-        currentSection?.section_type === 'listening' &&
-        Boolean(currentSection.audio_url) &&
-        exam.exam_type === 'exam';
-    const showSectionAudio = testMode === 'full' && hasSectionAudio;
-    const showPracticeSectionAudio = testMode === 'practice' && hasSectionAudio;
+
+    // Audio section = section (đầu tiên) có audio_url, thường là listening.
+    // Lift ra ngoài conditional theo currentSection để FullTestAudio KHÔNG unmount
+    // khi user navigate sang reading/writing — đảm bảo audio chạy liền mạch.
+    const audioSectionIdx = exam.sections.findIndex(
+        s => s.section_type === 'listening' && Boolean(s.audio_url)
+    );
+    const audioSection = audioSectionIdx >= 0 ? exam.sections[audioSectionIdx] : null;
+    const hasExamAudio = Boolean(audioSection) && exam.exam_type === 'exam';
+    const showSectionAudio = testMode === 'full' && hasExamAudio;
+    const showPracticeSectionAudio = testMode === 'practice' && hasExamAudio
+        && currentSection?.section_type === 'listening';
+
+    // Section gating cho test mode: không cho chuyển sang section sau nếu section
+    // hiện tại chưa làm hết. Tính set chỉ số section bị khoá (forward only).
+    // - Section đầu tiên có câu chưa trả lời → tất cả section sau đó bị khoá.
+    // - User vẫn có thể quay lại section trước để xem (không khoá backward).
+    const lockedSectionIndices = new Set<number>();
+    if (testMode === 'full') {
+        let foundIncomplete = false;
+        for (let sIdx = 0; sIdx < exam.sections.length; sIdx++) {
+            const sectionQs = questions.filter(q => q.sectionIndex === sIdx);
+            const allAnswered = sectionQs.length > 0
+                && sectionQs.every(q => answers[q.id] !== undefined);
+            if (foundIncomplete) lockedSectionIndices.add(sIdx);
+            if (!allAnswered) foundIncomplete = true;
+        }
+    }
+
+    // Helper: navigate sang câu mới với section gate.
+    const navigateToIndex = (newIdx: number) => {
+        if (newIdx < 0 || newIdx >= questions.length) return;
+        const target = questions[newIdx];
+        if (target && lockedSectionIndices.has(target.sectionIndex)) {
+            const targetSection = exam.sections[target.sectionIndex];
+            const targetLabel = SECTION_TYPE_LABELS[targetSection?.section_type || ''] || 'phần tiếp theo';
+            alert(`Vui lòng làm hết các câu của phần trước khi chuyển sang ${targetLabel}.`);
+            return;
+        }
+        setCurrentIndex(newIdx);
+    };
 
     // Practice mode: feedback cho câu hiện tại.
     // Normalize answer giống BE `gradeAnswer` để compare đúng (vd TrueFalseChoice
@@ -612,20 +644,33 @@ function ExamTakingPageContent() {
                                 const isAnswered = answers[q.id] !== undefined;
                                 const isCurrent = q.globalIndex === currentIndex;
                                 const isFlagged = flagged.has(q.id);
+                                const isLocked = lockedSectionIndices.has(q.sectionIndex);
                                 return (
                                     <button
                                         key={q.id}
-                                        onClick={() => { setCurrentIndex(q.globalIndex); setShowGrid(false); }}
+                                        onClick={() => {
+                                            if (isLocked) {
+                                                const targetLabel = SECTION_TYPE_LABELS[q.sectionType] || 'phần tiếp theo';
+                                                alert(`Vui lòng làm hết các câu của phần trước khi chuyển sang ${targetLabel}.`);
+                                                return;
+                                            }
+                                            setCurrentIndex(q.globalIndex);
+                                            setShowGrid(false);
+                                        }}
+                                        disabled={isLocked}
+                                        title={isLocked ? 'Câu bị khoá — chưa làm hết phần trước' : undefined}
                                         className={`relative aspect-square min-w-0 rounded border text-[11px] font-medium leading-none flex items-center justify-center transition-all duration-150 ${
-                                            isCurrent
-                                                ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
-                                                : isAnswered
-                                                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/40'
-                                                    : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--primary)]/60'
+                                            isLocked
+                                                ? 'bg-[var(--surface-secondary)] text-[var(--text-muted)] border-[var(--border)] opacity-50 cursor-not-allowed'
+                                                : isCurrent
+                                                    ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                                                    : isAnswered
+                                                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/40'
+                                                        : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--primary)]/60'
                                         }`}
                                     >
-                                        {q.questionNumber}
-                                        {isFlagged && (
+                                        {isLocked ? '🔒' : q.questionNumber}
+                                        {isFlagged && !isLocked && (
                                             <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-500" />
                                         )}
                                     </button>
@@ -697,26 +742,30 @@ function ExamTakingPageContent() {
                 {/* Question Area */}
                 <div className="flex-1 flex flex-col">
                     {/* Section-level audio liên tục cho chế độ Thi (exam_type='exam').
+                        Render ở top-level, KHÔNG phụ thuộc currentSection — để audio
+                        chạy liền mạch dù user navigate sang reading/writing (combined
+                        với section gating thì user chỉ chuyển section sau khi xong
+                        listening, nhưng giữ ở đây cho an toàn).
                         Migration 022: audio không còn timestamp per câu — chỉ 1 file
                         liên tục từ đầu đến cuối, user tự note đáp án theo thứ tự. */}
-                    {showSectionAudio && currentSection && (
+                    {showSectionAudio && audioSection && (
                         <FullTestAudio
-                            audioUrl={currentSection.audio_url!}
-                            sectionTitle={currentSection.title || `Phần ${currentSection.section_order}`}
+                            audioUrl={audioSection.audio_url!}
+                            sectionTitle={audioSection.title || `Phần ${audioSection.section_order}`}
                         />
                     )}
 
                     {/* Practice mode + exam_type='exam': cũng cần audio liên tục, nhưng
                         cho replay/tua không giới hạn. Không dùng FullTestAudio (lock seek). */}
-                    {showPracticeSectionAudio && currentSection && (
+                    {showPracticeSectionAudio && audioSection && (
                         <div className="sticky top-[57px] z-20 bg-emerald-500/10 border-b-2 border-emerald-500/30 px-4 py-3">
                             <div className="max-w-4xl mx-auto">
                                 <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2">
-                                    🎧 Luyện tập — {currentSection.title || `Phần ${currentSection.section_order}`} (audio có thể replay/tua)
+                                    🎧 Luyện tập — {audioSection.title || `Phần ${audioSection.section_order}`} (audio có thể replay/tua)
                                 </p>
                                 <AudioPlayer
-                                    key={currentSection.audio_url}
-                                    src={currentSection.audio_url!}
+                                    key={audioSection.audio_url}
+                                    src={audioSection.audio_url!}
                                     mode="practice"
                                 />
                             </div>
@@ -870,7 +919,7 @@ function ExamTakingPageContent() {
                     <div className="sticky bottom-0 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md">
                         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
                             <button
-                                onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+                                onClick={() => navigateToIndex(currentIndex - 1)}
                                 disabled={currentIndex === 0}
                                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             >
@@ -882,14 +931,26 @@ function ExamTakingPageContent() {
                                 {answeredCount}/{totalQuestions} đã trả lời
                             </span>
 
-                            <button
-                                onClick={() => setCurrentIndex(Math.min(totalQuestions - 1, currentIndex + 1))}
-                                disabled={currentIndex === totalQuestions - 1}
-                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                            >
-                                Câu sau
-                                <Icon name="arrow_forward" size="xs" />
-                            </button>
+                            {(() => {
+                                const nextIdx = currentIndex + 1;
+                                const nextQ = questions[nextIdx];
+                                const nextLocked = Boolean(nextQ) && lockedSectionIndices.has(nextQ.sectionIndex);
+                                return (
+                                    <button
+                                        onClick={() => navigateToIndex(nextIdx)}
+                                        disabled={currentIndex === totalQuestions - 1}
+                                        title={nextLocked ? 'Vui lòng làm hết phần hiện tại trước' : undefined}
+                                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                                            nextLocked
+                                                ? 'text-[var(--text-muted)] bg-[var(--surface-secondary)] cursor-not-allowed'
+                                                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
+                                        } disabled:opacity-30 disabled:cursor-not-allowed`}
+                                    >
+                                        {nextLocked ? '🔒 ' : ''}Câu sau
+                                        <Icon name="arrow_forward" size="xs" />
+                                    </button>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>
