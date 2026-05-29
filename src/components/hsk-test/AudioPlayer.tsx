@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { getMediaUrl } from '@/lib/api';
 
+// Volume persists across question remounts (player có key={question.id} nên remount mỗi câu).
+const VOLUME_STORAGE_KEY = 'hsk_audio_volume';
+const MUTED_STORAGE_KEY = 'hsk_audio_muted';
+
 interface Props {
     src: string;
     label?: string;
@@ -33,6 +37,10 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
     const [playsUsed, setPlaysUsed] = useState(0);
     const [activePlayCounted, setActivePlayCounted] = useState(false);
     const activePlayCountedRef = useRef(false);
+    const [volume, setVolume] = useState(1); // 0-1
+    const [muted, setMuted] = useState(false);
+    const [showVolume, setShowVolume] = useState(false);
+    const volumeBoxRef = useRef<HTMLDivElement>(null);
     const locked = mode === 'full';
     const playLimit = typeof maxPlays === 'number' && maxPlays > 0 ? maxPlays : null;
     const limitReached = playLimit !== null && playsUsed >= playLimit && !activePlayCounted;
@@ -49,6 +57,39 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
         else el.addEventListener('canplay', handler, { once: true });
         return () => el.removeEventListener('canplay', handler);
     }, [autoPlay, src]);
+
+    // Đọc volume/muted đã lưu khi mount (player remount mỗi câu → giữ nguyên lựa chọn).
+    useEffect(() => {
+        try {
+            const savedVol = localStorage.getItem(VOLUME_STORAGE_KEY);
+            const savedMuted = localStorage.getItem(MUTED_STORAGE_KEY);
+            if (savedVol !== null) {
+                const v = parseFloat(savedVol);
+                if (isFinite(v)) setVolume(Math.min(1, Math.max(0, v)));
+            }
+            if (savedMuted === 'true') setMuted(true);
+        } catch { /* localStorage unavailable */ }
+    }, []);
+
+    // Áp dụng volume/muted vào audio element (kể cả sau khi src đổi / remount).
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        el.volume = volume;
+        el.muted = muted;
+    }, [volume, muted, src]);
+
+    // Đóng popover âm lượng khi click ra ngoài.
+    useEffect(() => {
+        if (!showVolume) return;
+        const onDown = (e: MouseEvent) => {
+            if (volumeBoxRef.current && !volumeBoxRef.current.contains(e.target as Node)) {
+                setShowVolume(false);
+            }
+        };
+        document.addEventListener('mousedown', onDown);
+        return () => document.removeEventListener('mousedown', onDown);
+    }, [showVolume]);
 
     const toggle = () => {
         const el = ref.current;
@@ -123,6 +164,28 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
         return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
     };
 
+    const changeVolume = (next: number) => {
+        const v = Math.min(1, Math.max(0, next));
+        setVolume(v);
+        setMuted(v === 0);
+        try {
+            localStorage.setItem(VOLUME_STORAGE_KEY, String(v));
+            localStorage.setItem(MUTED_STORAGE_KEY, v === 0 ? 'true' : 'false');
+        } catch { /* ignore */ }
+    };
+
+    const toggleMute = () => {
+        setMuted(prev => {
+            const next = !prev;
+            try { localStorage.setItem(MUTED_STORAGE_KEY, next ? 'true' : 'false'); } catch { /* ignore */ }
+            return next;
+        });
+    };
+
+    const effectiveVolume = muted ? 0 : volume;
+    const volumeIcon = effectiveVolume === 0 ? 'volume_off' : effectiveVolume < 0.5 ? 'volume_down' : 'volume_up';
+    const volumePercent = Math.round(effectiveVolume * 100);
+
     return (
         <div className="flex items-center gap-3 py-2">
             <button
@@ -159,6 +222,41 @@ export function AudioPlayer({ src, label, onPlay, onTime, onEnded, mode = 'pract
                     {limitReached ? 'Hết lượt nghe' : `Còn ${Math.max(playLimit - playsUsed, 0)}/${playLimit} lượt`}
                 </span>
             )}
+            <div ref={volumeBoxRef} className="relative shrink-0">
+                <button
+                    onClick={() => setShowVolume(v => !v)}
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] transition-colors"
+                    aria-label="Âm lượng"
+                    aria-expanded={showVolume}
+                    type="button"
+                >
+                    <Icon name={volumeIcon} size="sm" />
+                </button>
+                {showVolume && (
+                    <div className="absolute bottom-full right-0 mb-2 p-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-lg z-10 flex items-center gap-2">
+                        <button
+                            onClick={toggleMute}
+                            className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors shrink-0"
+                            aria-label={muted ? 'Bật tiếng' : 'Tắt tiếng'}
+                            type="button"
+                        >
+                            <Icon name={volumeIcon} size="sm" />
+                        </button>
+                        <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={volumePercent}
+                            onChange={(e) => changeVolume(parseInt(e.target.value, 10) / 100)}
+                            className="w-28 accent-[var(--primary)] cursor-pointer"
+                            aria-label="Điều chỉnh âm lượng"
+                        />
+                        <span className="text-xs text-[var(--text-muted)] font-mono tabular-nums w-7 text-right shrink-0">
+                            {volumePercent}
+                        </span>
+                    </div>
+                )}
+            </div>
             <audio
                 ref={ref}
                 src={getMediaUrl(src)}
