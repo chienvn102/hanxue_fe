@@ -12,12 +12,15 @@ import {
     fetchWritingDue,
     submitWritingAttempt,
     fetchVocab,
+    fetchLessonVocab,
+    fetchLessonMeta,
     playAudio,
     type WritingWordResponse,
     type WritingDueItem,
     type WritingStage,
     type WritingSubmitResponse,
     type Vocabulary,
+    type LessonMeta,
 } from '@/lib/api';
 import { playSfx } from '@/lib/sound';
 import { useAuth } from '@/components/AuthContext';
@@ -33,6 +36,9 @@ function PracticeWriteContent() {
     const searchParams = useSearchParams();
     const { isAuthenticated, loading: authLoading } = useAuth();
     const word = searchParams.get('word')?.trim() || '';
+    const lessonRaw = searchParams.get('lesson');
+    const lessonInt = lessonRaw ? parseInt(lessonRaw, 10) : NaN;
+    const lessonId = Number.isFinite(lessonInt) && lessonInt > 0 ? lessonInt : null;
 
     if (authLoading) {
         return (
@@ -52,9 +58,17 @@ function PracticeWriteContent() {
         );
     }
 
+    // Preserve ?lesson across navigation so the picker remembers context after
+    // each character is finished.
+    const exitHref = lessonId ? `/practice/write?lesson=${lessonId}` : '/practice/write';
+    const onPickHref = (w: string) =>
+        lessonId
+            ? `/practice/write?word=${encodeURIComponent(w)}&lesson=${lessonId}`
+            : `/practice/write?word=${encodeURIComponent(w)}`;
+
     return word
-        ? <WritingSession word={word} onExit={() => router.push('/practice/write')} />
-        : <WritingPicker onPick={(w) => router.push(`/practice/write?word=${encodeURIComponent(w)}`)} />;
+        ? <WritingSession word={word} onExit={() => router.push(exitHref)} />
+        : <WritingPicker lessonId={lessonId} onPick={(w) => router.push(onPickHref(w))} />;
 }
 
 export default function PracticeWritePage() {
@@ -69,13 +83,18 @@ export default function PracticeWritePage() {
    Picker — shown when no ?word= param
    ======================================================================== */
 
-function WritingPicker({ onPick }: { onPick: (word: string) => void }) {
+function WritingPicker({ lessonId, onPick }: { lessonId: number | null; onPick: (word: string) => void }) {
     const [due, setDue] = useState<WritingDueItem[]>([]);
     const [suggestions, setSuggestions] = useState<Vocabulary[]>([]);
     const [search, setSearch] = useState('');
     const [searchResults, setSearchResults] = useState<Vocabulary[]>([]);
     const [searching, setSearching] = useState(false);
     const [loading, setLoading] = useState(true);
+
+    // Lesson-scoped: when ?lesson=<id> present, load that lesson's vocab and
+    // filter to single-character entries (writing operates per-character).
+    const [lessonMeta, setLessonMeta] = useState<LessonMeta | null>(null);
+    const [lessonChars, setLessonChars] = useState<Vocabulary[]>([]);
 
     useEffect(() => {
         Promise.all([
@@ -86,6 +105,23 @@ function WritingPicker({ onPick }: { onPick: (word: string) => void }) {
             setSuggestions(s);
         }).finally(() => setLoading(false));
     }, []);
+
+    useEffect(() => {
+        if (!lessonId) { setLessonMeta(null); setLessonChars([]); return; }
+        let cancelled = false;
+        Promise.all([
+            fetchLessonMeta(lessonId),
+            fetchLessonVocab(lessonId),
+        ]).then(([meta, vocab]) => {
+            if (cancelled) return;
+            setLessonMeta(meta);
+            // Writing requires per-character stroke data, so we restrict the
+            // picker to single-char entries from the lesson. Multi-char vocab
+            // can still be searched manually.
+            setLessonChars(vocab.filter(v => v.simplified && [...v.simplified].length === 1));
+        }).catch(() => { /* silent */ });
+        return () => { cancelled = true; };
+    }, [lessonId]);
 
     useEffect(() => {
         const q = search.trim();
@@ -118,6 +154,36 @@ function WritingPicker({ onPick }: { onPick: (word: string) => void }) {
                     <div className="py-8 text-center text-[var(--text-muted)]">Đang tải...</div>
                 ) : (
                     <>
+                        {/* Lesson section — when ?lesson=<id> provided */}
+                        {lessonMeta && (
+                            <section>
+                                <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-[var(--primary)]/5 border border-[var(--primary)]/20">
+                                    <Icon name="auto_stories" size="sm" className="text-[var(--primary)]" />
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Từ vựng bài</span>
+                                    <span className="text-sm font-bold text-[var(--text-main)] truncate">{lessonMeta.title}</span>
+                                    <span className="text-xs text-[var(--text-muted)]">· HSK {lessonMeta.hsk_level}</span>
+                                </div>
+                                {lessonChars.length === 0 ? (
+                                    <p className="px-3 py-2 text-xs text-[var(--text-muted)]">
+                                        Bài này không có từ 1 chữ để luyện viết. Dùng tìm kiếm bên dưới hoặc chọn từ HSK.
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                        {lessonChars.map((v) => (
+                                            <button
+                                                key={v.id}
+                                                onClick={() => onPick(v.simplified)}
+                                                className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)] hover:shadow-md transition-all text-left group"
+                                            >
+                                                <div className="text-4xl font-bold text-[var(--text-main)] hanzi text-center mb-2">{v.simplified}</div>
+                                                {v.pinyin && <div className="text-xs text-[var(--text-secondary)] text-center pinyin">{v.pinyin}</div>}
+                                                {v.meaningVi && <div className="text-[11px] text-[var(--text-muted)] text-center mt-1 line-clamp-1">{v.meaningVi}</div>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+                        )}
                         {/* Due section */}
                         {due.length > 0 && (
                             <section>

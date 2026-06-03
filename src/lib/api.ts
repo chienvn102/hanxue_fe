@@ -391,6 +391,7 @@ export async function fetchFlashcardSession(params: {
     deck?: string;
     hsk?: string;
     limit?: string;
+    lesson?: string | number;
 }): Promise<{ count: number; flashcards: FlashcardSessionCard[] }> {
     const qs = new URLSearchParams({ limit: params.limit || '20' });
     if (params.deck) {
@@ -399,6 +400,7 @@ export async function fetchFlashcardSession(params: {
         return res.json();
     }
     if (params.hsk) qs.set('hsk', params.hsk);
+    if (params.lesson) qs.set('lesson', String(params.lesson));
     const res = await fetch(`${API_BASE_URL}/api/flashcard?${qs.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch flashcards');
     return res.json();
@@ -815,10 +817,11 @@ export interface MatchSession {
     pairs: MatchPair[];
 }
 
-export async function fetchMatchSession(params: { hsk?: number; limit?: number }): Promise<MatchSession> {
+export async function fetchMatchSession(params: { hsk?: number; limit?: number; lesson?: number }): Promise<MatchSession> {
     const sp = new URLSearchParams();
     if (params.hsk) sp.set('hsk', String(params.hsk));
     sp.set('limit', String(params.limit || 8));
+    if (params.lesson) sp.set('lesson', String(params.lesson));
     const res = await authFetch(`${API_BASE_URL}/api/practice/match?${sp.toString()}`);
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
@@ -1759,6 +1762,79 @@ export async function fetchTextbookLesson(lessonId: string | number): Promise<Te
     }
     const json = await res.json();
     return json.data;
+}
+
+// ============================================================
+// Lesson meta + lesson-scoped vocab/grammar — used by practice pages
+// to render group label "Từ vựng bài <title> · HSK <n>" and preselect.
+// ============================================================
+
+export interface LessonMeta {
+    id: number;
+    title: string;
+    hsk_level: number;
+    course_id: number;
+    course_title: string | null;
+}
+
+export async function fetchLessonMeta(lessonId: string | number): Promise<LessonMeta | null> {
+    const res = await fetch(`${API_BASE_URL}/api/lessons/${lessonId}/meta`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.success ? (json.data as LessonMeta) : null;
+}
+
+export async function fetchLessonVocab(lessonId: string | number): Promise<Vocabulary[]> {
+    const sp = new URLSearchParams({ lesson: String(lessonId), limit: '200' });
+    const res = await fetch(`${API_BASE_URL}/api/vocab?${sp.toString()}`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.data || []) as Vocabulary[];
+}
+
+export async function fetchLessonGrammarIds(lessonId: string | number): Promise<number[]> {
+    try {
+        const payload = await fetchTextbookLesson(lessonId);
+        return (payload.grammar || []).map(g => g.id);
+    } catch {
+        return [];
+    }
+}
+
+// Lightweight typed views over the existing fetchCourses / fetchLessonsByCourse
+// endpoints — used by the "Theo bài học" tab in the practice hub.
+export interface CourseShort {
+    id: number;
+    title: string;
+    hskLevel?: number;
+    hsk_level?: number;
+}
+export interface LessonShort {
+    id: number;
+    title: string;
+    order_index?: number;
+}
+
+export async function fetchCoursesShort(): Promise<CourseShort[]> {
+    try {
+        const j = await fetchCourses() as { data?: unknown[] };
+        return ((j?.data as CourseShort[]) || []).filter(c => c && c.id != null);
+    } catch {
+        return [];
+    }
+}
+
+export async function fetchLessonsShort(courseId: string | number): Promise<LessonShort[]> {
+    try {
+        const res = await authFetch(`${API_BASE_URL}/api/lessons/course/${courseId}`);
+        if (!res.ok) return [];
+        const j = await res.json() as { data?: LessonShort[] } | LessonShort[];
+        // BE may wrap in {data} or return bare array depending on legacy path.
+        const list = Array.isArray(j) ? j : (j as { data?: LessonShort[] })?.data || [];
+        return list.filter(l => l && l.id != null);
+    } catch {
+        return [];
+    }
 }
 
 export type LessonSection = 'vocab' | 'passage' | 'grammar' | 'exercise';

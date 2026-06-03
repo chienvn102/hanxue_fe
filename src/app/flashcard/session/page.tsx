@@ -7,7 +7,7 @@ import Header from '@/components/Header';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { fetchFlashcardSession, submitReview } from '@/lib/api';
+import { fetchFlashcardSession, submitReview, fetchLessonMeta, type LessonMeta } from '@/lib/api';
 import { playSfx } from '@/lib/sound';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
@@ -39,6 +39,7 @@ function FlashcardSessionContent() {
     const hsk = Number.isFinite(hskInt) && hskInt >= 1 && hskInt <= 6 ? String(hskInt) : '';
     const limit = searchParams.get('limit') || '20';
     const mode = searchParams.get('mode') || 'choice';
+    const lesson = searchParams.get('lesson') || '';
 
     const switchHsk = (next: string) => {
         if (next === hsk) return;
@@ -70,12 +71,21 @@ function FlashcardSessionContent() {
     // Hint state for listen mode
     const [showHint, setShowHint] = useState(false);
 
+    // Lesson group label — shown above the card when ?lesson=<id> is present.
+    const [lessonMeta, setLessonMeta] = useState<LessonMeta | null>(null);
+    useEffect(() => {
+        if (!lesson) { setLessonMeta(null); return; }
+        let cancelled = false;
+        fetchLessonMeta(lesson).then(m => { if (!cancelled) setLessonMeta(m); });
+        return () => { cancelled = true; };
+    }, [lesson]);
+
     // Load flashcards (lifted ra ngoài effect để `restart` reuse được)
     const loadFlashcards = useCallback(async () => {
         setLoading(true);
         setError('');
         try {
-            const data = await fetchFlashcardSession({ deck, hsk, limit });
+            const data = await fetchFlashcardSession({ deck, hsk, limit, lesson });
 
             if (data.flashcards && data.flashcards.length > 0) {
                 setFlashcards(data.flashcards);
@@ -89,7 +99,7 @@ function FlashcardSessionContent() {
         } finally {
             setLoading(false);
         }
-    }, [deck, hsk, limit]);
+    }, [deck, hsk, limit, lesson]);
 
     useEffect(() => {
         loadFlashcards();
@@ -311,6 +321,14 @@ function FlashcardSessionContent() {
             <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-3 lg:py-5 grid grid-cols-1 lg:grid-cols-[minmax(0,760px)_220px] xl:grid-cols-[minmax(0,780px)_240px] gap-4 lg:gap-6">
                 {/* Main Content */}
                 <main className="flex flex-col gap-3 sm:gap-4 w-full min-w-0">
+                    {lessonMeta && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--primary)]/5 border border-[var(--primary)]/20">
+                            <Icon name="auto_stories" size="sm" className="text-[var(--primary)]" />
+                            <span className="text-xs font-semibold text-[var(--primary)] uppercase tracking-wider">Từ vựng bài</span>
+                            <span className="text-sm font-bold text-[var(--text-main)] truncate">{lessonMeta.title}</span>
+                            <span className="text-xs text-[var(--text-muted)]">· HSK {lessonMeta.hsk_level}</span>
+                        </div>
+                    )}
                     {/* Progress Bar */}
                     <div className="flex flex-col gap-2 w-full">
                         <div className="flex justify-between items-end gap-3">

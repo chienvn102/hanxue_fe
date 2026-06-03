@@ -7,7 +7,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { fetchMatchSession, clearMatchPair, MatchPair } from '@/lib/api';
+import { fetchMatchSession, clearMatchPair, MatchPair, fetchLessonMeta, type LessonMeta } from '@/lib/api';
 import { useAuth } from '@/components/AuthContext';
 
 type Cell = { pairId: number; text: string; sub?: string; side: 'zh' | 'vi' };
@@ -29,6 +29,17 @@ function MatchGameContent() {
     const hskRaw = searchParams.get('hsk');
     const hskInt = hskRaw ? parseInt(hskRaw, 10) : NaN;
     const hsk = Number.isFinite(hskInt) && hskInt >= 1 && hskInt <= 6 ? hskInt : undefined;
+    const lessonRaw = searchParams.get('lesson');
+    const lessonInt = lessonRaw ? parseInt(lessonRaw, 10) : NaN;
+    const lesson = Number.isFinite(lessonInt) && lessonInt > 0 ? lessonInt : undefined;
+
+    const [lessonMeta, setLessonMeta] = useState<LessonMeta | null>(null);
+    useEffect(() => {
+        if (!lesson) { setLessonMeta(null); return; }
+        let cancelled = false;
+        fetchLessonMeta(lesson).then(m => { if (!cancelled) setLessonMeta(m); });
+        return () => { cancelled = true; };
+    }, [lesson]);
 
     const [token, setToken] = useState<string>('');
     const [pairs, setPairs] = useState<MatchPair[]>([]);
@@ -53,7 +64,7 @@ function MatchGameContent() {
         setWrong({ zh: null, vi: null });
         setXpEarned(0);
         try {
-            const session = await fetchMatchSession({ hsk, limit: 8 });
+            const session = await fetchMatchSession({ hsk, lesson, limit: 8 });
             if (session.pairs.length < 2) {
                 setError('Không đủ từ vựng để tạo ván. Thử HSK khác.');
                 setLoading(false);
@@ -68,7 +79,7 @@ function MatchGameContent() {
         } finally {
             setLoading(false);
         }
-    }, [hsk]);
+    }, [hsk, lesson]);
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -118,6 +129,14 @@ function MatchGameContent() {
         <div className="min-h-screen flex flex-col bg-[var(--background)]">
             <Header />
             <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {lessonMeta && (
+                    <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--primary)]/5 border border-[var(--primary)]/20">
+                        <Icon name="auto_stories" size="sm" className="text-[var(--primary)]" />
+                        <span className="text-xs font-semibold text-[var(--primary)] uppercase tracking-wider">Từ vựng bài</span>
+                        <span className="text-sm font-bold text-[var(--text-main)] truncate">{lessonMeta.title}</span>
+                        <span className="text-xs text-[var(--text-muted)]">· HSK {lessonMeta.hsk_level}</span>
+                    </div>
+                )}
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>

@@ -14,10 +14,13 @@ import {
     startGrammarQuiz,
     answerGrammarQuiz,
     finishGrammarQuiz,
+    fetchLessonMeta,
+    fetchLessonGrammarIds,
     type Grammar,
     type GrammarQuizQuestion,
     type GrammarQuizAnswerResult,
     type GrammarQuizFinishResult,
+    type LessonMeta,
 } from '@/lib/api';
 
 const HSK_OPTS = [
@@ -51,6 +54,31 @@ function GrammarQuizInner() {
         const g = parseInt(search.get('grammar') ?? '', 10);
         return Number.isFinite(g) ? new Set([g]) : new Set();
     });
+
+    // ---- Lesson preselect ----
+    const lessonParam = search.get('lesson');
+    const lessonId = (() => {
+        const n = parseInt(lessonParam ?? '', 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    })();
+    const [lessonMeta, setLessonMeta] = useState<LessonMeta | null>(null);
+
+    useEffect(() => {
+        if (!lessonId) return;
+        let cancelled = false;
+        Promise.all([
+            fetchLessonMeta(lessonId),
+            fetchLessonGrammarIds(lessonId),
+        ]).then(([meta, ids]) => {
+            if (cancelled) return;
+            setLessonMeta(meta);
+            // Sync HSK filter to lesson level so the grammar list below loads the
+            // right pool. Preselect all grammar IDs of the lesson.
+            if (meta) setHsk(String(meta.hsk_level));
+            if (ids.length) setSelected(new Set(ids));
+        }).catch(() => { /* silent */ });
+        return () => { cancelled = true; };
+    }, [lessonId]);
 
     // ---- Quiz state ----
     const [phase, setPhase] = useState<Phase>('setup');
@@ -212,21 +240,31 @@ function GrammarQuizInner() {
                 )}
 
                 {phase === 'setup' && (
-                    <SetupView
-                        hsk={hsk}
-                        setHsk={setHsk}
-                        limit={limit}
-                        setLimit={setLimit}
-                        grammarList={grammarList}
-                        loadingList={loadingList}
-                        selected={selected}
-                        toggleOne={toggleOne}
-                        toggleAll={toggleAll}
-                        allSelected={allSelected}
-                        canStart={canStart}
-                        starting={starting}
-                        onStart={handleStart}
-                    />
+                    <>
+                        {lessonMeta && (
+                            <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--primary)]/5 border border-[var(--primary)]/20">
+                                <Icon name="auto_stories" size="sm" className="text-[var(--primary)]" />
+                                <span className="text-xs font-semibold text-[var(--primary)] uppercase tracking-wider">Ngữ pháp bài</span>
+                                <span className="text-sm font-bold text-[var(--text-main)] truncate">{lessonMeta.title}</span>
+                                <span className="text-xs text-[var(--text-muted)]">· HSK {lessonMeta.hsk_level}</span>
+                            </div>
+                        )}
+                        <SetupView
+                            hsk={hsk}
+                            setHsk={setHsk}
+                            limit={limit}
+                            setLimit={setLimit}
+                            grammarList={grammarList}
+                            loadingList={loadingList}
+                            selected={selected}
+                            toggleOne={toggleOne}
+                            toggleAll={toggleAll}
+                            allSelected={allSelected}
+                            canStart={canStart}
+                            starting={starting}
+                            onStart={handleStart}
+                        />
+                    </>
                 )}
 
                 {phase === 'quiz' && current && (

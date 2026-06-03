@@ -107,7 +107,10 @@ export default function AdminVocabularyPage() {
 
             const data = await res.json();
             if (data.success) {
-                setFormData(prev => ({ ...prev, audio_url: data.url }));
+                // Prefer canonical short reference (gs://… or /uploads/…) to
+                // avoid bloating vocabulary.audio_url (VARCHAR 255). Signed
+                // URLs (data.url) can exceed 600 chars and get truncated.
+                setFormData(prev => ({ ...prev, audio_url: data.ref || data.url }));
             } else {
                 alert(data.message || 'Upload thất bại');
             }
@@ -157,7 +160,8 @@ export default function AdminVocabularyPage() {
                 });
                 const status = await statusRes.json();
                 if (status.status === 'done' && status.url) {
-                    // FE giữ signed URL để play preview; khi save BE sẽ normalize → gs://
+                    // FE giữ playable URL để preview; handleSave sẽ normalize
+                    // về canonical (gs:// hoặc /audio/...) trước khi POST.
                     setFormData(prev => ({ ...prev, audio_url: status.url }));
                     return;
                 }
@@ -228,11 +232,32 @@ export default function AdminVocabularyPage() {
         setIsModalOpen(true);
     };
 
+    /**
+     * Convert signed GCS URLs (long, transient) to canonical `gs://bucket/object`
+     * before sending to BE — mirrors the BE `normalizeAudioRef`. Keeps
+     * `/audio/...`, `/uploads/...`, and unknown URLs intact.
+     */
+    const normalizeAudioUrlForStorage = (raw: string): string => {
+        if (!raw) return '';
+        if (raw.startsWith('gs://') || raw.startsWith('/audio') || raw.startsWith('/uploads')) {
+            return raw;
+        }
+        // storage.googleapis.com/<bucket>/<object>?... → gs://<bucket>/<object>
+        const m1 = raw.match(/^https?:\/\/storage\.googleapis\.com\/([^/?#]+)\/([^?#]+)/i);
+        if (m1) return `gs://${m1[1]}/${decodeURIComponent(m1[2])}`;
+        // <bucket>.storage.googleapis.com/<object>?... → gs://<bucket>/<object>
+        const m2 = raw.match(/^https?:\/\/([^./]+)\.storage\.googleapis\.com\/([^?#]+)/i);
+        if (m2) return `gs://${m2[1]}/${decodeURIComponent(m2[2])}`;
+        return raw;
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError('');
 
         // Trim các field text trước khi submit (whitespace gây trùng giả).
+        // audio_url normalize sang canonical (gs:// hoặc relative path) để
+        // không vượt VARCHAR(255) khi signed URL dài hơn 600 ký tự.
         const payload = {
             ...formData,
             simplified: formData.simplified.trim(),
@@ -242,6 +267,7 @@ export default function AdminVocabularyPage() {
             meaning_vi: formData.meaning_vi.trim(),
             meaning_en: formData.meaning_en.trim(),
             word_type: formData.word_type.trim(),
+            audio_url: normalizeAudioUrlForStorage(formData.audio_url),
         };
 
         if (!payload.simplified || !payload.pinyin || !payload.meaning_vi) {
@@ -316,7 +342,13 @@ export default function AdminVocabularyPage() {
                 return;
             }
 
-            setFormError(data.message || `Lỗi khi lưu từ vựng (HTTP ${res.status}).`);
+            // Log đầy đủ để debug khi save fail mà message generic.
+            console.error('[vocab save] failed', {
+                status: res.status,
+                response: data,
+                sentPayload: payload,
+            });
+            setFormError(data.message || data.error || `Lỗi khi lưu từ vựng (HTTP ${res.status}). Xem Console để biết chi tiết.`);
         } catch (error) {
             console.error('Save error', error);
             setFormError('Mất kết nối tới server. Kiểm tra mạng hoặc thử lại.');
