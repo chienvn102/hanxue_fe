@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout, { AuthInput } from '@/components/AuthLayout';
 import { useAuth } from '@/components/AuthContext';
-import { completeOnboarding, sendPasswordChangeCode } from '@/lib/api';
+import { completeOnboarding } from '@/lib/api';
 import { Icon } from '@/components/ui/Icon';
 
 export default function OnboardingPage() {
@@ -18,14 +18,11 @@ export default function OnboardingPage() {
         preferredVoice: user?.preferredVoice || 'female',
         newPassword: '',
         confirmPassword: '',
-        code: ''
     }), [user]);
 
     const [form, setForm] = useState(initialForm);
-    const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const [sendingCode, setSendingCode] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -44,25 +41,9 @@ export default function OnboardingPage() {
         setForm((current) => ({ ...current, [field]: value }));
     };
 
-    const handleSendCode = async () => {
-        setError('');
-        setMessage('');
-        setSendingCode(true);
-
-        try {
-            await sendPasswordChangeCode();
-            setMessage('Mã xác nhận đã được gửi về email của bạn.');
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Không gửi được mã xác nhận');
-        } finally {
-            setSendingCode(false);
-        }
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        setMessage('');
 
         if (form.newPassword !== form.confirmPassword) {
             setError('Mật khẩu nhập lại không khớp');
@@ -79,7 +60,6 @@ export default function OnboardingPage() {
                 dailyGoalMins: Number(form.dailyGoalMins),
                 preferredVoice: form.preferredVoice as 'male' | 'female',
                 newPassword: form.newPassword,
-                code: form.code
             });
             updateUser(updatedUser);
             router.push('/profile');
@@ -101,13 +81,6 @@ export default function OnboardingPage() {
                 <h2 className="text-3xl font-bold text-[var(--text-main)] mb-2">Thiết Lập Tài Khoản</h2>
                 <p className="text-[var(--text-secondary)]">Cập nhật hồ sơ và đặt mật khẩu để bảo vệ tài khoản của bạn.</p>
             </div>
-
-            {message && (
-                <div className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex items-start gap-3 text-green-600 dark:text-green-400 text-sm">
-                    <Icon name="check_circle" />
-                    <span>{message}</span>
-                </div>
-            )}
 
             {error && (
                 <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-600 dark:text-red-400 text-sm">
@@ -202,27 +175,6 @@ export default function OnboardingPage() {
                         </button>
                     }
                 />
-
-                <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
-                    <AuthInput
-                        label="Mã xác nhận email"
-                        icon="pin"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength={6}
-                        value={form.code}
-                        onChange={(e) => updateField('code', e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        required
-                    />
-                    <button
-                        type="button"
-                        disabled={sendingCode}
-                        onClick={handleSendCode}
-                        className="h-[46px] px-4 rounded-xl border border-[var(--border)] font-semibold text-sm hover:bg-[var(--surface-secondary)] disabled:opacity-60"
-                    >
-                        {sendingCode ? 'Đang gửi' : 'Gửi mã'}
-                    </button>
-                </div>
 
                 <button
                     type="submit"

@@ -225,6 +225,40 @@ export async function markAllNotificationsRead(): Promise<void> {
     await authFetch(`${API_BASE_URL}/api/notifications/read-all`, { method: 'PUT' });
 }
 
+// ----- Notification preferences -----
+
+export interface NotificationPreferences {
+    daily_reminder_enabled: number;
+    daily_reminder_time: string;
+    streak_warning_enabled: number;
+    level_up_enabled: number;
+    course_update_enabled: number;
+    timezone: string;
+    srs_review_push_enabled: number;
+    srs_review_email_enabled: number;
+}
+
+export async function fetchNotificationPreferences(): Promise<NotificationPreferences | null> {
+    const res = await authFetch(`${API_BASE_URL}/api/notifications/preferences`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.success ? (json.data as NotificationPreferences) : null;
+}
+
+export async function updateNotificationPreferences(
+    payload: Partial<NotificationPreferences>
+): Promise<void> {
+    const res = await authFetch(`${API_BASE_URL}/api/notifications/preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Không cập nhật được cài đặt thông báo');
+    }
+}
+
 // ============================================================
 // Activity log
 // ============================================================
@@ -536,7 +570,6 @@ export interface ProfileUpdatePayload {
 
 export interface OnboardingPayload extends ProfileUpdatePayload {
     newPassword: string;
-    code: string;
 }
 
 export async function sendPasswordChangeCode(): Promise<{ message: string }> {
@@ -1953,4 +1986,114 @@ export async function adminReplyFeedback(fid: number, content: string): Promise<
     }
     const data = await res.json();
     return data.data?.id || 0;
+}
+
+// ============================================================
+// Admin — Grammar Quiz Questions CRUD (/api/admin/grammar-quiz)
+// ============================================================
+
+export type GrammarQuizQuestionType =
+    | 'multiple_choice'
+    | 'fill_blank'
+    | 'error_identify'
+    | 'sentence_order';
+
+export interface AdminGrammarQuizQuestion {
+    id: number;
+    grammar_pattern_id: number;
+    grammar_point: string;
+    hsk_level: number;
+    question_type: GrammarQuizQuestionType;
+    question_text: string;
+    options: string[];
+    correct_answer: string;
+    explanation: string | null;
+    points: number;
+    created_at: string;
+}
+
+export interface AdminGrammarQuizListResult {
+    rows: AdminGrammarQuizQuestion[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
+export interface AdminGrammarQuizPayload {
+    grammar_pattern_id: number;
+    question_type: GrammarQuizQuestionType;
+    question_text: string;
+    options: string[];
+    correct_answer: string;
+    explanation?: string;
+    points?: number;
+}
+
+async function readAdminError(res: Response, fallback: string): Promise<string> {
+    if (res.status === 401) return 'Cần đăng nhập admin. Vào /admin/login.';
+    if (res.status === 403) return 'Token admin không hợp lệ. Đăng nhập lại /admin/login.';
+    try {
+        const body = await res.json();
+        return body?.message || fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+export async function adminListGrammarQuiz(params: {
+    grammar_pattern_id?: number;
+    hsk_level?: number;
+    page?: number;
+    limit?: number;
+} = {}): Promise<AdminGrammarQuizListResult> {
+    const sp = new URLSearchParams();
+    if (params.grammar_pattern_id) sp.set('grammar_pattern_id', String(params.grammar_pattern_id));
+    if (params.hsk_level) sp.set('hsk_level', String(params.hsk_level));
+    sp.set('page', String(params.page || 1));
+    sp.set('limit', String(params.limit || 20));
+
+    const res = await fetch(`${API_BASE_URL}/api/admin/grammar-quiz?${sp.toString()}`, {
+        headers: adminAuthHeader(),
+    });
+    if (!res.ok) throw new Error(await readAdminError(res, 'Không tải được danh sách câu hỏi'));
+    const json = await res.json();
+    return {
+        rows: json.data || [],
+        pagination: json.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 },
+    };
+}
+
+export async function adminGetGrammarQuiz(id: number): Promise<AdminGrammarQuizQuestion> {
+    const res = await fetch(`${API_BASE_URL}/api/admin/grammar-quiz/${id}`, {
+        headers: adminAuthHeader(),
+    });
+    if (!res.ok) throw new Error(await readAdminError(res, 'Không tải được câu hỏi'));
+    const json = await res.json();
+    return json.data;
+}
+
+export async function adminCreateGrammarQuiz(payload: AdminGrammarQuizPayload): Promise<number> {
+    const res = await fetch(`${API_BASE_URL}/api/admin/grammar-quiz`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...adminAuthHeader() },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await readAdminError(res, 'Không tạo được câu hỏi'));
+    const json = await res.json();
+    return json.data?.id || 0;
+}
+
+export async function adminUpdateGrammarQuiz(id: number, payload: Partial<AdminGrammarQuizPayload>): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/admin/grammar-quiz/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...adminAuthHeader() },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await readAdminError(res, 'Không cập nhật được câu hỏi'));
+}
+
+export async function adminDeleteGrammarQuiz(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/admin/grammar-quiz/${id}`, {
+        method: 'DELETE',
+        headers: adminAuthHeader(),
+    });
+    if (!res.ok) throw new Error(await readAdminError(res, 'Không xóa được câu hỏi'));
 }

@@ -9,11 +9,14 @@ import {
     fetchProfile,
     ProfileUpdatePayload,
     sendPasswordChangeCode,
-    updateProfile
+    updateProfile,
+    fetchNotificationPreferences,
+    updateNotificationPreferences,
+    type NotificationPreferences,
 } from '@/lib/api';
 import { Icon } from '@/components/ui/Icon';
 
-type SettingsTab = 'profile' | 'security';
+type SettingsTab = 'profile' | 'security' | 'notifications';
 
 export default function SettingsPage() {
     const { user, updateUser, logout } = useAuth();
@@ -40,6 +43,36 @@ export default function SettingsPage() {
     const [sendingCode, setSendingCode] = useState(false);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+
+    // Notification preferences
+    const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
+    const [loadingPrefs, setLoadingPrefs] = useState(false);
+    const [savingPrefs, setSavingPrefs] = useState(false);
+
+    useEffect(() => {
+        if (activeTab !== 'notifications' || prefs) return;
+        setLoadingPrefs(true);
+        fetchNotificationPreferences()
+            .then(p => setPrefs(p))
+            .catch(() => setPrefs(null))
+            .finally(() => setLoadingPrefs(false));
+    }, [activeTab, prefs]);
+
+    const togglePref = async (key: keyof NotificationPreferences, value: boolean) => {
+        if (!prefs) return;
+        const next = { ...prefs, [key]: value ? 1 : 0 };
+        setPrefs(next); // optimistic
+        setSavingPrefs(true);
+        try {
+            await updateNotificationPreferences({ [key]: value ? 1 : 0 } as Partial<NotificationPreferences>);
+            setMessage('Đã lưu cài đặt thông báo.');
+        } catch (err) {
+            setPrefs(prefs); // rollback
+            setError(err instanceof Error ? err.message : 'Không lưu được cài đặt');
+        } finally {
+            setSavingPrefs(false);
+        }
+    };
     const inputClass = 'w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--foreground)] px-4 py-3 outline-none font-medium focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)]';
 
     useEffect(() => {
@@ -188,6 +221,16 @@ export default function SettingsPage() {
                     >
                         Bảo mật
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('notifications')}
+                        className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'notifications'
+                            ? 'border-[var(--primary)] text-[var(--primary)]'
+                            : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                            }`}
+                    >
+                        Thông báo
+                    </button>
                 </div>
 
                 {message && (
@@ -204,7 +247,7 @@ export default function SettingsPage() {
                     </div>
                 )}
 
-                {activeTab === 'profile' ? (
+                {activeTab === 'profile' && (
                     <form onSubmit={handleSaveProfile} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-5">
                         {loadingProfile ? (
                             <div className="py-16 flex justify-center">
@@ -286,7 +329,9 @@ export default function SettingsPage() {
                             </>
                         )}
                     </form>
-                ) : (
+                )}
+
+                {activeTab === 'security' && (
                     <form onSubmit={handleChangePassword} className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-5">
                         <div>
                             <h2 className="text-xl font-bold mb-1">Đổi mật khẩu</h2>
@@ -360,6 +405,53 @@ export default function SettingsPage() {
                         </button>
                     </form>
                 )}
+
+                {activeTab === 'notifications' && (
+                    <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-5">
+                        <div>
+                            <h2 className="text-xl font-bold mb-1">Nhắc ôn tập</h2>
+                            <p className="text-sm text-[var(--text-secondary)]">
+                                Khi bạn có ≥5 mục (từ vựng + ngữ pháp + chữ viết) đến hạn ôn theo SRS, HanXue sẽ nhắc.
+                            </p>
+                        </div>
+
+                        {loadingPrefs ? (
+                            <div className="py-10 flex justify-center">
+                                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--primary)]"></div>
+                            </div>
+                        ) : !prefs ? (
+                            <p className="text-sm text-[var(--text-secondary)]">Không tải được cài đặt. Thử lại sau.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                <ToggleRow
+                                    icon="notifications_active"
+                                    label="Nhắc ôn tập qua trình duyệt (Web Push)"
+                                    description="Hiển thị thông báo trên trình duyệt + chuông trong ứng dụng."
+                                    checked={!!prefs.srs_review_push_enabled}
+                                    disabled={savingPrefs}
+                                    onChange={(v) => togglePref('srs_review_push_enabled', v)}
+                                />
+                                <ToggleRow
+                                    icon="mail"
+                                    label="Nhắc ôn tập qua email"
+                                    description="Gửi email tóm tắt mục đang chờ ôn (tối đa 1 lần/ngày)."
+                                    checked={!!prefs.srs_review_email_enabled}
+                                    disabled={savingPrefs}
+                                    onChange={(v) => togglePref('srs_review_email_enabled', v)}
+                                />
+                                <div className="border-t border-[var(--border)] pt-3 mt-3"></div>
+                                <ToggleRow
+                                    icon="local_fire_department"
+                                    label="Cảnh báo mất streak"
+                                    description="Nhắc lúc 20:00 nếu hôm nay chưa học."
+                                    checked={!!prefs.streak_warning_enabled}
+                                    disabled={savingPrefs}
+                                    onChange={(v) => togglePref('streak_warning_enabled', v)}
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
             </main>
 
         </div>
@@ -372,5 +464,42 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
             <span className="text-sm font-semibold text-[var(--text-main)]">{label}</span>
             {children}
         </label>
+    );
+}
+
+function ToggleRow(props: {
+    icon: string;
+    label: string;
+    description: string;
+    checked: boolean;
+    disabled?: boolean;
+    onChange: (next: boolean) => void;
+}) {
+    const { icon, label, description, checked, disabled, onChange } = props;
+    return (
+        <div className="flex items-start gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+            <div className="mt-0.5 w-9 h-9 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center shrink-0">
+                <Icon name={icon} />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-[var(--text-main)]">{label}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{description}</p>
+            </div>
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onChange(!checked)}
+                aria-pressed={checked}
+                className={`shrink-0 relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${
+                    checked ? 'bg-[var(--primary)]' : 'bg-[var(--surface-secondary)]'
+                }`}
+            >
+                <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                        checked ? 'translate-x-5' : ''
+                    }`}
+                />
+            </button>
+        </div>
     );
 }

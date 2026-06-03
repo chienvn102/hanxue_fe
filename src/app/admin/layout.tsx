@@ -34,6 +34,7 @@ function AdminProtectedLayout({ children }: { children: React.ReactNode }) {
         { href: '/admin/courses', icon: 'school', label: 'Khóa học' },
         { href: '/admin/vocabulary', icon: 'translate', label: 'Từ vựng' },
         { href: '/admin/grammar', icon: 'text_snippet', label: 'Ngữ pháp' },
+        { href: '/admin/grammar-quiz', icon: 'fact_check', label: 'Trắc nghiệm NP' },
         { href: '/admin/hsk-test', icon: 'quiz', label: 'Đề thi HSK' },
         { href: '/admin/feedback', icon: 'forum', label: 'Phản hồi bài học' },
     ];
