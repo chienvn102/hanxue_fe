@@ -9,18 +9,44 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { HSKBadge } from '@/components/ui/Badge';
-import { fetchGrammarById, playAudio, type Grammar } from '@/lib/api';
+import { useAuth } from '@/components/AuthContext';
+import {
+    fetchGrammarById,
+    playAudio,
+    fetchSavedGrammarIds,
+    toggleSaveGrammar,
+    type Grammar,
+} from '@/lib/api';
 
 export default function GrammarDetailPage() {
     const params = useParams();
+    const { isAuthenticated } = useAuth();
     const [grammar, setGrammar] = useState<Grammar | null>(null);
     const [loading, setLoading] = useState(true);
+    const [saved, setSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (params.id) {
             loadGrammar();
         }
     }, [params.id]);
+
+    useEffect(() => {
+        if (!isAuthenticated || !params.id) {
+            setSaved(false);
+            return;
+        }
+        let cancelled = false;
+        fetchSavedGrammarIds()
+            .then(ids => {
+                if (!cancelled) setSaved(ids.includes(Number(params.id)));
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated, params.id]);
 
     const loadGrammar = async () => {
         try {
@@ -31,6 +57,26 @@ export default function GrammarDetailPage() {
             console.error('Failed to fetch grammar:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleToggleSave = async () => {
+        if (!grammar || saving) return;
+        if (!isAuthenticated) {
+            window.location.href = '/login';
+            return;
+        }
+        setSaving(true);
+        const next = !saved;
+        setSaved(next); // optimistic
+        try {
+            const result = await toggleSaveGrammar(grammar.id, next);
+            setSaved(result);
+        } catch (err) {
+            setSaved(!next); // rollback
+            console.error('Failed to toggle saved grammar:', err);
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -176,10 +222,24 @@ export default function GrammarDetailPage() {
                             <p className="text-sm text-[var(--text-secondary)] mb-4">
                                 Kiểm tra khả năng vận dụng ngữ pháp &ldquo;{grammar.grammarPoint}&rdquo; với bài tập trắc nghiệm ngắn.
                             </p>
-                            <Button fullWidth>
-                                Bắt đầu Quiz
-                            </Button>
+                            <Link href={`/practice/grammar-quiz?grammar=${grammar.id}`}>
+                                <Button fullWidth>
+                                    <Icon name="play_arrow" size="sm" />
+                                    Bắt đầu Quiz
+                                </Button>
+                            </Link>
                         </Card>
+
+                        {/* Save to notebook */}
+                        <Button
+                            variant={saved ? 'primary' : 'secondary'}
+                            fullWidth
+                            onClick={handleToggleSave}
+                            disabled={saving}
+                        >
+                            <Icon name={saved ? 'bookmark' : 'bookmark_border'} size="sm" filled={saved} />
+                            {saved ? 'Đã lưu vào sổ tay' : 'Lưu vào sổ tay'}
+                        </Button>
 
                         {/* Grammar Info Card */}
                         <Card hover={false} padding="md">

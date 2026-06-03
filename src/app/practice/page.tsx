@@ -7,7 +7,7 @@ import Footer from '@/components/Footer';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
 
-type GameId = 'flashcard' | 'quiz' | 'match' | 'write' | 'type' | 'dictation' | 'translate';
+type GameId = 'flashcard' | 'quiz' | 'match' | 'write' | 'type' | 'dictation' | 'translate' | 'grammar-quiz';
 
 interface GameTile {
     id: GameId;
@@ -32,6 +32,7 @@ const GAMES: GameTile[] = [
     { id: 'type',       label: 'Gõ từ',         sub: 'Gõ nghĩa tiếng Việt',     icon: 'keyboard',       accent: 'text-sky-500',     bg: 'bg-sky-500/10',     available: true },
     { id: 'dictation',  label: 'Nghe viết',     sub: 'Nghe → gõ Hán',           icon: 'hearing',        accent: 'text-purple-500',  bg: 'bg-purple-500/10',  available: true },
     { id: 'translate',  label: 'Dịch câu',      sub: 'AI sinh câu, bạn dịch',    icon: 'translate',      accent: 'text-indigo-500',  bg: 'bg-indigo-500/10',  available: true },
+    { id: 'grammar-quiz', label: 'Trắc nghiệm ngữ pháp', sub: 'MCQ theo điểm ngữ pháp', icon: 'menu_book',    accent: 'text-rose-500',    bg: 'bg-rose-500/10',    available: true },
 ];
 
 const HSK_OPTS = [

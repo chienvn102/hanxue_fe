@@ -8,7 +8,15 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/components/AuthContext';
 import { HSKBadge } from '@/components/ui/Badge';
-import { playAudio, fetchNotebooks as apiFetchNotebooks, fetchNotebookItems, toggleSaveVocab } from '@/lib/api';
+import {
+    playAudio,
+    fetchNotebooks as apiFetchNotebooks,
+    fetchNotebookItems,
+    toggleSaveVocab,
+    fetchSavedGrammar,
+    toggleSaveGrammar,
+    type SavedGrammarItem,
+} from '@/lib/api';
 
 interface SavedVocab {
     notebook_id: number;
@@ -39,6 +47,47 @@ const filterOptions: { id: FilterType; label: string; icon: string }[] = [
     { id: 'learning', label: 'Đang học', icon: 'autorenew' },
     { id: 'mastered', label: 'Đã thuộc', icon: 'check_circle' },
 ];
+
+type NotebookTab = 'vocab' | 'grammar';
+
+function SavedGrammarCard({ item, onRemove }: { item: SavedGrammarItem; onRemove: () => void }) {
+    return (
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] border-l-4 border-l-rose-500 overflow-hidden hover:shadow-lg transition-all">
+            <div className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                    <HSKBadge level={item.hsk_level as 1 | 2 | 3 | 4 | 5 | 6} />
+                    <button
+                        onClick={onRemove}
+                        className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-muted)] flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                        title="Bỏ lưu"
+                    >
+                        <Icon name="bookmark_remove" size="sm" />
+                    </button>
+                </div>
+
+                <Link href={`/grammar/${item.grammar_pattern_id}`} className="block">
+                    <h3 className="font-bold text-[var(--text-main)] hover:text-[var(--primary)] transition-colors line-clamp-2">
+                        {item.grammar_point}
+                    </h3>
+                    {item.pattern_formula && (
+                        <p className="text-xs font-mono text-[var(--primary)] mt-1">{item.pattern_formula}</p>
+                    )}
+                </Link>
+
+                {item.explanation && (
+                    <p className="text-sm text-[var(--text-secondary)] mt-2 line-clamp-2">{item.explanation}</p>
+                )}
+
+                <Link href={`/practice/grammar-quiz?grammar=${item.grammar_pattern_id}`} className="block mt-3">
+                    <Button variant="secondary" size="sm" fullWidth>
+                        <Icon name="play_arrow" size="sm" />
+                        Luyện tập
+                    </Button>
+                </Link>
+            </div>
+        </div>
+    );
+}
 
 function SavedVocabCard({ vocab, onRemove }: { vocab: SavedVocab; onRemove: () => void }) {
     const masteryColors = {
@@ -96,14 +145,42 @@ export default function NotebookPage() {
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState<'newest' | 'hsk'>('newest');
+    const [activeTab, setActiveTab] = useState<NotebookTab>('vocab');
+    const [savedGrammar, setSavedGrammar] = useState<SavedGrammarItem[]>([]);
+    const [loadingGrammar, setLoadingGrammar] = useState(true);
 
     useEffect(() => {
         if (isAuthenticated) {
             fetchData();
+            fetchGrammar();
         } else {
             setLoading(false);
+            setLoadingGrammar(false);
         }
     }, [isAuthenticated]);
+
+    const fetchGrammar = async () => {
+        try {
+            setLoadingGrammar(true);
+            const data = await fetchSavedGrammar();
+            setSavedGrammar(data);
+        } catch (error) {
+            console.error('Failed to load saved grammar', error);
+        } finally {
+            setLoadingGrammar(false);
+        }
+    };
+
+    const handleRemoveGrammar = async (grammarId: number) => {
+        const prev = savedGrammar;
+        setSavedGrammar(p => p.filter(g => g.grammar_pattern_id !== grammarId)); // optimistic
+        try {
+            await toggleSaveGrammar(grammarId, false);
+        } catch (error) {
+            setSavedGrammar(prev); // rollback
+            console.error('Failed to remove grammar', error);
+        }
+    };
 
     const fetchData = async () => {
         try {
@@ -183,6 +260,61 @@ export default function NotebookPage() {
             <Header />
 
             <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {/* Tabs */}
+                <div className="flex gap-2 mb-6 border-b border-[var(--border)]">
+                    {([
+                        { id: 'vocab', label: 'Từ vựng', icon: 'translate', count: savedVocabs.length },
+                        { id: 'grammar', label: 'Ngữ pháp', icon: 'menu_book', count: savedGrammar.length },
+                    ] as { id: NotebookTab; label: string; icon: string; count: number }[]).map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-2 px-4 py-2.5 -mb-px border-b-2 font-semibold text-sm transition-colors ${
+                                activeTab === tab.id
+                                    ? 'border-[var(--primary)] text-[var(--primary)]'
+                                    : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                            }`}
+                        >
+                            <Icon name={tab.icon} size="sm" />
+                            {tab.label}
+                            <span className="text-xs px-1.5 py-0.5 rounded-md bg-[var(--surface-secondary)]">{tab.count}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {activeTab === 'grammar' && (
+                    loadingGrammar ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-40 rounded-xl skeleton" />)}
+                        </div>
+                    ) : savedGrammar.length === 0 ? (
+                        <div className="text-center py-16 bg-[var(--surface)] rounded-xl border border-[var(--border)]">
+                            <Icon name="menu_book" size="xl" className="text-[var(--text-muted)] mb-4" />
+                            <h3 className="text-lg font-bold text-[var(--text-main)] mb-2">Chưa lưu ngữ pháp nào</h3>
+                            <p className="text-[var(--text-secondary)] mb-4">Mở một điểm ngữ pháp và nhấn &ldquo;Lưu vào sổ tay&rdquo;.</p>
+                            <Link href="/grammar">
+                                <Button>
+                                    <Icon name="search" size="sm" className="mr-2" />
+                                    Khám phá ngữ pháp
+                                </Button>
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {savedGrammar.map((item, index) => (
+                                <div
+                                    key={item.grammar_pattern_id}
+                                    className="animate-fade-in"
+                                    style={{ animationDelay: `${index * 0.03}s` }}
+                                >
+                                    <SavedGrammarCard item={item} onRemove={() => handleRemoveGrammar(item.grammar_pattern_id)} />
+                                </div>
+                            ))}
+                        </div>
+                    )
+                )}
+
+                {activeTab === 'vocab' && (
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {/* Sidebar */}
                     <div className="lg:col-span-1 space-y-4">
@@ -303,6 +435,7 @@ export default function NotebookPage() {
                         )}
                     </div>
                 </div>
+                )}
             </main>
 
             <Footer />

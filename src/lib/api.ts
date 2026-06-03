@@ -946,6 +946,124 @@ export async function fetchGrammarById(id: number): Promise<Grammar> {
 }
 
 // ============================================================
+// Grammar Quiz (seeded MCQ) — server-side session token (anti-cheat).
+// /start never returns correct answers; grading happens server-side.
+// ============================================================
+
+export interface GrammarQuizQuestion {
+    id: number;
+    grammarPatternId: number;
+    grammarPoint: string;
+    hskLevel: number;
+    questionType: string;
+    questionText: string;
+    options: string[];
+}
+
+export interface GrammarQuizStartResult {
+    token: string;
+    questions: GrammarQuizQuestion[];
+}
+
+export interface GrammarQuizAnswerResult {
+    correct: boolean;
+    correctAnswer: string;
+    explanation: string;
+}
+
+export interface GrammarQuizFinishResult {
+    total: number;
+    answered: number;
+    correct: number;
+    score: number;
+    xpEarned: number;
+}
+
+export async function startGrammarQuiz(params: {
+    grammarIds?: number[];
+    hsk?: number;
+    limit?: number;
+}): Promise<GrammarQuizStartResult> {
+    const res = await authFetch(`${API_BASE_URL}/api/practice/grammar-quiz/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            grammarIds: params.grammarIds || [],
+            hsk: params.hsk,
+            limit: params.limit || 10,
+        }),
+    });
+    if (!res.ok) throw new Error(await readApiError(res, 'Không tạo được phiên trắc nghiệm'));
+    const json = await res.json();
+    return json.data;
+}
+
+export async function answerGrammarQuiz(payload: {
+    token: string;
+    questionId: number;
+    choice: string;
+}): Promise<GrammarQuizAnswerResult> {
+    const res = await authFetch(`${API_BASE_URL}/api/practice/grammar-quiz/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await readApiError(res, 'Không chấm được câu trả lời'));
+    const json = await res.json();
+    return json.data;
+}
+
+export async function finishGrammarQuiz(token: string): Promise<GrammarQuizFinishResult> {
+    const res = await authFetch(`${API_BASE_URL}/api/practice/grammar-quiz/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+    });
+    if (!res.ok) throw new Error(await readApiError(res, 'Không hoàn tất được phiên'));
+    const json = await res.json();
+    return json.data;
+}
+
+// ============================================================
+// Saved grammar points ("Ngữ pháp" tab in notebook)
+// ============================================================
+
+export interface SavedGrammarItem {
+    grammar_pattern_id: number;
+    note: string | null;
+    created_at: string;
+    grammar_point: string;
+    pattern_formula: string | null;
+    hsk_level: number;
+    explanation: string;
+}
+
+export async function fetchSavedGrammarIds(): Promise<number[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/notebooks/grammar/ids`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.data || [];
+}
+
+export async function fetchSavedGrammar(): Promise<SavedGrammarItem[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/notebooks/grammar`);
+    if (!res.ok) throw new Error('Failed to fetch saved grammar');
+    const json = await res.json();
+    return json.data || [];
+}
+
+export async function toggleSaveGrammar(grammarId: number, save: boolean): Promise<boolean> {
+    const res = await authFetch(`${API_BASE_URL}/api/notebooks/grammar/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grammarId, save }),
+    });
+    if (!res.ok) throw new Error(await readApiError(res, 'Không lưu được ngữ pháp'));
+    const json = await res.json();
+    return json.saved === true;
+}
+
+// ============================================================
 // User Profile Functions
 // ============================================================
 

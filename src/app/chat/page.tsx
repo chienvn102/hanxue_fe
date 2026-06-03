@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
-import { sendChatMessage, fetchChatUsage, playAudio, transcribeAudio, synthesizeSpeech } from '@/lib/api';
+import { sendChatMessage, fetchChatUsage, transcribeAudio, synthesizeSpeech } from '@/lib/api';
 import { isRecordingSupported, requestMicPermission, startRecording } from '@/lib/audioRecorder';
 import PracticePanel from '@/components/PracticePanel';
 import { RealtimePanel } from '@/components/chat/RealtimePanel';
@@ -524,15 +524,7 @@ export default function ChatPage() {
                                         {msg.role === 'assistant' && /[一-鿿]/.test(msg.content) && (
                                             <div className="mt-2 flex items-center gap-3">
                                                 <button
-                                                    onClick={() => {
-                                                        const zh = msg.content.match(/[一-鿿㐀-䶿，。？！]+/g);
-                                                        if (!zh) return;
-                                                        if (mode === 'conversation') {
-                                                            speakReply(msg.content);
-                                                        } else {
-                                                            playAudio(zh.join(''));
-                                                        }
-                                                    }}
+                                                    onClick={() => speakReply(msg.content)}
                                                     className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
                                                     title="Nghe phát âm"
                                                 >
