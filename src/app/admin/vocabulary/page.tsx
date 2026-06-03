@@ -126,7 +126,7 @@ export default function AdminVocabularyPage() {
      * - Khi đang tạo mới: cần formData.simplified, gọi /api/admin/gen-audio-text
      *   → BE chỉ gen audio dựa trên text, trả URL → admin save vocab sau.
      */
-    const handleGenerateAudio = async () => {
+    const handleGenerateAudio = async (engine: 'cloud' | 'edge' = 'cloud') => {
         const word = formData.simplified.trim();
         if (!editingVocab && !word) {
             alert('Vui lòng nhập chữ giản thể trước khi tạo audio.');
@@ -134,9 +134,10 @@ export default function AdminVocabularyPage() {
         }
         setGeneratingAudio(true);
         try {
+            const suffix = engine === 'edge' ? '-edge' : '';
             const endpoint = editingVocab
-                ? `${API_BASE}/api/admin/vocab/${editingVocab.id}/gen-audio`
-                : `${API_BASE}/api/admin/gen-audio-text`;
+                ? `${API_BASE}/api/admin/vocab/${editingVocab.id}/gen-audio${suffix}`
+                : `${API_BASE}/api/admin/gen-audio-text${suffix}`;
             const init: RequestInit = {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
@@ -621,13 +622,23 @@ export default function AdminVocabularyPage() {
                                         )}
                                         <button
                                             type="button"
-                                            onClick={handleGenerateAudio}
+                                            onClick={() => handleGenerateAudio('cloud')}
                                             disabled={generatingAudio || uploading || !formData.simplified.trim()}
-                                            title={!formData.simplified.trim() ? 'Nhập chữ giản thể trước' : 'Tạo audio bằng AI (Google Cloud TTS)'}
+                                            title={!formData.simplified.trim() ? 'Nhập chữ giản thể trước' : 'Tạo audio bằng Google Cloud TTS (chất lượng cao, có phí)'}
                                             className="px-4 py-2 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                                         >
                                             <Icon name="graphic_eq" size="sm" />
                                             {generatingAudio ? 'Đang tạo...' : 'AI'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleGenerateAudio('edge')}
+                                            disabled={generatingAudio || uploading || !formData.simplified.trim()}
+                                            title={!formData.simplified.trim() ? 'Nhập chữ giản thể trước' : 'Tạo audio bằng Microsoft Edge TTS (miễn phí, local)'}
+                                            className="px-4 py-2 bg-purple-500/10 text-purple-400 rounded-lg hover:bg-purple-500/20 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                                        >
+                                            <Icon name="record_voice_over" size="sm" />
+                                            {generatingAudio ? 'Đang tạo...' : 'Edge'}
                                         </button>
                                     </div>
                                     {formData.audio_url && (
