@@ -7,14 +7,18 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/AuthContext';
-import { fetchHskExamResult, getMediaUrl, type HskExamResult, type HskResultQuestion } from '@/lib/api';
+import {
+    fetchHskExamResult, getMediaUrl,
+    type HskExamResult, type HskResultQuestion, type HskOption,
+} from '@/lib/api';
 import { playSfx } from '@/lib/sound';
-
-const SECTION_TYPE_LABELS: Record<string, string> = {
-    listening: 'Nghe hiểu',
-    reading: 'Đọc hiểu',
-    writing: 'Viết',
-};
+import {
+    ExamReviewShell,
+    type ReviewSection,
+    type NodeStatus,
+    SECTION_TYPE_LABELS,
+} from '@/components/hsk-test/ExamReviewShell';
+import { HskTestProvider } from '@/components/hsk-test/HskTestContext';
 
 const SECTION_TYPE_ICONS: Record<string, string> = {
     listening: 'headphones',
@@ -36,9 +40,7 @@ function ScoreCircle({ score, maxScore, passed }: { score: number; maxScore: num
     return (
         <div className="relative w-36 h-36">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 128 128">
-                {/* Background circle */}
                 <circle cx="64" cy="64" r="58" fill="none" stroke="var(--border)" strokeWidth="8" />
-                {/* Progress circle */}
                 <circle
                     cx="64" cy="64" r="58" fill="none"
                     stroke={passed ? '#10B981' : '#EF4444'}
@@ -57,202 +59,192 @@ function ScoreCircle({ score, maxScore, passed }: { score: number; maxScore: num
     );
 }
 
-function QuestionReview({ question, index }: { question: HskResultQuestion; index: number }) {
-    const [expanded, setExpanded] = useState(false);
+/**
+ * Single-question review body. Same content as the previous accordion but
+ * rendered in-place inside ExamReviewShell. Status (correct / wrong /
+ * unanswered) is reflected by the surrounding card border + status pill,
+ * mirroring the per-card colors of the old accordion.
+ */
+function ResultQuestionBody({
+    question, questionNumber, sectionInstructions,
+}: {
+    question: HskResultQuestion;
+    questionNumber: number;
+    sectionInstructions?: string;
+}) {
     const isAiGraded = AI_GRADED_TYPES.has(question.questionType);
     const suggestedAnswer = question.aiFeedback?.suggestedAnswer || question.correctAnswer;
+    const borderClass =
+        question.isCorrect === null
+            ? 'border-[var(--border)] bg-[var(--surface)]'
+            : question.isCorrect
+                ? 'border-emerald-500/40 bg-emerald-500/5'
+                : 'border-red-500/40 bg-red-500/5';
+
+    const statusPill = question.isCorrect === null
+        ? <span className="text-xs px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">Chưa trả lời / chưa chấm</span>
+        : question.isCorrect
+            ? <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1"><Icon name="check_circle" size="xs" filled />Đúng</span>
+            : <span className="text-xs px-2 py-0.5 rounded-md bg-red-500/15 text-red-600 dark:text-red-400 font-semibold flex items-center gap-1"><Icon name="cancel" size="xs" filled />Sai</span>;
 
     return (
-        <div className={`border rounded-xl overflow-hidden transition-colors ${
-            question.isCorrect === null
-                ? 'border-[var(--border)] bg-[var(--surface)]'
-                : question.isCorrect
-                    ? 'border-emerald-500/30 bg-emerald-500/5'
-                    : 'border-red-500/30 bg-red-500/5'
-        }`}>
-            <button
-                onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center gap-3 p-4 text-left"
-            >
-                {/* Status icon */}
-                <span className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                    question.isCorrect === null
-                        ? 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'
-                        : question.isCorrect
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-red-500 text-white'
-                }`}>
-                    {question.isCorrect === null ? (index + 1) : question.isCorrect ? (
-                        <Icon name="check" size="xs" />
-                    ) : (
-                        <Icon name="close" size="xs" />
-                    )}
-                </span>
+        <div className={`rounded-xl border-2 ${borderClass} p-4 space-y-3`}>
+            {sectionInstructions && (
+                <p className="text-sm text-[var(--text-secondary)] italic">{sectionInstructions}</p>
+            )}
 
-                {/* Question text — ưu tiên statement (true_false), questionText (MCQ),
-                    rồi snippet passage hoặc transcript */}
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm text-[var(--text-main)] truncate">
-                        <span className="font-medium">Câu {index + 1}:</span>{' '}
-                        {question.statement
-                            || question.questionText
-                            || (question.transcript ? `🎧 ${question.transcript.slice(0, 80)}` : null)
-                            || (question.passage ? question.passage.slice(0, 80) : null)
-                            || '(Câu hỏi hình ảnh/âm thanh)'}
-                    </p>
+            {/* Header pill row */}
+            <div className="flex items-center gap-2 text-xs flex-wrap">
+                <span className="font-bold text-[var(--text-secondary)]">Câu {questionNumber}</span>
+                <span className="text-[var(--text-muted)]">·</span>
+                <span className="text-[var(--text-muted)] italic">{question.questionType}</span>
+                {statusPill}
+                <span className="ml-auto text-[var(--text-muted)]">
+                    {question.pointsEarned}/{question.points} điểm
+                </span>
+            </div>
+
+            {/* Passage */}
+            {question.passage && (
+                <div className="bg-[var(--surface)] rounded-lg p-3 text-sm hanzi border border-[var(--border)] leading-relaxed">
+                    {question.passage}
                 </div>
+            )}
 
-                {/* Points */}
-                <span className="flex-shrink-0 text-xs font-medium text-[var(--text-muted)]">
-                    {question.pointsEarned}/{question.points}
-                </span>
+            {/* Statement */}
+            {question.statement && (
+                <div className="bg-[var(--surface-secondary)] rounded-lg p-3 text-base hanzi border-l-4 border-[var(--primary)]">
+                    <span className="text-xs text-[var(--primary)] mr-2">★</span>
+                    {question.statement}
+                </div>
+            )}
 
-                <Icon name={expanded ? 'expand_less' : 'expand_more'} size="sm" className="text-[var(--text-muted)]" />
-            </button>
-
-            {expanded && (
-                <div className="px-4 pb-4 pt-0 border-t border-[var(--border)]">
-                    <div className="pt-3 space-y-3">
-                        {/* Passage (reading) */}
-                        {question.passage && (
-                            <div className="p-3 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-sm leading-relaxed">
-                                {question.passage}
-                            </div>
-                        )}
-
-                        {/* Statement (true_false / question stem) */}
-                        {question.statement && (
-                            <div className="p-3 rounded-lg bg-[var(--surface-secondary)] border-l-4 border-[var(--primary)]">
-                                <span className="text-[var(--primary)] mr-2">★</span>
-                                <span className="text-sm text-[var(--text-main)]">{question.statement}</span>
-                            </div>
-                        )}
-
-                        {/* Transcript (listening) */}
-                        {question.transcript && (
-                            <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/30">
-                                <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1">
-                                    <Icon name="record_voice_over" size="xs" />
-                                    Transcript audio
-                                </summary>
-                                <div className="px-3 pb-3 text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
-                                    {question.transcript}
-                                </div>
-                            </details>
-                        )}
-
-                        {/* Question text — show only if khác statement/passage */}
-                        {question.questionText && question.questionText !== question.statement && (
-                            <div className="text-sm text-[var(--text-main)]">{question.questionText}</div>
-                        )}
-
-                        {/* Question image */}
-                        {question.questionImage && (
-                            <img
-                                src={getMediaUrl(question.questionImage)}
-                                alt={`Câu ${index + 1}`}
-                                className="max-h-40 rounded-lg border border-[var(--border)] object-contain"
-                            />
-                        )}
-
-                        {/* Options with correct/wrong highlighting */}
-                        {question.options && question.options.length > 0 && (
-                            <div className="space-y-2">
-                                {question.options.map((option, oIdx) => {
-                                    const opt = option as unknown as string | { label?: string; text?: string; word?: string; pinyin?: string };
-                                    const optionText = typeof opt === 'string'
-                                        ? opt
-                                        : (opt?.text || opt?.word || '');
-                                    const label = (typeof opt === 'object' && opt?.label) || String.fromCharCode(65 + oIdx);
-                                    const isUserAnswer = question.userAnswer === label;
-                                    const isCorrectAnswer = question.correctAnswer === label;
-
-                                    return (
-                                        <div
-                                            key={oIdx}
-                                            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${
-                                                isCorrectAnswer
-                                                    ? 'bg-emerald-500/10 border border-emerald-500/30'
-                                                    : isUserAnswer && !isCorrectAnswer
-                                                        ? 'bg-red-500/10 border border-red-500/30'
-                                                        : 'bg-[var(--surface-secondary)]'
-                                            }`}
-                                        >
-                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                                isCorrectAnswer
-                                                    ? 'bg-emerald-500 text-white'
-                                                    : isUserAnswer
-                                                        ? 'bg-red-500 text-white'
-                                                        : 'bg-[var(--border)] text-[var(--text-muted)]'
-                                            }`}>
-                                                {label}
-                                            </span>
-                                            <span className={`flex-1 ${
-                                                isCorrectAnswer
-                                                    ? 'text-emerald-600 dark:text-emerald-400 font-medium'
-                                                    : isUserAnswer && !isCorrectAnswer
-                                                        ? 'text-red-600 dark:text-red-400 line-through'
-                                                        : 'text-[var(--text-secondary)]'
-                                            }`}>
-                                                {optionText}
-                                            </span>
-                                            {isCorrectAnswer && <Icon name="check_circle" size="xs" className="text-emerald-500" filled />}
-                                            {isUserAnswer && !isCorrectAnswer && <Icon name="cancel" size="xs" className="text-red-500" />}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        {/* For fill_blank / short_answer / AI writing - show user answer vs correct */}
-                        {(!question.options || question.options.length === 0) && (
-                            <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[var(--text-muted)]">Đáp án của bạn:</span>
-                                    <span className={question.isCorrect ? 'text-emerald-500 font-medium' : 'text-red-500 line-through'}>
-                                        {question.userAnswer || '(Không trả lời)'}
-                                    </span>
-                                </div>
-                                {question.isCorrect === null && isAiGraded && (
-                                    <div className="text-[var(--text-muted)]">
-                                        AI chưa chấm câu này. Câu trả lời đã được lưu.
-                                    </div>
-                                )}
-                                {question.aiScore !== null && question.aiScore !== undefined && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[var(--text-muted)]">Điểm AI:</span>
-                                        <span className="font-semibold text-[var(--text-main)]">{question.aiScore}/100</span>
-                                    </div>
-                                )}
-                                {question.aiFeedback?.feedbackVi && (
-                                    <div className="rounded-lg bg-[var(--surface-secondary)] p-3 text-[var(--text-secondary)]">
-                                        {question.aiFeedback.feedbackVi}
-                                    </div>
-                                )}
-                                {!question.isCorrect && suggestedAnswer && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[var(--text-muted)]">Đáp án đúng:</span>
-                                        <span className="text-emerald-500 font-medium">{suggestedAnswer}</span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Explanation */}
-                        {question.explanation && (
-                            <div className="mt-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
-                                <p className="text-xs font-semibold text-blue-500 mb-1">Giải thích</p>
-                                <p className="text-sm text-[var(--text-secondary)]">{question.explanation}</p>
-                            </div>
-                        )}
+            {/* Transcript (collapsible — usually long) */}
+            {question.transcript && (
+                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/30">
+                    <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1">
+                        <Icon name="record_voice_over" size="xs" />
+                        Transcript audio
+                    </summary>
+                    <div className="px-3 pb-3 text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                        {question.transcript}
                     </div>
+                </details>
+            )}
+
+            {/* Question text (if different from statement) */}
+            {question.questionText && question.questionText !== question.statement && (
+                <div className="text-base hanzi">{question.questionText}</div>
+            )}
+
+            {/* Question image */}
+            {question.questionImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={getMediaUrl(question.questionImage)}
+                    alt={`Câu ${questionNumber}`}
+                    className="max-h-48 rounded-lg border border-[var(--border)] object-contain"
+                />
+            )}
+
+            {/* Options with correct/wrong highlighting */}
+            {question.options && question.options.length > 0 && (
+                <div className="space-y-2">
+                    {question.options.map((option, oIdx) => {
+                        const opt = option as unknown as string | HskOption;
+                        const optionText = typeof opt === 'string' ? opt : (opt?.text || '');
+                        const label = (typeof opt === 'object' && opt?.label) || String.fromCharCode(65 + oIdx);
+                        const isUserAnswer = question.userAnswer === label;
+                        const isCorrectAnswer = question.correctAnswer === label;
+
+                        return (
+                            <div
+                                key={oIdx}
+                                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm border ${
+                                    isCorrectAnswer
+                                        ? 'bg-emerald-500/10 border-emerald-500/40'
+                                        : isUserAnswer && !isCorrectAnswer
+                                            ? 'bg-red-500/10 border-red-500/40'
+                                            : 'bg-[var(--surface-secondary)] border-transparent'
+                                }`}
+                            >
+                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                    isCorrectAnswer
+                                        ? 'bg-emerald-500 text-white'
+                                        : isUserAnswer
+                                            ? 'bg-red-500 text-white'
+                                            : 'bg-[var(--border)] text-[var(--text-muted)]'
+                                }`}>
+                                    {label}
+                                </span>
+                                <span className={`flex-1 hanzi ${
+                                    isCorrectAnswer
+                                        ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                                        : isUserAnswer && !isCorrectAnswer
+                                            ? 'text-red-600 dark:text-red-400 line-through'
+                                            : 'text-[var(--text-secondary)]'
+                                }`}>
+                                    {optionText}
+                                </span>
+                                {isCorrectAnswer && <Icon name="check_circle" size="xs" className="text-emerald-500" filled />}
+                                {isUserAnswer && !isCorrectAnswer && <Icon name="cancel" size="xs" className="text-red-500" />}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Text-entry questions */}
+            {(!question.options || question.options.length === 0) && (
+                <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[var(--text-muted)]">Đáp án của bạn:</span>
+                        <span className={question.isCorrect ? 'text-emerald-500 font-medium hanzi' : 'text-red-500 line-through hanzi'}>
+                            {question.userAnswer || '(Không trả lời)'}
+                        </span>
+                    </div>
+                    {question.isCorrect === null && isAiGraded && (
+                        <div className="text-[var(--text-muted)] italic text-xs">
+                            AI chưa chấm câu này. Câu trả lời đã được lưu.
+                        </div>
+                    )}
+                    {question.aiScore !== null && question.aiScore !== undefined && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-[var(--text-muted)]">Điểm AI:</span>
+                            <span className="font-semibold text-[var(--text-main)]">{question.aiScore}/100</span>
+                        </div>
+                    )}
+                    {question.aiFeedback?.feedbackVi && (
+                        <div className="rounded-lg bg-[var(--surface-secondary)] p-3 text-[var(--text-secondary)] leading-relaxed">
+                            {question.aiFeedback.feedbackVi}
+                        </div>
+                    )}
+                    {!question.isCorrect && suggestedAnswer && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[var(--text-muted)]">Đáp án đúng:</span>
+                            <span className="text-emerald-500 font-medium hanzi">{suggestedAnswer}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Explanation */}
+            {question.explanation && (
+                <div className="rounded-lg bg-blue-500/5 border border-blue-500/20 p-3">
+                    <p className="text-xs font-semibold text-blue-500 mb-1 flex items-center gap-1">
+                        <Icon name="lightbulb" size="xs" />
+                        Giải thích
+                    </p>
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                        {question.explanation}
+                    </p>
                 </div>
             )}
         </div>
     );
 }
 
-export default function ExamResultPage() {
+function ExamResultInner() {
     const params = useParams();
     const router = useRouter();
     const { isAuthenticated } = useAuth();
@@ -267,7 +259,6 @@ export default function ExamResultPage() {
             router.push('/login');
             return;
         }
-
         async function load() {
             try {
                 setLoading(true);
@@ -277,13 +268,11 @@ export default function ExamResultPage() {
                     playSfx(data.attempt.is_passed ? 'complete' : 'wrong');
                 }
             } catch (err: unknown) {
-                const message = err instanceof Error ? err.message : 'Failed to load result';
-                setError(message);
+                setError(err instanceof Error ? err.message : 'Failed to load result');
             } finally {
                 setLoading(false);
             }
         }
-
         load();
     }, [attemptId, isAuthenticated, router]);
 
@@ -298,7 +287,6 @@ export default function ExamResultPage() {
         );
     }
 
-    // Defensive: nếu BE trả thiếu attempt hoặc exam, hiện banner thay vì crash
     if (error || !result || !result.attempt || !result.exam || !Array.isArray(result.exam.sections)) {
         return (
             <div className="min-h-screen flex flex-col bg-[var(--background)]">
@@ -319,7 +307,7 @@ export default function ExamResultPage() {
     const timeMinutes = Math.floor(totalTime / 60);
     const timeSeconds = totalTime % 60;
 
-    // Compute section scores — defensive với section.questions có thể null
+    // Section-level scores for the breakdown row above the shell.
     const sectionScores: { type: string; score: number; total: number; correct: number; count: number }[] = [];
     exam.sections.forEach(section => {
         const qs = Array.isArray(section.questions) ? section.questions : [];
@@ -329,82 +317,69 @@ export default function ExamResultPage() {
         sectionScores.push({ type: section.section_type, score, total, correct, count: qs.length });
     });
 
-    // All questions flat for review
-    let questionIndex = 0;
+    // Adapt to the shell's generic ReviewSection<Q> shape. HskResultSection
+    // lacks `groups` (BE doesn't include them in the result payload), so
+    // clusters fall back to "no group" mode automatically — still grouped
+    // visually in the map by section.
+    const sections: ReviewSection<HskResultQuestion>[] = exam.sections.map(s => ({
+        id: s.id,
+        section_type: s.section_type,
+        title: s.title,
+        questions: Array.isArray(s.questions) ? s.questions : [],
+    }));
 
-    return (
-        <div className="min-h-screen flex flex-col bg-[var(--background)]">
-            <Header />
-            <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Back link */}
-                <nav className="flex items-center gap-2 text-sm text-[var(--text-muted)] mb-6">
-                    <Link href="/hsk-test" className="hover:text-[var(--primary)]">Luyện thi HSK</Link>
-                    <Icon name="chevron_right" size="xs" />
-                    <span className="text-[var(--text-main)]">Kết quả</span>
-                </nav>
+    // Map node colors by result state. `current` is handled by the shell.
+    const nodeStatus = (q: HskResultQuestion): NodeStatus => {
+        if (q.isCorrect === null) return 'unanswered';
+        return q.isCorrect ? 'correct' : 'wrong';
+    };
 
-                {/* Score Card */}
-                <div className={`rounded-2xl border-2 p-8 mb-8 ${
-                    passed
-                        ? 'border-emerald-500/30 bg-emerald-500/5'
-                        : 'border-red-500/30 bg-red-500/5'
-                }`}>
-                    <div className="flex flex-col sm:flex-row items-center gap-8">
-                        {/* Score circle */}
-                        <ScoreCircle score={attempt.total_score} maxScore={attempt.max_score} passed={passed} />
-
-                        {/* Score details */}
-                        <div className="flex-1 text-center sm:text-left">
-                            <h1 className="text-2xl font-bold text-[var(--text-main)] mb-1">{exam.title}</h1>
-                            <div className="flex items-center justify-center sm:justify-start gap-2 mb-4">
-                                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold ${
-                                    passed
-                                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                                        : 'bg-red-500/15 text-red-600 dark:text-red-400'
-                                }`}>
-                                    <Icon name={passed ? 'check_circle' : 'cancel'} size="xs" filled />
-                                    {passed ? 'ĐẠT' : 'CHƯA ĐẠT'}
-                                </span>
-                                <span className="text-sm text-[var(--text-muted)]">
-                                    (Cần {exam.passingScore} điểm)
-                                </span>
-                            </div>
-
-                            {/* Stats row */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                <div>
-                                    <p className="text-xs text-[var(--text-muted)] mb-0.5">Đúng</p>
-                                    <p className="text-lg font-bold text-emerald-500">{attempt.correct_count}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-[var(--text-muted)] mb-0.5">Sai</p>
-                                    <p className="text-lg font-bold text-red-500">{attempt.wrong_count}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-[var(--text-muted)] mb-0.5">Bỏ trống</p>
-                                    <p className="text-lg font-bold text-[var(--text-muted)]">{attempt.unanswered_count}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-[var(--text-muted)] mb-0.5">Thời gian</p>
-                                    <p className="text-lg font-bold text-[var(--text-main)]">{timeMinutes}:{timeSeconds.toString().padStart(2, '0')}</p>
-                                </div>
-                            </div>
+    const scoreCard = (
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <div className={`rounded-2xl border-2 p-6 mb-6 ${
+                passed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/30 bg-red-500/5'
+            }`}>
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                    <ScoreCircle score={attempt.total_score} maxScore={attempt.max_score} passed={passed} />
+                    <div className="flex-1 text-center sm:text-left">
+                        <h1 className="text-xl font-bold text-[var(--text-main)] mb-1">{exam.title}</h1>
+                        <div className="flex items-center justify-center sm:justify-start gap-2 mb-3">
+                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold ${
+                                passed
+                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                    : 'bg-red-500/15 text-red-600 dark:text-red-400'
+                            }`}>
+                                <Icon name={passed ? 'check_circle' : 'cancel'} size="xs" filled />
+                                {passed ? 'ĐẠT' : 'CHƯA ĐẠT'}
+                            </span>
+                            <span className="text-sm text-[var(--text-muted)]">
+                                (Cần {exam.passingScore} điểm)
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <Stat label="Đúng" value={attempt.correct_count} valueClass="text-emerald-500" />
+                            <Stat label="Sai" value={attempt.wrong_count} valueClass="text-red-500" />
+                            <Stat label="Bỏ trống" value={attempt.unanswered_count} valueClass="text-[var(--text-muted)]" />
+                            <Stat
+                                label="Thời gian"
+                                value={`${timeMinutes}:${timeSeconds.toString().padStart(2, '0')}`}
+                                valueClass="text-[var(--text-main)]"
+                            />
                         </div>
                     </div>
                 </div>
 
-                {/* Section Breakdown */}
                 {sectionScores.length > 1 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5 pt-5 border-t border-[var(--border)]">
                         {sectionScores.map(section => (
-                            <div key={section.type} className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4">
-                                <div className="flex items-center gap-2 mb-3">
+                            <div key={section.type} className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-3">
+                                <div className="flex items-center gap-2 mb-2">
                                     <Icon name={SECTION_TYPE_ICONS[section.type] || 'quiz'} size="sm" className="text-[var(--text-muted)]" />
                                     <h3 className="text-sm font-semibold text-[var(--text-main)]">
                                         {SECTION_TYPE_LABELS[section.type] || section.type}
                                     </h3>
                                 </div>
-                                <p className="text-2xl font-bold text-[var(--text-main)] mb-1">
+                                <p className="text-xl font-bold text-[var(--text-main)] mb-0.5">
                                     {section.score}<span className="text-sm font-normal text-[var(--text-muted)]">/{section.total}</span>
                                 </p>
                                 <p className="text-xs text-[var(--text-muted)]">
@@ -414,47 +389,82 @@ export default function ExamResultPage() {
                         ))}
                     </div>
                 )}
+            </div>
+        </div>
+    );
 
-                {/* Question Review */}
-                <div className="mb-8">
-                    <h2 className="text-lg font-bold text-[var(--text-main)] mb-4">Chi tiết từng câu</h2>
-                    <div className="space-y-3">
-                        {exam.sections.map(section => (
-                            <div key={section.id}>
-                                {exam.sections.length > 1 && (
-                                    <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2 mt-4">
-                                        {SECTION_TYPE_LABELS[section.section_type] || section.section_type}
-                                        {section.title ? ` - ${section.title}` : ''}
-                                    </h3>
-                                )}
-                                {(Array.isArray(section.questions) ? section.questions : []).map(q => {
-                                    const idx = questionIndex++;
-                                    return <QuestionReview key={q.id} question={q} index={idx} />;
-                                })}
-                            </div>
-                        ))}
-                    </div>
-                </div>
+    const actionButtons = (
+        <div className="flex flex-col sm:flex-row gap-3 mt-6">
+            <Link
+                href={`/hsk-test/${attempt.exam_id}`}
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors"
+            >
+                <Icon name="replay" size="sm" />
+                Thi lại
+            </Link>
+            <Link
+                href={`/hsk-test/${attempt.exam_id}/answers`}
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface-secondary)] transition-colors"
+            >
+                <Icon name="task_alt" size="sm" />
+                Xem đáp án đầy đủ
+            </Link>
+            <Link
+                href="/hsk-test"
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface-secondary)] transition-colors"
+            >
+                <Icon name="list" size="sm" />
+                Danh sách đề thi
+            </Link>
+        </div>
+    );
 
-                {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row gap-3 mb-8">
-                    <Link
-                        href={`/hsk-test/${attempt.exam_id}`}
-                        className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition-colors"
-                    >
-                        <Icon name="replay" size="sm" />
-                        Thi lại
-                    </Link>
-                    <Link
-                        href="/hsk-test"
-                        className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-medium bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface-secondary)] transition-colors"
-                    >
-                        <Icon name="list" size="sm" />
-                        Danh sách đề thi
-                    </Link>
-                </div>
-            </main>
+    return (
+        <div className="min-h-screen flex flex-col bg-[var(--background)]">
+            <Header />
+
+            <ExamReviewShell<HskResultQuestion>
+                title={exam.title}
+                hskLevel={exam.hskLevel}
+                subtitle="Kết quả bài làm"
+                breadcrumb={[
+                    { href: '/hsk-test', label: 'Luyện thi HSK' },
+                    { label: 'Kết quả' },
+                ]}
+                sections={sections}
+                nodeStatus={nodeStatus}
+                headerSlot={scoreCard}
+                footerSlot={actionButtons}
+                renderQuestion={(q, info) => {
+                    const isSectionFirst = info.section.questions[0]?.id === q.id;
+                    return (
+                        <ResultQuestionBody
+                            question={q}
+                            questionNumber={info.questionNumber}
+                            sectionInstructions={isSectionFirst ? info.section.instructions : undefined}
+                        />
+                    );
+                }}
+            />
+
             <Footer />
         </div>
+    );
+}
+
+function Stat({ label, value, valueClass }: { label: string; value: number | string; valueClass: string }) {
+    return (
+        <div>
+            <p className="text-xs text-[var(--text-muted)] mb-0.5">{label}</p>
+            <p className={`text-lg font-bold ${valueClass}`}>{value}</p>
+        </div>
+    );
+}
+
+export default function ExamResultPage() {
+    return (
+        <HskTestProvider>
+            <ExamResultInner />
+        </HskTestProvider>
     );
 }

@@ -2173,3 +2173,220 @@ export async function adminDeleteGrammarQuiz(id: number): Promise<void> {
     });
     if (!res.ok) throw new Error(await readAdminError(res, 'Không xóa được câu hỏi'));
 }
+
+// ============================================================
+// Pronunciation Lab (Phòng phát âm)
+// ============================================================
+
+export interface PinyinChartData {
+    initials: string[];
+    finals: string[];
+    valid: Record<string, string[]>;
+}
+
+export interface SyllableAudio {
+    audio_url: string;
+    provider: 'cache' | 'forvo' | 'edge_tts';
+}
+
+export interface MinimalPair {
+    id: number;
+    group_label: string;
+    syllable_a: string;
+    syllable_b: string;
+    char_a: string | null;
+    char_b: string | null;
+    audio_a: string | null;
+    audio_b: string | null;
+    difficulty: number;
+    hint_vi: string | null;
+}
+
+export interface PronunciationSrsRow {
+    syllable: string;
+    times_seen: number;
+    times_correct: number;
+    best_score: number;
+    interval_days: number;
+    repetitions: number;
+    next_review: string | null;
+    last_reviewed: string | null;
+}
+
+export interface PronunciationStats {
+    overall: {
+        total_syllables?: number;
+        mastered?: number;
+        avg_best_score?: number;
+    };
+    byDrill: Array<{
+        drill_type: string;
+        attempts: number;
+        correct: number;
+        avg_score: number | null;
+    }>;
+}
+
+export interface ToneTrainerResult {
+    score: number;
+    tone: number;
+    syllable: string;
+    user_contour: number[];
+    native_contour: number[] | null;
+    template_contour: number[];
+    feedback_vi: string;
+    srs: { next_review_at: string | null; interval_days: number };
+}
+
+/** GET /api/pronunciation/pinyin-chart */
+export async function fetchPinyinChart(): Promise<PinyinChartData> {
+    const res = await authFetch(`${API_BASE_URL}/api/pronunciation/pinyin-chart`);
+    if (!res.ok) throw new Error('Không tải được bảng pinyin.');
+    const data = await res.json();
+    return data.data;
+}
+
+/** GET /api/pronunciation/audio?syllable=ma3 — returns playable URL */
+export async function fetchSyllableAudio(syllable: string): Promise<SyllableAudio> {
+    const url = `${API_BASE_URL}/api/pronunciation/audio?syllable=${encodeURIComponent(syllable)}`;
+    const res = await authFetch(url);
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Không lấy được audio.');
+    }
+    const data = await res.json();
+    // BE returns a path relative to its origin; absolutise so <audio src=…> works.
+    const audio_url = data.data.audio_url?.startsWith('http')
+        ? data.data.audio_url
+        : `${API_BASE_URL}${data.data.audio_url}`;
+    return { ...data.data, audio_url };
+}
+
+/** GET /api/pronunciation/minimal-pairs?level=N&limit=M */
+export async function fetchMinimalPairs(level?: number, limit = 30): Promise<MinimalPair[]> {
+    const params = new URLSearchParams();
+    if (level !== undefined) params.set('level', String(level));
+    params.set('limit', String(limit));
+    const res = await authFetch(`${API_BASE_URL}/api/pronunciation/minimal-pairs?${params.toString()}`);
+    if (!res.ok) throw new Error('Không tải được cặp từ.');
+    const data = await res.json();
+    return (data.data || []).map((p: MinimalPair) => ({
+        ...p,
+        audio_a: p.audio_a && !p.audio_a.startsWith('http') ? `${API_BASE_URL}${p.audio_a}` : p.audio_a,
+        audio_b: p.audio_b && !p.audio_b.startsWith('http') ? `${API_BASE_URL}${p.audio_b}` : p.audio_b,
+    }));
+}
+
+/** GET /api/pronunciation/due */
+export async function fetchDueSyllables(limit = 20): Promise<PronunciationSrsRow[]> {
+    const res = await authFetch(`${API_BASE_URL}/api/pronunciation/due?limit=${limit}`);
+    if (!res.ok) throw new Error('Không lấy được danh sách ôn.');
+    const data = await res.json();
+    return data.data || [];
+}
+
+/** GET /api/pronunciation/stats */
+export async function fetchPronunciationStats(): Promise<PronunciationStats> {
+    const res = await authFetch(`${API_BASE_URL}/api/pronunciation/stats`);
+    if (!res.ok) throw new Error('Không lấy được thống kê.');
+    const data = await res.json();
+    return data.data;
+}
+
+/** POST /api/pronunciation/tone-trainer — multipart audio */
+export async function submitToneTrainer(params: {
+    audio: Blob;
+    syllable: string;
+    tone: number;
+    referenceUrl?: string;
+    nativeContour?: number[];
+}): Promise<ToneTrainerResult> {
+    const form = new FormData();
+    form.append('audio', params.audio, 'recording.wav');
+    form.append('syllable', params.syllable);
+    form.append('tone', String(params.tone));
+    if (params.referenceUrl) form.append('referenceUrl', params.referenceUrl);
+    if (params.nativeContour) form.append('nativeContour', JSON.stringify(params.nativeContour));
+
+    const res = await authFetch(`${API_BASE_URL}/api/pronunciation/tone-trainer`, {
+        method: 'POST',
+        body: form,
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Lỗi chấm tone.');
+    }
+    const data = await res.json();
+    return data.data;
+}
+
+/** POST /api/pronunciation/tone-match */
+export async function submitToneMatch(params: {
+    syllable: string;
+    picked: number;
+    correct: number;
+}): Promise<{ correct: boolean; picked: number; expected: number }> {
+    const res = await authFetch(`${API_BASE_URL}/api/pronunciation/tone-match`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Lỗi ghi kết quả.');
+    }
+    const data = await res.json();
+    return data.data;
+}
+
+/** POST /api/pronunciation/shadow — multipart audio */
+export async function submitShadow(params: {
+    audio: Blob;
+    syllable: string;
+    tone?: number;
+    playbackRate?: number;
+    referenceUrl?: string;
+}): Promise<{ score: number; voiced_frames: number; playback_rate: number }> {
+    const form = new FormData();
+    form.append('audio', params.audio, 'recording.wav');
+    form.append('syllable', params.syllable);
+    if (params.tone) form.append('tone', String(params.tone));
+    if (params.playbackRate) form.append('playbackRate', String(params.playbackRate));
+    if (params.referenceUrl) form.append('referenceUrl', params.referenceUrl);
+
+    const res = await authFetch(`${API_BASE_URL}/api/pronunciation/shadow`, {
+        method: 'POST',
+        body: form,
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Lỗi shadow.');
+    }
+    const data = await res.json();
+    return data.data;
+}
+
+/** POST /api/pronunciation/minimal-pair */
+export async function submitMinimalPair(params: {
+    pairId: number;
+    picked: 'A' | 'B';
+    correct: 'A' | 'B';
+}): Promise<{
+    correct: boolean;
+    picked: 'A' | 'B';
+    expected: 'A' | 'B';
+    char_correct: string | null;
+    hint_vi: string | null;
+}> {
+    const res = await authFetch(`${API_BASE_URL}/api/pronunciation/minimal-pair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Lỗi ghi kết quả.');
+    }
+    const data = await res.json();
+    return data.data;
+}

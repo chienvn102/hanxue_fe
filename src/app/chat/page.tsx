@@ -9,6 +9,7 @@ import { sendChatMessage, fetchChatUsage, transcribeAudio, synthesizeSpeech } fr
 import { isRecordingSupported, requestMicPermission, startRecording } from '@/lib/audioRecorder';
 import PracticePanel from '@/components/PracticePanel';
 import { RealtimePanel } from '@/components/chat/RealtimePanel';
+import { PronunciationLab } from '@/components/chat/PronunciationLab';
 import Link from 'next/link';
 
 
@@ -38,6 +39,7 @@ const TUTOR = {
     chat: { name: '小明', pinyin: 'Xiǎo Míng', avatar: '明', color: 'bg-emerald-500/10 text-emerald-600' },
     conversation: { name: 'GPT Realtime', pinyin: 'Realtime voice', avatar: 'AI', color: 'bg-rose-500/10 text-rose-600' },
     practice: { name: '老师', pinyin: 'Lǎo shī', avatar: '师', color: 'bg-blue-500/10 text-blue-600' },
+    lab: { name: 'Phòng phát âm', pinyin: 'Yīn jié shì', avatar: '音', color: 'bg-violet-500/10 text-violet-600' },
 } as const;
 
 export default function ChatPage() {
@@ -49,7 +51,7 @@ export default function ChatPage() {
     const [remaining, setRemaining] = useState<number | null>(null);
     const [usageLimit, setUsageLimit] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [mode, setMode] = useState<'chat' | 'conversation' | 'practice'>('chat');
+    const [mode, setMode] = useState<'chat' | 'conversation' | 'practice' | 'lab'>('chat');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const sendingRef = useRef(false);
@@ -170,8 +172,8 @@ export default function ChatPage() {
         const messageText = (text || input).trim();
         if (!messageText || sendingRef.current) return;
 
-        // Practice mode doesn't use sendChatMessage
-        if (mode === 'practice') return;
+        // Practice & Lab modes don't use sendChatMessage
+        if (mode === 'practice' || mode === 'lab') return;
 
         sendingRef.current = true;
 
@@ -308,7 +310,7 @@ export default function ChatPage() {
     }, []);
 
     // --- Mode switch ---
-    const switchMode = useCallback((newMode: 'chat' | 'conversation' | 'practice') => {
+    const switchMode = useCallback((newMode: 'chat' | 'conversation' | 'practice' | 'lab') => {
         if (newMode === mode) return;
         recorderRef.current?.cancel();
         stopTtsAudio();
@@ -374,7 +376,9 @@ export default function ChatPage() {
                                     ? `Gia sư ${tutor.name} (${tutor.pinyin})`
                                     : mode === 'conversation'
                                         ? 'Hội thoại trực tiếp bằng GPT Realtime'
-                                        : `Giáo viên ${tutor.name} (${tutor.pinyin})`
+                                        : mode === 'lab'
+                                            ? 'Luyện tone, shadow, minimal pairs & bảng pinyin'
+                                            : `Giáo viên ${tutor.name} (${tutor.pinyin})`
                                 } &middot; HSK {user?.targetHsk || 1}
                             </p>
                         </div>
@@ -415,6 +419,17 @@ export default function ChatPage() {
                             <Icon name="record_voice_over" size="xs" className="mr-1 align-middle" />
                             Luyện phát âm
                         </button>
+                        <button
+                            onClick={() => switchMode('lab')}
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                mode === 'lab'
+                                    ? 'bg-[var(--primary)] text-white'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--surface)]'
+                            }`}
+                        >
+                            <Icon name="graphic_eq" size="xs" className="mr-1 align-middle" />
+                            Phòng phát âm
+                        </button>
                     </div>
                 </div>
 
@@ -444,6 +459,10 @@ export default function ChatPage() {
                                 console.log('Practice completed:', result);
                             }}
                         />
+                    </div>
+                ) : mode === 'lab' ? (
+                    <div className="flex-1 rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-3 sm:p-4 mb-4 min-h-[400px]">
+                        <PronunciationLab />
                     </div>
                 ) : (
                     <>
