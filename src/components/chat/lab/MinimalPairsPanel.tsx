@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { applyToneMark } from '@/lib/pinyinChart';
-import { fetchMinimalPairs, submitMinimalPair, type MinimalPair } from '@/lib/api';
+import { fetchMinimalPairs, fetchSyllableAudio, submitMinimalPair, type MinimalPair } from '@/lib/api';
 import { playOnce } from '@/lib/audioPlayer';
 
 export function MinimalPairsPanel() {
@@ -33,18 +33,36 @@ export function MinimalPairsPanel() {
         setFeedback(null);
     }, [current]);
 
+    // Lazy-resolve audio for the picked side. listMinimalPairs only returns
+    // cached URLs (to avoid spawning 60 TTS subprocesses per page-load); on
+    // cache miss we resolve on demand here.
+    const resolveAndPlay = useCallback(async (pair: MinimalPair, side: 'A' | 'B') => {
+        const syllable = side === 'A' ? pair.syllable_a : pair.syllable_b;
+        const cachedUrl = side === 'A' ? pair.audio_a : pair.audio_b;
+        try {
+            const url = cachedUrl || (await fetchSyllableAudio(syllable)).audio_url;
+            // Cache the resolved URL on the pair so replay/round doesn't re-fetch.
+            if (!cachedUrl) {
+                setPairs(prev => prev.map(p => p.id === pair.id
+                    ? { ...p, [side === 'A' ? 'audio_a' : 'audio_b']: url }
+                    : p));
+            }
+            playOnce(url);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Lỗi audio');
+        }
+    }, []);
+
     // Auto-play target on round start
     useEffect(() => {
         if (!current || !target) return;
-        const url = target === 'A' ? current.audio_a : current.audio_b;
-        if (url) playOnce(url);
-    }, [current, target]);
+        resolveAndPlay(current, target);
+    }, [current, target, resolveAndPlay]);
 
     const replay = useCallback(() => {
         if (!current || !target) return;
-        const url = target === 'A' ? current.audio_a : current.audio_b;
-        if (url) playOnce(url);
-    }, [current, target]);
+        resolveAndPlay(current, target);
+    }, [current, target, resolveAndPlay]);
 
     const pick = useCallback(async (side: 'A' | 'B') => {
         if (!current || !target || picked !== null) return;

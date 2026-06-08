@@ -12,6 +12,10 @@ import { RealtimePanel } from '@/components/chat/RealtimePanel';
 import { PronunciationLab } from '@/components/chat/PronunciationLab';
 import Link from 'next/link';
 
+// Feature flag: tạm tắt tab "Phòng phát âm" cho tới khi server có RAM headroom
+// (Edge TTS subprocess gây OOM trên droplet 1GB). Bật lại: đổi sang `true`.
+const ENABLE_PRONUNCIATION_LAB = false;
+
 
 
 interface Message {
@@ -419,17 +423,19 @@ export default function ChatPage() {
                             <Icon name="record_voice_over" size="xs" className="mr-1 align-middle" />
                             Luyện phát âm
                         </button>
-                        <button
-                            onClick={() => switchMode('lab')}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                                mode === 'lab'
-                                    ? 'bg-[var(--primary)] text-white'
-                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--surface)]'
-                            }`}
-                        >
-                            <Icon name="graphic_eq" size="xs" className="mr-1 align-middle" />
-                            Phòng phát âm
-                        </button>
+                        {ENABLE_PRONUNCIATION_LAB && (
+                            <button
+                                onClick={() => switchMode('lab')}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                                    mode === 'lab'
+                                        ? 'bg-[var(--primary)] text-white'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--surface)]'
+                                }`}
+                            >
+                                <Icon name="graphic_eq" size="xs" className="mr-1 align-middle" />
+                                Phòng phát âm
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -460,7 +466,7 @@ export default function ChatPage() {
                             }}
                         />
                     </div>
-                ) : mode === 'lab' ? (
+                ) : mode === 'lab' && ENABLE_PRONUNCIATION_LAB ? (
                     <div className="flex-1 rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-3 sm:p-4 mb-4 min-h-[400px]">
                         <PronunciationLab />
                     </div>
