@@ -16,6 +16,7 @@ export default function PracticePanel({ hskLevel, onPracticeComplete }: Practice
     const [isProcessing, setIsProcessing] = useState(false);
     const [isPlayingSample, setIsPlayingSample] = useState(false);
     const [isPlayingFeedback, setIsPlayingFeedback] = useState(false);
+    const [sampleRate, setSampleRate] = useState(1);   // 1x | 0.5x nghe chậm
     const [result, setResult] = useState<PronunciationResult | null>(null);
 
     const recorderRef = useRef<{ stop: () => Promise<Blob>; cancel: () => void } | null>(null);
@@ -63,15 +64,23 @@ export default function PracticePanel({ hskLevel, onPracticeComplete }: Practice
         }
     }, [hskLevel]);
 
-    // Play sample audio
-    const playSample = useCallback(async () => {
+    // Play sample audio. `rate` cho phép nghe chậm (0.5x) để bắt rõ thanh điệu.
+    const playSample = useCallback(async (rate?: number) => {
         if (!practiceText || isPlayingSample) return;
+        const playbackRate = rate ?? sampleRate;
 
         try {
             setIsPlayingSample(true);
             const audioBlob = await synthesizeSpeech(practiceText.text);
             const audioUrl = URL.createObjectURL(audioBlob);
             const audio = new Audio(audioUrl);
+            audio.playbackRate = playbackRate;
+            // preservesPitch=false giữ formant tự nhiên hơn khi chậm (Safari: webkit prefix)
+            type PitchAudio = HTMLAudioElement & { preservesPitch?: boolean; mozPreservesPitch?: boolean; webkitPreservesPitch?: boolean };
+            const pa = audio as PitchAudio;
+            pa.preservesPitch = true;
+            pa.mozPreservesPitch = true;
+            pa.webkitPreservesPitch = true;
             sampleAudioRef.current = audio;
 
             audio.onended = () => {
@@ -91,7 +100,7 @@ export default function PracticePanel({ hskLevel, onPracticeComplete }: Practice
             console.error('Failed to play sample:', error);
             setIsPlayingSample(false);
         }
-    }, [practiceText, isPlayingSample]);
+    }, [practiceText, isPlayingSample, sampleRate]);
 
     // Play feedback audio from text (for auto-play after assessment)
     const playFeedbackAudio = useCallback(async (feedbackText: string) => {
@@ -289,15 +298,26 @@ export default function PracticePanel({ hskLevel, onPracticeComplete }: Practice
                         </div>
                     )}
 
-                    {/* Play sample button */}
-                    <button
-                        onClick={playSample}
-                        disabled={isPlayingSample || isRecording || isProcessing}
-                        className="mt-3 w-full py-2 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors disabled:opacity-50"
-                    >
-                        <Icon name={isPlayingSample ? 'volume_up' : 'play_circle'} size="sm" className="mr-2" />
-                        {isPlayingSample ? 'Đang nghe mẫu...' : 'Nghe mẫu'}
-                    </button>
+                    {/* Play sample buttons — 1x + 0.5x (nghe chậm bắt rõ thanh điệu) */}
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                            onClick={() => { setSampleRate(1); playSample(1); }}
+                            disabled={isPlayingSample || isRecording || isProcessing}
+                            className="py-2 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                        >
+                            <Icon name={isPlayingSample ? 'volume_up' : 'play_circle'} size="sm" />
+                            Nghe mẫu
+                        </button>
+                        <button
+                            onClick={() => { setSampleRate(0.5); playSample(0.5); }}
+                            disabled={isPlayingSample || isRecording || isProcessing}
+                            className="py-2 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                            title="Nghe chậm 0.5x để bắt rõ thanh điệu"
+                        >
+                            <Icon name="slow_motion_video" size="sm" />
+                            Chậm 0.5x
+                        </button>
+                    </div>
                 </div>
             )}
 

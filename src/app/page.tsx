@@ -277,8 +277,8 @@ export default function HomePage() {
                           {v.simplified}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm text-[var(--primary)] truncate">{v.pinyin}</div>
-                          <div className="text-sm text-[var(--text-secondary)] truncate">
+                          <div className="text-sm font-semibold text-[var(--primary)] truncate">{v.pinyin}</div>
+                          <div className="text-sm text-[var(--text-main)] truncate">
                             {v.meaningVi}
                           </div>
                         </div>
