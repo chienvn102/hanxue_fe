@@ -780,6 +780,31 @@ export async function fetchLearningStats(): Promise<LearningStats> {
     return res.json();
 }
 
+export interface TodayGoal {
+    todayXp: number;
+    wordsReviewed: number;
+    wordsLearned: number;
+    studyMins: number;
+    testsTaken: number;
+    currentStreak: number;
+    dailyGoalMins: number;
+    goalPercent: number;
+    goalMet: boolean;
+}
+
+/**
+ * Get TODAY's activity for the "Mục tiêu hôm nay" panel (daily_activity-based;
+ * SRS removed in HF4 so there is no due-card count).
+ */
+export async function fetchTodayGoal(): Promise<TodayGoal> {
+    const res = await authFetch(`${API_BASE_URL}/api/progress/today`);
+    if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized');
+        throw new Error('Failed to fetch today activity');
+    }
+    return res.json();
+}
+
 /**
  * Submit a flashcard review result.
  * @param vocabId - Vocabulary ID

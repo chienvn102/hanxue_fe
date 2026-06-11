@@ -27,6 +27,7 @@ const SECONDARY_NAV: NavItem[] = [
     { href: '/', label: 'Trang chủ', icon: 'home' },
     { href: '/grammar', label: 'Ngữ pháp', icon: 'auto_stories' },
     { href: '/leaderboard', label: 'Xếp hạng', icon: 'emoji_events' },
+    { href: '/achievements', label: 'Thành tích', icon: 'military_tech' },
     { href: '/chat', label: 'Học cùng AI', icon: 'smart_toy' },
 ];
 

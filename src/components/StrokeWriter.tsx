@@ -70,11 +70,31 @@ export default function StrokeWriter({
     onComplete,
 }: StrokeWriterProps) {
     const containerRef = useRef<HTMLDivElement>(null);
+    const rootRef = useRef<HTMLDivElement>(null);
     const writerRef = useRef<any>(null);
     const strokeCountRef = useRef<number>(0);
     const [isAnimating, setIsAnimating] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [quizRunning, setQuizRunning] = useState(false);
+    // Auto-fit (responsive): render ở min(size, bề rộng khả dụng) để không tràn
+    // trên màn nhỏ (vd iPhone SE 320px). HanziWriter dùng toạ độ px nên ta đổi
+    // kích thước render thật thay vì scale CSS (svg không có viewBox).
+    const [renderSize, setRenderSize] = useState(size);
+
+    useEffect(() => {
+        const root = rootRef.current;
+        if (!root) return;
+        const apply = () => {
+            const avail = Math.floor(root.clientWidth);
+            const next = Math.max(120, Math.min(size, avail || size));
+            setRenderSize(prev => (prev === next ? prev : next));
+        };
+        apply();
+        if (typeof ResizeObserver === 'undefined') return;
+        const ro = new ResizeObserver(apply);
+        ro.observe(root);
+        return () => ro.disconnect();
+    }, [size]);
 
     // If stage is set it overrides legacy mode. Otherwise compute config from mode.
     const cfg = stage !== undefined
@@ -97,8 +117,8 @@ export default function StrokeWriter({
 
         try {
             const writer = HanziWriter.create(container, character, {
-                width: size,
-                height: size,
+                width: renderSize,
+                height: renderSize,
                 padding: 5,
                 showOutline: cfg.showOutline,
                 showCharacter: cfg.showCharacter,
@@ -124,7 +144,7 @@ export default function StrokeWriter({
             container.innerHTML = '';
             writerRef.current = null;
         };
-    }, [character, size, strokeColor, mode]);
+    }, [character, renderSize, strokeColor, mode]);
 
     const startQuiz = () => {
         const writer = writerRef.current;
@@ -201,10 +221,10 @@ export default function StrokeWriter({
 
     if (!character) {
         return (
-            <div className={`stroke-writer ${className}`}>
+            <div ref={rootRef} className={`stroke-writer ${className}`} style={{ width: size, maxWidth: '100%' }}>
                 <div
-                    className="flex items-center justify-center bg-white rounded-lg"
-                    style={{ width: size, height: size, border: '2px solid #d1d5db' }}
+                    className="flex items-center justify-center bg-white rounded-lg mx-auto"
+                    style={{ width: renderSize, height: renderSize, border: '2px solid #d1d5db' }}
                 >
                     <span className="text-gray-400 text-xs">--</span>
                 </div>
@@ -213,21 +233,21 @@ export default function StrokeWriter({
     }
 
     return (
-        <div className={`stroke-writer ${className}`}>
+        <div ref={rootRef} className={`stroke-writer ${className}`} style={{ width: size, maxWidth: '100%' }}>
             <div
-                className="relative bg-white rounded-lg overflow-hidden"
-                style={{ width: size, height: size, border: '2px solid #d1d5db' }}
+                className="relative bg-white rounded-lg overflow-hidden mx-auto"
+                style={{ width: renderSize, height: renderSize, border: '2px solid #d1d5db' }}
             >
                 <svg
                     className="absolute inset-0 pointer-events-none"
-                    width={size}
-                    height={size}
+                    width={renderSize}
+                    height={renderSize}
                     style={{ zIndex: 0 }}
                 >
-                    <line x1="0" y1={size / 2} x2={size} y2={size / 2} stroke="#e5e7eb" strokeWidth="1" />
-                    <line x1={size / 2} y1="0" x2={size / 2} y2={size} stroke="#e5e7eb" strokeWidth="1" />
-                    <line x1="0" y1="0" x2={size} y2={size} stroke="#f3f4f6" strokeWidth="1" />
-                    <line x1={size} y1="0" x2="0" y2={size} stroke="#f3f4f6" strokeWidth="1" />
+                    <line x1="0" y1={renderSize / 2} x2={renderSize} y2={renderSize / 2} stroke="#e5e7eb" strokeWidth="1" />
+                    <line x1={renderSize / 2} y1="0" x2={renderSize / 2} y2={renderSize} stroke="#e5e7eb" strokeWidth="1" />
+                    <line x1="0" y1="0" x2={renderSize} y2={renderSize} stroke="#f3f4f6" strokeWidth="1" />
+                    <line x1={renderSize} y1="0" x2="0" y2={renderSize} stroke="#f3f4f6" strokeWidth="1" />
                 </svg>
                 <div ref={containerRef} className="absolute inset-0" style={{ zIndex: 1 }} />
             </div>

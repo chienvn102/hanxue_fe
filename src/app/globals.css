@@ -33,6 +33,13 @@
   --success: #10B981;
   --error: #EF4444;
   --warning: #F59E0B;
+
+  /* Motion tokens (compositor-friendly only: transform / opacity) */
+  --dur-fast: 150ms;
+  --dur-normal: 280ms;
+  --dur-slow: 500ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Dark Mode */
@@ -93,6 +100,10 @@ body {
   font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
   line-height: 1.6;
   transition: background-color 0.2s ease, color 0.2s ease;
+  /* Auto-fit safety net (Ý4d): chặn tràn ngang ngoài ý muốn trên màn nhỏ.
+     Dùng `clip` (không phải `hidden`) để KHÔNG tạo scroll-container → sticky
+     header vẫn hoạt động. */
+  overflow-x: clip;
 }
 
 /* ===== CHINESE TEXT STYLING ===== */
@@ -428,4 +439,79 @@ body {
 }
 .animate-shake {
   animation: shake 0.3s ease-in-out;
+}
+
+/* ===== SCROLL REVEAL (Ý4a — chỉ thêm chuyển động, KHÔNG đổi layout) =====
+   Phần tử mang class `reveal` bắt đầu ẩn (opacity 0 + dịch nhẹ) và hiện ra khi
+   IntersectionObserver thêm `is-visible`. App là CSR/Next nên luôn có JS; nếu
+   user bật prefers-reduced-motion thì guard cuối file ép hiện ngay, không animate. */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity var(--dur-slow) var(--ease-out),
+              transform var(--dur-slow) var(--ease-out);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  will-change: auto;
+}
+/* Stagger: dùng style={{ '--reveal-i': n }} để các item nối tiếp nhau. */
+.reveal[style*="--reveal-i"] {
+  transition-delay: calc(var(--reveal-i) * 55ms);
+}
+
+/* Fade + slide-up tiện dụng cho mount (modal/sheet/panel) */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up var(--dur-normal) var(--ease-out);
+}
+@keyframes pop-in {
+  0%   { opacity: 0; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-pop-in {
+  animation: pop-in var(--dur-normal) var(--ease-spring);
+}
+
+/* Hover lift dùng cho card/tile (chỉ transform + shadow, không layout) */
+.hover-lift {
+  transition: transform var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+}
+.dark .hover-lift:hover {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+.hover-lift:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+/* ===== REDUCED MOTION GUARD (WCAG / ECC rule) =====
+   Tắt mọi chuyển động khi user yêu cầu; nội dung hiện đầy đủ ngay lập tức. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .hover-lift:hover,
+  .hover-lift:active {
+    transform: none !important;
+  }
 }

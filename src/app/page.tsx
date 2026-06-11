@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { Reveal } from '@/components/ui/Reveal';
 import { VocabCard } from '@/components/VocabCard';
 import { playAudio, fetchProfile, fetchSavedVocabIds, toggleSaveVocab } from '@/lib/api';
 import { useAuth } from '@/components/AuthContext';
@@ -310,7 +311,7 @@ export default function HomePage() {
           {/* Main Content */}
           <div className="flex-1 flex flex-col gap-10">
             {/* HSK Levels */}
-            <div>
+            <Reveal>
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold text-[var(--text-main)] flex items-center gap-2">
                   <Icon name="school" className="text-[var(--primary)]" />
@@ -343,10 +344,10 @@ export default function HomePage() {
                   );
                 })}
               </div>
-            </div>
+            </Reveal>
 
             {/* Featured Vocabulary */}
-            <div>
+            <Reveal>
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold text-[var(--text-main)] flex items-center gap-2">
                   <Icon name="star" className="text-[var(--primary)]" />
@@ -377,7 +378,7 @@ export default function HomePage() {
                   ))}
                 </div>
               )}
-            </div>
+            </Reveal>
           </div>
 
           {/* Sidebar */}
