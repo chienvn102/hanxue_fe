@@ -52,7 +52,6 @@ export default function AdminUsersPage() {
 
     const [search, setSearch] = useState('');
     const [hsk, setHsk] = useState('');
-    const [role, setRole] = useState('');
     const [sort, setSort] = useState('created_at_desc');
     const [page, setPage] = useState(1);
 
@@ -63,7 +62,6 @@ export default function AdminUsersPage() {
             const qs = new URLSearchParams({ page: String(page), limit: '20', sort });
             if (search.trim()) qs.set('search', search.trim());
             if (hsk) qs.set('hsk', hsk);
-            if (role) qs.set('role', role);
             const res = await fetch(`${API_BASE}/api/admin/users?${qs}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -75,7 +73,7 @@ export default function AdminUsersPage() {
         } finally {
             setLoading(false);
         }
-    }, [token, page, sort, search, hsk, role]);
+    }, [token, page, sort, search, hsk]);
 
     useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
@@ -94,7 +92,7 @@ export default function AdminUsersPage() {
     };
 
     const clearFilters = () => {
-        setSearch(''); setHsk(''); setRole(''); setSort('created_at_desc'); setPage(1);
+        setSearch(''); setHsk(''); setSort('created_at_desc'); setPage(1);
     };
 
     return (
@@ -154,15 +152,6 @@ export default function AdminUsersPage() {
                 >
                     <option value="">Tất cả HSK</option>
                     {HSK_LEVELS.map(n => <option key={n} value={n}>HSK {n}</option>)}
-                </select>
-                <select
-                    value={role}
-                    onChange={e => { setRole(e.target.value); setPage(1); }}
-                    className="px-3 py-2 border rounded-lg bg-[var(--surface-secondary)] text-[var(--text-main)]"
-                >
-                    <option value="">Tất cả vai trò</option>
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
                 </select>
                 <select
                     value={sort}

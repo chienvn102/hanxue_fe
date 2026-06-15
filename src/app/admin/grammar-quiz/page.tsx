@@ -14,7 +14,6 @@ import {
     type Grammar,
     type AdminGrammarQuizQuestion,
     type AdminGrammarQuizPayload,
-    type GrammarQuizQuestionType,
 } from '@/lib/api';
 
 const HSK_LEVELS = [1, 2, 3, 4, 5, 6];
@@ -27,34 +26,27 @@ const HSK_COLORS: Record<number, string> = {
     6: 'bg-purple-500',
 };
 
-const TYPE_OPTIONS: { value: GrammarQuizQuestionType; label: string }[] = [
-    { value: 'multiple_choice', label: 'Chọn đáp án đúng' },
-    { value: 'fill_blank', label: 'Điền chỗ trống' },
-    { value: 'error_identify', label: 'Tìm câu đúng / lỗi sai' },
-    { value: 'sentence_order', label: 'Sắp xếp thứ tự' },
-];
-
-const TYPE_LABEL: Record<string, string> =
-    Object.fromEntries(TYPE_OPTIONS.map(o => [o.value, o.label]));
+const TYPE_LABEL: Record<string, string> = {
+    multiple_choice: 'Chọn đáp án đúng',
+    fill_blank: 'Điền chỗ trống',
+    error_identify: 'Tìm câu đúng / lỗi sai',
+    sentence_order: 'Sắp xếp thứ tự',
+};
 
 interface FormState {
     grammar_pattern_id: number | '';
-    question_type: GrammarQuizQuestionType;
     question_text: string;
     options: [string, string, string, string];
     correct_index: number; // 0..3
     explanation: string;
-    points: number;
 }
 
 const EMPTY_FORM: FormState = {
     grammar_pattern_id: '',
-    question_type: 'multiple_choice',
     question_text: '',
     options: ['', '', '', ''],
     correct_index: 0,
     explanation: '',
-    points: 1,
 };
 
 function GrammarQuizAdminInner() {
@@ -87,9 +79,28 @@ function GrammarQuizAdminInner() {
     const [form, setForm] = useState<FormState>(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
+    const [grammarSearchText, setGrammarSearchText] = useState('');
+    const [grammarPickerHsk, setGrammarPickerHsk] = useState('');
 
     // ----- Toast / inline error -----
     const [pageError, setPageError] = useState('');
+
+    const grammarPickerOptions = useMemo(() => {
+        const needle = grammarSearchText.trim().toLowerCase();
+        const filtered = grammars.filter(g => {
+            if (grammarPickerHsk && String(g.hskLevel) !== grammarPickerHsk) return false;
+            if (!needle) return true;
+            return [
+                g.grammarPoint,
+                g.patternFormula,
+                String(g.id),
+            ].some(v => String(v || '').toLowerCase().includes(needle));
+        });
+
+        const current = form.grammar_pattern_id ? grammarById.get(Number(form.grammar_pattern_id)) : undefined;
+        if (current && !filtered.some(g => g.id === current.id)) return [current, ...filtered];
+        return filtered;
+    }, [form.grammar_pattern_id, grammarById, grammarPickerHsk, grammarSearchText, grammars]);
 
     const loadGrammars = useCallback(async () => {
         try {
@@ -135,6 +146,8 @@ function GrammarQuizAdminInner() {
             ...EMPTY_FORM,
             grammar_pattern_id: grammarFilter || '',
         });
+        setGrammarSearchText('');
+        setGrammarPickerHsk(hskFilter ? String(hskFilter) : '');
         setFormError('');
         setModalOpen(true);
     };
@@ -145,13 +158,13 @@ function GrammarQuizAdminInner() {
         setEditingId(q.id);
         setForm({
             grammar_pattern_id: q.grammar_pattern_id,
-            question_type: q.question_type,
             question_text: q.question_text,
             options: [opts[0] || '', opts[1] || '', opts[2] || '', opts[3] || ''],
             correct_index: correctIdx,
             explanation: q.explanation || '',
-            points: q.points,
         });
+        setGrammarSearchText('');
+        setGrammarPickerHsk(String(q.hsk_level));
         setFormError('');
         setModalOpen(true);
     };
@@ -176,7 +189,6 @@ function GrammarQuizAdminInner() {
         const unique = new Set(form.options.map(o => o.trim()));
         if (unique.size < 4) return '4 lựa chọn phải khác nhau';
         if (form.correct_index < 0 || form.correct_index > 3) return 'Chọn đáp án đúng';
-        if (form.points < 1 || form.points > 10) return 'Điểm phải từ 1-10';
         return null;
     };
 
@@ -185,12 +197,12 @@ function GrammarQuizAdminInner() {
         if (err) { setFormError(err); return; }
         const payload: AdminGrammarQuizPayload = {
             grammar_pattern_id: Number(form.grammar_pattern_id),
-            question_type: form.question_type,
+            question_type: 'multiple_choice',
             question_text: form.question_text.trim(),
             options: form.options.map(o => o.trim()),
             correct_answer: form.options[form.correct_index].trim(),
             explanation: form.explanation.trim() || undefined,
-            points: form.points,
+            points: 1,
         };
         setSaving(true);
         setFormError('');
@@ -377,35 +389,48 @@ function GrammarQuizAdminInner() {
                             {/* Grammar selector */}
                             <div>
                                 <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1">Điểm ngữ pháp *</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2 mb-2">
+                                    <div className="relative">
+                                        <Icon name="search" size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                                        <input
+                                            type="search"
+                                            value={grammarSearchText}
+                                            onChange={e => setGrammarSearchText(e.target.value)}
+                                            placeholder="Tìm tên, công thức hoặc ID..."
+                                            className="w-full pl-9 pr-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
+                                        />
+                                    </div>
+                                    <select
+                                        value={grammarPickerHsk}
+                                        onChange={e => setGrammarPickerHsk(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
+                                    >
+                                        <option value="">Tất cả HSK</option>
+                                        {HSK_LEVELS.map(level => (
+                                            <option key={level} value={level}>HSK {level}</option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <select
                                     value={form.grammar_pattern_id}
                                     onChange={e => setForm(f => ({ ...f, grammar_pattern_id: e.target.value ? parseInt(e.target.value, 10) : '' }))}
                                     className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
                                 >
                                     <option value="">— Chọn ngữ pháp —</option>
-                                    {grammars.map(g => (
+                                    {grammarPickerOptions.map(g => (
                                         <option key={g.id} value={g.id}>
                                             #{g.id} — {g.grammarPoint} (HSK {g.hskLevel})
                                         </option>
                                     ))}
+                                    {grammarPickerOptions.length === 0 && (
+                                        <option value="" disabled>Không có ngữ pháp phù hợp</option>
+                                    )}
                                 </select>
                                 {form.grammar_pattern_id && grammarById.get(Number(form.grammar_pattern_id))?.patternFormula && (
                                     <p className="text-xs text-[var(--primary)] font-mono mt-1">
                                         {grammarById.get(Number(form.grammar_pattern_id))?.patternFormula}
                                     </p>
                                 )}
-                            </div>
-
-                            {/* Type */}
-                            <div>
-                                <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1">Loại câu hỏi *</label>
-                                <select
-                                    value={form.question_type}
-                                    onChange={e => setForm(f => ({ ...f, question_type: e.target.value as GrammarQuizQuestionType }))}
-                                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
-                                >
-                                    {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                </select>
                             </div>
 
                             {/* Question text */}
@@ -455,19 +480,6 @@ function GrammarQuizAdminInner() {
                                     rows={2}
                                     placeholder="Giải thích vì sao đáp án đúng…"
                                     className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] outline-none resize-y"
-                                />
-                            </div>
-
-                            {/* Points */}
-                            <div className="flex items-center gap-3">
-                                <label className="text-xs font-semibold text-[var(--text-muted)]">Điểm (1-10)</label>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    max={10}
-                                    value={form.points}
-                                    onChange={e => setForm(f => ({ ...f, points: parseInt(e.target.value, 10) || 1 }))}
-                                    className="w-20 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
                                 />
                             </div>
 

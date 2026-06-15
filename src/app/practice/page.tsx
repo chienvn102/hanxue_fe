@@ -140,7 +140,7 @@ export default function PracticeHubPage() {
             params.set('lesson', lessonId);
         } else {
             if (hsk) params.set('hsk', hsk);
-            params.set('limit', String(count));
+            if (activeGame.id !== 'grammar-quiz') params.set('limit', String(count));
         }
         router.push(`/practice/${activeGame.id}?${params.toString()}`);
     };
@@ -267,6 +267,7 @@ export default function PracticeHubPage() {
                                         {HSK_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                     </select>
                                 </div>
+                                {activeGame.id !== 'grammar-quiz' && (
                                 <div>
                                     <label className="text-xs font-medium text-[var(--text-muted)] block mb-1.5">Số từ</label>
                                     <div className="grid grid-cols-4 gap-2">
@@ -285,6 +286,7 @@ export default function PracticeHubPage() {
                                         ))}
                                     </div>
                                 </div>
+                                )}
                             </div>
                         ) : (
                             <div className="space-y-4">

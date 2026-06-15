@@ -1050,14 +1050,16 @@ export async function startGrammarQuiz(params: {
     hsk?: number;
     limit?: number;
 }): Promise<GrammarQuizStartResult> {
+    const body: { grammarIds: number[]; hsk?: number; limit?: number } = {
+        grammarIds: params.grammarIds || [],
+        hsk: params.hsk,
+    };
+    if (typeof params.limit === 'number') body.limit = params.limit;
+
     const res = await authFetch(`${API_BASE_URL}/api/practice/grammar-quiz/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            grammarIds: params.grammarIds || [],
-            hsk: params.hsk,
-            limit: params.limit || 10,
-        }),
+        body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(await readApiError(res, 'Không tạo được phiên trắc nghiệm'));
     const json = await res.json();

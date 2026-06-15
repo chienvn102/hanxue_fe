@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -33,8 +33,6 @@ const HSK_OPTS = [
     { value: '6', label: 'HSK 6' },
 ];
 
-const COUNT_OPTS = [10, 20, 30, 50];
-
 type Phase = 'setup' | 'quiz' | 'result';
 
 function GrammarQuizInner() {
@@ -44,10 +42,6 @@ function GrammarQuizInner() {
 
     // ---- Setup state ----
     const [hsk, setHsk] = useState(search.get('hsk') ?? '');
-    const [limit, setLimit] = useState(() => {
-        const q = parseInt(search.get('limit') ?? '', 10);
-        return COUNT_OPTS.includes(q) ? q : 10;
-    });
     const [grammarList, setGrammarList] = useState<Grammar[]>([]);
     const [loadingList, setLoadingList] = useState(true);
     const [selected, setSelected] = useState<Set<number>>(() => {
@@ -153,7 +147,6 @@ function GrammarQuizInner() {
             const res = await startGrammarQuiz({
                 grammarIds: ids,
                 hsk: ids.length === 0 && hsk ? parseInt(hsk, 10) : undefined,
-                limit,
             });
             if (!res.questions?.length) {
                 setError('Chưa có câu hỏi cho lựa chọn này. Thử chọn ngữ pháp khác.');
@@ -171,7 +164,7 @@ function GrammarQuizInner() {
         } finally {
             setStarting(false);
         }
-    }, [canStart, starting, selected, hsk, limit]);
+    }, [canStart, starting, selected, hsk]);
 
     const current = questions[index];
 
@@ -252,8 +245,6 @@ function GrammarQuizInner() {
                         <SetupView
                             hsk={hsk}
                             setHsk={setHsk}
-                            limit={limit}
-                            setLimit={setLimit}
                             grammarList={grammarList}
                             loadingList={loadingList}
                             selected={selected}
@@ -299,8 +290,6 @@ function GrammarQuizInner() {
 function SetupView(props: {
     hsk: string;
     setHsk: (v: string) => void;
-    limit: number;
-    setLimit: (v: number) => void;
     grammarList: Grammar[];
     loadingList: boolean;
     selected: Set<number>;
@@ -312,7 +301,7 @@ function SetupView(props: {
     onStart: () => void;
 }) {
     const {
-        hsk, setHsk, limit, setLimit, grammarList, loadingList,
+        hsk, setHsk, grammarList, loadingList,
         selected, toggleOne, toggleAll, allSelected, canStart, starting, onStart,
     } = props;
 
@@ -326,7 +315,7 @@ function SetupView(props: {
             </div>
 
             <Card hover={false} padding="md" className="mb-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                     <div>
                         <label className="text-xs font-medium text-[var(--text-muted)] block mb-1">HSK Level</label>
                         <select
@@ -335,16 +324,6 @@ function SetupView(props: {
                             className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
                         >
                             {HSK_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-[var(--text-muted)] block mb-1">Số câu hỏi</label>
-                        <select
-                            value={limit}
-                            onChange={e => setLimit(parseInt(e.target.value, 10))}
-                            className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text-main)] focus:border-[var(--primary)] outline-none"
-                        >
-                            {COUNT_OPTS.map(n => <option key={n} value={n}>{n} câu</option>)}
                         </select>
                     </div>
                 </div>
