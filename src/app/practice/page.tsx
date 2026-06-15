@@ -346,8 +346,8 @@ function TodayGoalPanel({ data, loading }: { data: TodayGoal | null; loading: bo
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
                 <div className="skeleton h-5 w-40 mb-4" />
                 <div className="skeleton h-2.5 w-full mb-4" />
-                <div className="grid grid-cols-4 gap-3">
-                    {[0, 1, 2, 3].map(i => <div key={i} className="skeleton h-12" />)}
+                <div className="grid grid-cols-3 gap-3">
+                    {[0, 1, 2].map(i => <div key={i} className="skeleton h-12" />)}
                 </div>
             </div>
         );
@@ -359,7 +359,6 @@ function TodayGoalPanel({ data, loading }: { data: TodayGoal | null; loading: bo
         { icon: 'local_fire_department', color: 'text-orange-500', value: data.currentStreak, label: 'Ngày streak' },
         { icon: 'bolt',                  color: 'text-amber-500',  value: data.todayXp,       label: 'XP hôm nay' },
         { icon: 'style',                 color: 'text-pink-500',   value: data.wordsReviewed, label: 'Từ đã ôn' },
-        { icon: 'schedule',              color: 'text-sky-500',    value: data.studyMins,     label: 'Phút học' },
     ];
 
     return (
@@ -370,11 +369,11 @@ function TodayGoalPanel({ data, loading }: { data: TodayGoal | null; loading: bo
                     Mục tiêu hôm nay
                 </h2>
                 <span className={`text-sm font-bold ${data.goalMet ? 'text-emerald-500' : 'text-[var(--text-muted)]'}`}>
-                    {data.goalMet ? '✓ Đạt mục tiêu!' : `${data.studyMins}/${data.dailyGoalMins} phút`}
+                    {data.goalMet ? '✓ Đạt mục tiêu!' : `${data.todayXp}/${data.dailyXpGoal} XP`}
                 </span>
             </div>
 
-            {/* Progress bar */}
+            {/* Progress bar (theo XP) */}
             <div className="h-2.5 w-full rounded-full bg-[var(--surface-secondary)] overflow-hidden mb-4">
                 <div
                     className={`h-full rounded-full transition-[width] duration-700 ease-out ${data.goalMet ? 'bg-emerald-500' : 'bg-[var(--primary)]'}`}
@@ -383,7 +382,7 @@ function TodayGoalPanel({ data, loading }: { data: TodayGoal | null; loading: bo
             </div>
 
             {/* Stat chips */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
                 {stats.map(s => (
                     <div key={s.label} className="rounded-xl bg-[var(--surface-secondary)] p-3 text-center">
                         <Icon name={s.icon} className={`${s.color} mb-1`} />

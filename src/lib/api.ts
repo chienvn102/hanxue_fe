@@ -789,10 +789,8 @@ export interface TodayGoal {
     todayXp: number;
     wordsReviewed: number;
     wordsLearned: number;
-    studyMins: number;
-    testsTaken: number;
     currentStreak: number;
-    dailyGoalMins: number;
+    dailyXpGoal: number;
     goalPercent: number;
     goalMet: boolean;
 }
