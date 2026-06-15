@@ -10,11 +10,16 @@ import {
     ProfileUpdatePayload,
     sendPasswordChangeCode,
     updateProfile,
+    uploadAvatar,
+    getMediaUrl,
     fetchNotificationPreferences,
     updateNotificationPreferences,
     type NotificationPreferences,
 } from '@/lib/api';
 import { Icon } from '@/components/ui/Icon';
+
+// Preset mục tiêu XP/ngày cho ô chọn (thay cho phút học).
+const XP_GOAL_OPTIONS = [20, 50, 100, 150, 200, 300];
 
 type SettingsTab = 'profile' | 'security' | 'notifications';
 
@@ -25,12 +30,15 @@ export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
     const [profileForm, setProfileForm] = useState({
         displayName: user?.displayName || '',
-        avatarUrl: user?.avatarUrl || '',
         targetHsk: String(user?.targetHsk || 1),
-        nativeLanguage: user?.nativeLanguage || 'vn',
-        dailyGoalMins: String(user?.dailyGoalMins || 15),
-        preferredVoice: user?.preferredVoice || 'female'
+        dailyGoalXp: String(user?.dailyGoalXp || 50),
     });
+    // Avatar: preview hiển thị (signed URL) tách khỏi `avatarRef` (ref ngắn để lưu).
+    // Chỉ gửi avatarUrl khi user upload ảnh MỚI → tránh gửi lại signed URL dài (>255)
+    // vốn là nguyên nhân lỗi "Failed to update profile" khi đổi HSK.
+    const [avatarPreview, setAvatarPreview] = useState(user?.avatarUrl || '');
+    const [avatarRef, setAvatarRef] = useState('');
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
     const [passwordForm, setPasswordForm] = useState({
         currentPassword: '',
         newPassword: '',
@@ -90,12 +98,11 @@ export default function SettingsPage() {
                 updateUser(profile);
                 setProfileForm({
                     displayName: profile.displayName || '',
-                    avatarUrl: profile.avatarUrl || '',
                     targetHsk: String(profile.targetHsk || 1),
-                    nativeLanguage: profile.nativeLanguage || 'vn',
-                    dailyGoalMins: String(profile.dailyGoalMins || 15),
-                    preferredVoice: profile.preferredVoice || 'female'
+                    dailyGoalXp: String(profile.dailyGoalXp || 50),
                 });
+                setAvatarPreview(profile.avatarUrl || '');
+                setAvatarRef('');
             })
             .catch((err) => {
                 if (!cancelled) {
@@ -128,19 +135,40 @@ export default function SettingsPage() {
         try {
             const payload: ProfileUpdatePayload = {
                 displayName: profileForm.displayName,
-                avatarUrl: profileForm.avatarUrl || null,
                 targetHsk: Number(profileForm.targetHsk),
-                nativeLanguage: profileForm.nativeLanguage,
-                dailyGoalMins: Number(profileForm.dailyGoalMins),
-                preferredVoice: profileForm.preferredVoice as 'male' | 'female'
+                dailyGoalXp: Number(profileForm.dailyGoalXp),
             };
+            // Chỉ gửi avatar khi user vừa upload ảnh mới (ref ngắn). KHÔNG gửi lại
+            // signed URL hiển thị (dài >255 → BE từ chối).
+            if (avatarRef) payload.avatarUrl = avatarRef;
+
             const updated = await updateProfile(payload);
             updateUser(updated);
+            setAvatarRef('');
+            if (updated.avatarUrl) setAvatarPreview(updated.avatarUrl);
             setMessage('Đã lưu thông tin cá nhân.');
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Không lưu được thông tin cá nhân');
         } finally {
             setSavingProfile(false);
+        }
+    };
+
+    const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setError('');
+        setMessage('');
+        setUploadingAvatar(true);
+        try {
+            const { ref, url } = await uploadAvatar(file);
+            setAvatarRef(ref);
+            setAvatarPreview(url);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Tải ảnh đại diện thất bại');
+        } finally {
+            setUploadingAvatar(false);
+            e.target.value = '';
         }
     };
 
@@ -255,6 +283,32 @@ export default function SettingsPage() {
                             </div>
                         ) : (
                             <>
+                                {/* Avatar — upload (không còn nhập URL) */}
+                                <div className="flex items-center gap-4">
+                                    <div className="w-20 h-20 rounded-full overflow-hidden bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center shrink-0">
+                                        {avatarPreview ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={getMediaUrl(avatarPreview)} alt="Ảnh đại diện" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Icon name="person" size="xl" className="text-[var(--text-muted)]" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border)] cursor-pointer text-sm font-semibold hover:bg-[var(--surface-secondary)] transition-colors ${uploadingAvatar ? 'opacity-60 pointer-events-none' : ''}`}>
+                                            <Icon name="upload" size="sm" />
+                                            {uploadingAvatar ? 'Đang tải…' : 'Tải ảnh lên'}
+                                            <input
+                                                type="file"
+                                                accept="image/jpeg,image/png,image/webp,image/gif"
+                                                className="hidden"
+                                                onChange={handleAvatarFile}
+                                                disabled={uploadingAvatar}
+                                            />
+                                        </label>
+                                        <p className="text-xs text-[var(--text-muted)] mt-1">JPEG, PNG, WebP hoặc GIF.</p>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <Field label="Tên hiển thị">
                                         <input
@@ -262,15 +316,6 @@ export default function SettingsPage() {
                                             onChange={(e) => updateProfileField('displayName', e.target.value)}
                                             className={inputClass}
                                             required
-                                        />
-                                    </Field>
-
-                                    <Field label="Avatar URL">
-                                        <input
-                                            value={profileForm.avatarUrl}
-                                            onChange={(e) => updateProfileField('avatarUrl', e.target.value)}
-                                            className={inputClass}
-                                            placeholder="https://..."
                                         />
                                     </Field>
 
@@ -284,44 +329,31 @@ export default function SettingsPage() {
                                                 <option key={level} value={level}>HSK {level}</option>
                                             ))}
                                         </select>
+                                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                                            Cấp độ HSK bạn đang hướng tới — dùng để gợi ý từ vựng/đề theo trình độ,
+                                            lọc bảng xếp hạng và hiển thị huy hiệu HSK. Đổi lúc nào cũng được.
+                                        </p>
                                     </Field>
 
-                                    <Field label="Ngôn ngữ mẹ đẻ">
-                                        <input
-                                            value={profileForm.nativeLanguage}
-                                            onChange={(e) => updateProfileField('nativeLanguage', e.target.value)}
-                                            className={inputClass}
-                                            required
-                                        />
-                                    </Field>
-
-                                    <Field label="Mục tiêu mỗi ngày">
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            max={600}
-                                            value={profileForm.dailyGoalMins}
-                                            onChange={(e) => updateProfileField('dailyGoalMins', e.target.value)}
-                                            className={inputClass}
-                                            required
-                                        />
-                                    </Field>
-
-                                    <Field label="Giọng đọc ưa thích">
+                                    <Field label="Mục tiêu XP mỗi ngày">
                                         <select
-                                            value={profileForm.preferredVoice}
-                                            onChange={(e) => updateProfileField('preferredVoice', e.target.value)}
+                                            value={profileForm.dailyGoalXp}
+                                            onChange={(e) => updateProfileField('dailyGoalXp', e.target.value)}
                                             className={inputClass}
                                         >
-                                            <option value="female">Nữ</option>
-                                            <option value="male">Nam</option>
+                                            {XP_GOAL_OPTIONS.map((xp) => (
+                                                <option key={xp} value={xp}>{xp} XP</option>
+                                            ))}
                                         </select>
+                                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                                            Hiển thị ở &quot;Mục tiêu hôm nay&quot;. Mỗi từ ôn đúng được ~5–10 XP.
+                                        </p>
                                     </Field>
                                 </div>
 
                                 <button
                                     type="submit"
-                                    disabled={savingProfile}
+                                    disabled={savingProfile || uploadingAvatar}
                                     className="px-5 py-3 rounded-xl bg-[var(--primary)] text-white font-bold hover:bg-[var(--primary-dark)] disabled:opacity-70"
                                 >
                                     {savingProfile ? 'Đang lưu' : 'Lưu thay đổi'}

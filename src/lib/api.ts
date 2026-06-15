@@ -57,6 +57,7 @@ export interface User {
     completedHskLevels?: number[];
     isPremium?: boolean;
     dailyGoalMins?: number;
+    dailyGoalXp?: number;
     totalXp?: number;
     currentStreak?: number;
     longestStreak?: number;
@@ -566,6 +567,7 @@ export interface ProfileUpdatePayload {
     targetHsk?: number;
     nativeLanguage?: string;
     dailyGoalMins?: number;
+    dailyGoalXp?: number;
     preferredVoice?: 'male' | 'female';
     avatarUrl?: string | null;
 }
@@ -1148,7 +1150,10 @@ export async function updateProfile(data: ProfileUpdatePayload): Promise<User> {
     });
     if (!res.ok) {
         if (res.status === 401) throw new Error('Unauthorized');
-        throw new Error('Failed to update profile');
+        // Surface BE message (vd validate) thay vì luôn báo chung chung — trước đây
+        // lỗi thật bị che bởi "Failed to update profile".
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || body.message || 'Failed to update profile');
     }
     return res.json();
 }

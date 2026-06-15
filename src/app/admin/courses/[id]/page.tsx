@@ -55,6 +55,11 @@ export default function AdminCourseDetailPage() {
     const [showAddLesson, setShowAddLesson] = useState(false);
     const [newLesson, setNewLesson] = useState({ title: '', order_index: 0, hsk_level: 1 });
 
+    // Kéo-thả sắp xếp lại bài học.
+    const [dragId, setDragId] = useState<number | null>(null);
+    const [overId, setOverId] = useState<number | null>(null);
+    const [reordering, setReordering] = useState(false);
+
     // Sau lesson cuối hiện có. Khi list trống → 0; ngược lại → max(order_index)+1.
     // Tránh off-by-one khi list không liên tục từ 0 (vd: 0,1,5).
     const nextOrderIndex = (list: { order_index: number }[]) =>
@@ -167,6 +172,48 @@ export default function AdminCourseDetailPage() {
         } catch (e) {
             console.error(e);
             alert('Lỗi kết nối server');
+        }
+    };
+
+    // Thả 1 bài lên vị trí của bài khác → chèn lại + đánh số order_index 0..N theo
+    // thứ tự mới, rồi persist các bài thay đổi qua PUT /api/lessons/:id.
+    const handleDrop = async (targetId: number) => {
+        const fromId = dragId;
+        setDragId(null);
+        setOverId(null);
+        if (fromId == null || fromId === targetId) return;
+
+        const ordered = [...lessons].sort((a, b) => a.order_index - b.order_index);
+        const from = ordered.findIndex(l => l.id === fromId);
+        const to = ordered.findIndex(l => l.id === targetId);
+        if (from < 0 || to < 0) return;
+
+        const oldOrder = new Map(ordered.map(l => [l.id, l.order_index]));
+        const [moved] = ordered.splice(from, 1);
+        ordered.splice(to, 0, moved);
+        const renumbered = ordered.map((l, i) => ({ ...l, order_index: i }));
+
+        setLessons(renumbered); // optimistic
+        const changed = renumbered.filter(l => oldOrder.get(l.id) !== l.order_index);
+        if (changed.length === 0) return;
+
+        setReordering(true);
+        try {
+            const results = await Promise.all(changed.map(l =>
+                fetch(`${API_BASE}/api/lessons/${l.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ order_index: l.order_index }),
+                })
+            ));
+            if (results.some(r => !r.ok)) throw new Error('reorder failed');
+            await load();
+        } catch (e) {
+            console.error('Reorder failed', e);
+            alert('Lỗi sắp xếp — tải lại danh sách.');
+            await load(); // rollback về trạng thái DB
+        } finally {
+            setReordering(false);
         }
     };
 
@@ -303,8 +350,9 @@ export default function AdminCourseDetailPage() {
             {tab === 'lessons' && (
                 <div>
                     <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm text-[var(--text-muted)]">
-                            Bài học của khóa này (sắp xếp theo <code>order_index</code>)
+                        <p className="text-sm text-[var(--text-muted)] flex items-center gap-1.5">
+                            <Icon name="drag_indicator" size="sm" />
+                            Kéo-thả để đổi thứ tự bài học{reordering && <span className="text-[var(--primary)]">· đang lưu…</span>}
                         </p>
                         <Button onClick={() => { setNewLesson({ title: '', order_index: nextOrderIndex(lessons), hsk_level: course.hsk_level }); setShowAddLesson(true); }} className="flex items-center gap-1.5">
                             <Icon name="add" size="sm" />
@@ -316,19 +364,32 @@ export default function AdminCourseDetailPage() {
                         <div className="text-center py-12 border-2 border-dashed border-[var(--border)] rounded-xl">
                             <Icon name="menu_book" size="xl" className="text-[var(--text-muted)] mb-2" />
                             <p className="text-[var(--text-secondary)] mb-3">Chưa có bài học nào</p>
-                            <Button onClick={() => setShowAddLesson(true)} variant="ghost">
+                            <Button onClick={() => { setNewLesson({ title: '', order_index: nextOrderIndex(lessons), hsk_level: course.hsk_level }); setShowAddLesson(true); }} variant="ghost">
                                 Tạo bài học đầu tiên
                             </Button>
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {[...lessons].sort((a, b) => a.order_index - b.order_index).map(lesson => (
+                            {[...lessons].sort((a, b) => a.order_index - b.order_index).map((lesson, idx) => (
                                 <div
                                     key={lesson.id}
-                                    className="flex items-center gap-4 p-4 bg-[var(--surface)] border border-[var(--border)] rounded-xl hover:border-[var(--primary)]/40 transition-colors"
+                                    draggable
+                                    onDragStart={() => setDragId(lesson.id)}
+                                    onDragOver={(e) => { e.preventDefault(); if (overId !== lesson.id) setOverId(lesson.id); }}
+                                    onDragLeave={() => setOverId(o => (o === lesson.id ? null : o))}
+                                    onDrop={(e) => { e.preventDefault(); handleDrop(lesson.id); }}
+                                    onDragEnd={() => { setDragId(null); setOverId(null); }}
+                                    className={`flex items-center gap-3 p-4 bg-[var(--surface)] border rounded-xl transition-colors ${
+                                        overId === lesson.id && dragId !== lesson.id
+                                            ? 'border-[var(--primary)] ring-2 ring-[var(--primary)]/20'
+                                            : 'border-[var(--border)] hover:border-[var(--primary)]/40'
+                                    } ${dragId === lesson.id ? 'opacity-50' : ''}`}
                                 >
-                                    <div className="w-10 h-10 rounded-lg bg-[var(--surface-secondary)] flex items-center justify-center text-sm font-bold text-[var(--text-muted)] shrink-0">
-                                        {lesson.order_index}
+                                    <span className="cursor-grab active:cursor-grabbing text-[var(--text-muted)] shrink-0" title="Kéo để sắp xếp">
+                                        <Icon name="drag_indicator" size="sm" />
+                                    </span>
+                                    <div className="w-9 h-9 rounded-lg bg-[var(--surface-secondary)] flex items-center justify-center text-sm font-bold text-[var(--text-muted)] shrink-0">
+                                        {idx + 1}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-semibold text-[var(--text-main)] truncate">{lesson.title}</h3>
@@ -391,26 +452,13 @@ export default function AdminCourseDetailPage() {
                                     placeholder="VD: Bài 1 — Chào hỏi"
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Thứ tự</label>
-                                    <input
-                                        type="number"
-                                        className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none"
-                                        value={newLesson.order_index}
-                                        onChange={e => setNewLesson({ ...newLesson, order_index: parseInt(e.target.value) || 0 })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">HSK</label>
-                                    <select
-                                        className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none"
-                                        value={newLesson.hsk_level}
-                                        onChange={e => setNewLesson({ ...newLesson, hsk_level: parseInt(e.target.value) })}
-                                    >
-                                        {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>HSK {n}</option>)}
-                                    </select>
-                                </div>
+                            <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--surface-secondary)] rounded-lg px-3 py-2">
+                                <Icon name="info" size="sm" />
+                                <span>
+                                    Bài số <strong className="text-[var(--text-main)]">#{lessons.length + 1}</strong>,
+                                    cấp <strong className="text-[var(--text-main)]">HSK {course.hsk_level}</strong> (tự động).
+                                    Đổi thứ tự bằng kéo-thả ở danh sách sau khi tạo.
+                                </span>
                             </div>
                             <div className="flex gap-3 pt-2">
                                 <Button type="button" variant="ghost" onClick={() => setShowAddLesson(false)} className="flex-1">Hủy</Button>
