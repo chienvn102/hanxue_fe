@@ -313,6 +313,7 @@ export default function AdminLessonEditorPage() {
                     onChange={setPassage}
                     onSave={savePassage}
                     saving={savingPassage}
+                    token={token}
                 />
             )}
 
