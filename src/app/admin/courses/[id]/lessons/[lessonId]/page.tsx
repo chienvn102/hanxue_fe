@@ -265,38 +265,11 @@ export default function AdminLessonEditorPage() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">HSK Level</label>
-                            <select
-                                className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none"
-                                value={info.hsk_level}
-                                onChange={e => setInfo({ ...info, hsk_level: parseInt(e.target.value) })}
-                            >
-                                {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>HSK {n}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Thứ tự</label>
-                            <input
-                                type="number"
-                                className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none"
-                                value={info.order_index}
-                                onChange={e => setInfo({ ...info, order_index: parseInt(e.target.value) || 0 })}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Trạng thái</label>
-                            <select
-                                className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none"
-                                value={info.is_active}
-                                onChange={e => setInfo({ ...info, is_active: parseInt(e.target.value) })}
-                            >
-                                <option value={1}>Hoạt động</option>
-                                <option value={0}>Ẩn</option>
-                            </select>
-                        </div>
-                    </div>
+                    {/* HSK Level / Thứ tự / Trạng thái đã bỏ khỏi form:
+                        - HSK level: kế thừa theo cấp của khóa học.
+                        - Thứ tự: quản lý bằng kéo-thả ở danh sách bài học.
+                        - Trạng thái: mặc định Hoạt động (ẩn bài bằng nút xóa).
+                        Giá trị cũ vẫn được giữ nguyên trong `info` khi lưu. */}
 
                     <div className="flex gap-3 pt-2">
                         <Button type="submit" disabled={savingInfo}>

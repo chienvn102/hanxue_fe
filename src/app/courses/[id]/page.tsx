@@ -79,14 +79,15 @@ function ProgressRing({ progress, size = 120 }: { progress: number; size?: numbe
     );
 }
 
-function LessonCard({ lesson, index, isCompleted, isLocked }: {
+function LessonCard({ lesson, index, isCompleted, isInProgress, isLocked }: {
     lesson: Lesson;
     index: number;
     isCompleted: boolean;
+    isInProgress: boolean;
     isLocked: boolean;
 }) {
-    const statusIcon = isCompleted ? 'check_circle' : isLocked ? 'lock' : 'play_circle';
-    const statusColor = isCompleted ? 'text-emerald-400' : isLocked ? 'text-[var(--text-muted)]' : 'text-[var(--primary)]';
+    const statusIcon = isCompleted ? 'check_circle' : isInProgress ? 'pending' : isLocked ? 'lock' : 'play_circle';
+    const statusColor = isCompleted ? 'text-emerald-400' : isInProgress ? 'text-amber-500' : isLocked ? 'text-[var(--text-muted)]' : 'text-[var(--primary)]';
 
     return (
         <Link
@@ -121,10 +122,18 @@ function LessonCard({ lesson, index, isCompleted, isLocked }: {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                            <div>
-                                <h3 className={`font-semibold text-[var(--text-main)] line-clamp-1 ${!isLocked ? 'group-hover:text-[var(--primary)]' : ''} transition-colors`}>
-                                    Bài {index + 1}: {lesson.title}
-                                </h3>
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className={`font-semibold text-[var(--text-main)] line-clamp-1 ${!isLocked ? 'group-hover:text-[var(--primary)]' : ''} transition-colors`}>
+                                        Bài {index + 1}: {lesson.title}
+                                    </h3>
+                                    {isCompleted && (
+                                        <span className="shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500">Hoàn thành</span>
+                                    )}
+                                    {isInProgress && (
+                                        <span className="shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500">Đang học</span>
+                                    )}
+                                </div>
                                 <p className="text-sm text-[var(--text-secondary)] line-clamp-1 mt-0.5">
                                     {lesson.description || 'Video bài giảng'}
                                 </p>
@@ -188,8 +197,12 @@ export default function CourseDetailPage() {
         }
     }, [params.id, isAuthenticated, fetchData]);
 
-    const progress = course && course.lesson_count > 0 && course.completed_lessons
-        ? Math.round((course.completed_lessons / course.lesson_count) * 100)
+    // Tiến trình tính TRỰC TIẾP từ progress_status mỗi bài (model đã join
+    // user_lesson_progress) — đáng tin hơn course.completed_lessons (endpoint
+    // course không tính per-user → trước đây luôn hiện 0% dù bài đã hoàn thành).
+    const completedCount = lessons.filter(l => l.progress_status === 'completed').length;
+    const progress = lessons.length > 0
+        ? Math.round((completedCount / lessons.length) * 100)
         : 0;
 
     if (loading) {
@@ -282,7 +295,7 @@ export default function CourseDetailPage() {
                                     Danh sách bài học
                                 </h2>
                                 <span className="text-sm text-[var(--text-muted)]">
-                                    {progress > 0 ? `${course.completed_lessons}/${lessons.length} hoàn thành` : `${lessons.length} bài`}
+                                    {completedCount > 0 ? `${completedCount}/${lessons.length} hoàn thành` : `${lessons.length} bài`}
                                 </span>
                             </div>
 
@@ -309,6 +322,7 @@ export default function CourseDetailPage() {
                                                 lesson={lesson}
                                                 index={index}
                                                 isCompleted={lesson.progress_status === 'completed'}
+                                                isInProgress={lesson.progress_status === 'in_progress'}
                                                 isLocked={isLocked}
                                             />
                                         );
@@ -363,16 +377,23 @@ export default function CourseDetailPage() {
                                 course.completed_lessons (chỉ ratio). */}
                             <div className="mt-6">
                                 {lessons.length > 0 ? (() => {
-                                    const inProgress = lessons.find(l => l.progress_status === 'in_progress');
+                                    // Resume về CHỖ CUỐI đã học:
+                                    //   bài đang học dở (in_progress, lấy bài xa nhất)
+                                    //   > bài kế ngay sau bài hoàn thành cuối cùng
+                                    //   > bài chưa bắt đầu đầu tiên > bài 1
+                                    const inProgress = [...lessons].reverse().find(l => l.progress_status === 'in_progress');
                                     const allCompleted = lessons.every(l => l.progress_status === 'completed');
                                     const hasAnyTouched = lessons.some(
                                         l => l.progress_status === 'in_progress' || l.progress_status === 'completed'
                                     );
-                                    // next: bài đang học dở > bài chưa bắt đầu kế tiếp > bài 1
+                                    let lastCompletedIdx = -1;
+                                    lessons.forEach((l, i) => { if (l.progress_status === 'completed') lastCompletedIdx = i; });
+                                    const afterLastCompleted = (lastCompletedIdx >= 0 && lastCompletedIdx < lessons.length - 1)
+                                        ? lessons[lastCompletedIdx + 1] : undefined;
                                     const nextNotStarted = lessons.find(
                                         l => !l.progress_status || l.progress_status === 'not_started'
                                     );
-                                    const next = inProgress ?? nextNotStarted ?? lessons[0];
+                                    const next = inProgress ?? afterLastCompleted ?? nextNotStarted ?? lessons[0];
 
                                     const lessonIdx = lessons.findIndex(l => l.id === next.id);
                                     const lessonNo = lessonIdx >= 0 ? lessonIdx + 1 : 1;
