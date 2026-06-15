@@ -630,7 +630,12 @@ export function getMediaUrl(path: string | null | undefined): string {
     if (!path) return '';
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     if (path.startsWith('/')) return `${API_BASE_URL}${path}`;
-    // Unknown scheme (gs://, etc.) → don't construct a broken URL
+    // gs:// không load trực tiếp được trên browser → đi qua media proxy của BE,
+    // proxy sẽ 302 sang signed URL. Giữ nguyên gs:// ở DB (admin vẫn sửa gs://).
+    if (path.startsWith('gs://')) {
+        return `${API_BASE_URL}/api/media/img?ref=${encodeURIComponent(path)}`;
+    }
+    // Unknown scheme → don't construct a broken URL
     return '';
 }
 

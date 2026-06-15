@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getMediaUrl } from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -57,10 +58,12 @@ export function UploadField({ label, value, onChange, type, accept }: {
                 </label>
             </div>
             {value && type === 'image' && (
-                <img src={value.startsWith('/') ? `${API_BASE}${value}` : value} alt="preview" className="mt-2 max-h-20 rounded border border-[var(--border)] object-contain" />
+                // getMediaUrl xử lý gs:// (qua proxy), '/path' (BE host) và http(s).
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={getMediaUrl(value)} alt="preview" className="mt-2 max-h-20 rounded border border-[var(--border)] object-contain" />
             )}
             {value && type === 'audio' && (
-                <audio src={value.startsWith('/') ? `${API_BASE}${value}` : value} controls className="mt-2 h-8 w-full" />
+                <audio src={getMediaUrl(value)} controls className="mt-2 h-8 w-full" />
             )}
         </div>
     );

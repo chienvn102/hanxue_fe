@@ -6,12 +6,13 @@ import type { TextbookGrammar } from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// Khớp shape THẬT của GET /api/grammar (camelCase, envelope { data }).
 interface GrammarSearchResult {
     id: number;
-    grammar_point: string;
+    grammarPoint: string;
     explanation: string | null;
-    pattern_formula: string | null;
-    hsk_level: number | null;
+    patternFormula: string | null;
+    hskLevel: number | null;
 }
 
 interface Props {
@@ -42,11 +43,12 @@ export function GrammarTab({ lessonId, items, token, onChanged }: Props) {
                 const res = await fetch(`${API_BASE}/api/grammar?${params}`, {
                     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
                 });
+                if (!res.ok) { setResults([]); return; }
                 const data = await res.json();
-                if (data.success) {
-                    const attached = new Set(items.map(i => i.id));
-                    setResults((data.data || []).filter((g: GrammarSearchResult) => !attached.has(g.id)));
-                }
+                // BE trả { data: [...] } (KHÔNG có field success) → đọc thẳng data.data.
+                const list: GrammarSearchResult[] = Array.isArray(data?.data) ? data.data : [];
+                const attached = new Set(items.map(i => i.id));
+                setResults(list.filter(g => !attached.has(g.id)));
             } finally {
                 setSearching(false);
             }
@@ -120,13 +122,13 @@ export function GrammarTab({ lessonId, items, token, onChanged }: Props) {
                             <div key={g.id} className="flex items-center gap-3 p-2 rounded hover:bg-[var(--surface-secondary)]">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <span className="font-semibold text-[var(--text-main)]">{g.grammar_point}</span>
-                                        {g.hsk_level && (
-                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-muted)]">HSK {g.hsk_level}</span>
+                                        <span className="font-semibold text-[var(--text-main)]">{g.grammarPoint}</span>
+                                        {g.hskLevel && (
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-muted)]">HSK {g.hskLevel}</span>
                                         )}
                                     </div>
-                                    {g.pattern_formula && (
-                                        <p className="text-xs hanzi text-[var(--text-secondary)] mt-0.5">{g.pattern_formula}</p>
+                                    {g.patternFormula && (
+                                        <p className="text-xs hanzi text-[var(--text-secondary)] mt-0.5">{g.patternFormula}</p>
                                     )}
                                 </div>
                                 <button

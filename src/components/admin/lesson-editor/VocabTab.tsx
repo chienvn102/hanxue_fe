@@ -7,12 +7,13 @@ import type { TextbookVocab } from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// Khớp shape THẬT của GET /api/vocab (camelCase, envelope { data }).
 interface VocabSearchResult {
     id: number;
     simplified: string;
     pinyin: string;
-    meaning_vi: string;
-    hsk_level: number | null;
+    meaningVi: string;
+    hskLevel: number | null;
 }
 
 interface Props {
@@ -44,11 +45,12 @@ export function VocabTab({ lessonId, items, token, onChanged }: Props) {
                 const res = await fetch(`${API_BASE}/api/vocab?${params}`, {
                     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
                 });
+                if (!res.ok) { setResults([]); return; }
                 const data = await res.json();
-                if (data.success) {
-                    const attached = new Set(items.map(i => i.id));
-                    setResults((data.data || []).filter((v: VocabSearchResult) => !attached.has(v.id)));
-                }
+                // BE trả { data: [...] } (KHÔNG có field success) → đọc thẳng data.data.
+                const list: VocabSearchResult[] = Array.isArray(data?.data) ? data.data : [];
+                const attached = new Set(items.map(i => i.id));
+                setResults(list.filter(v => !attached.has(v.id)));
             } finally {
                 setSearching(false);
             }
@@ -141,11 +143,11 @@ export function VocabTab({ lessonId, items, token, onChanged }: Props) {
                                     <div className="flex items-center gap-2">
                                         <span className="hanzi font-semibold">{v.simplified}</span>
                                         <span className="text-xs text-[var(--primary)]">{v.pinyin}</span>
-                                        {v.hsk_level && (
-                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-muted)]">HSK {v.hsk_level}</span>
+                                        {v.hskLevel && (
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-muted)]">HSK {v.hskLevel}</span>
                                         )}
                                     </div>
-                                    <p className="text-xs text-[var(--text-secondary)] truncate">{v.meaning_vi}</p>
+                                    <p className="text-xs text-[var(--text-secondary)] truncate">{v.meaningVi}</p>
                                 </div>
                                 <button
                                     onClick={() => attachVocab(v.id)}
