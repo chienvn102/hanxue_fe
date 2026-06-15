@@ -456,6 +456,7 @@ export default function HskExamDetailAdminPage() {
                                 sectionType={editing.section_type}
                                 sectionId={editing.section_id}
                                 examType={exam.exam_type}
+                                hskLevel={exam.hsk_level}
                             />
                         </div>
 

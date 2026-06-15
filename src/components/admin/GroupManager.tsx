@@ -20,7 +20,8 @@ interface Group {
 }
 
 interface ImageGridContent {
-    items: { label: string; image_url: string; alt_vi?: string }[];
+    image_url?: string; // chuẩn mới: 1 ảnh ghép A–F (như đề in)
+    items: { label: string; image_url?: string; alt_vi?: string }[]; // chỉ giữ label cho đáp án; image_url/alt_vi là back-compat đề cũ (6 ảnh rời)
     example?: { label: string; content: { zh: string; pinyin?: string } };
 }
 interface WordBankContent {
@@ -289,70 +290,50 @@ function GroupEditorModal({
  * Editor: image_grid (5-6 ảnh A-F)
  * ───────────────────────────────────────────────────────────────────── */
 function ImageGridEditor({ content, onChange }: { content: ImageGridContent | null; onChange: (c: ImageGridContent) => void }) {
-    const items = content?.items || DEFAULT_LABELS.slice(0, 6).map(l => ({ label: l, image_url: '', alt_vi: '' }));
+    // Chuẩn mới: 1 ảnh ghép A–F (như đề in). `items` chỉ giữ LABEL để render đáp án A–F.
+    const items: ImageGridContent['items'] = content?.items?.length ? content.items : DEFAULT_LABELS.slice(0, 6).map(l => ({ label: l }));
+    const optionCount = items.length;
+    const imageUrl = content?.image_url || '';
     const example = content?.example;
+    const legacyPerCell = items.some(it => it.image_url); // đề cũ: 6 ảnh rời
 
-    const update = (idx: number, patch: Partial<{ label: string; image_url: string; alt_vi: string }>) => {
-        const next = items.map((it, i) => i === idx ? { ...it, ...patch } : it);
-        onChange({ ...content, items: next, example });
+    const emit = (patch: Partial<ImageGridContent>) => {
+        onChange({ image_url: imageUrl, items, example, ...patch });
     };
-
-    const addItem = () => {
-        if (items.length >= 6) return;
-        const nextLabel = DEFAULT_LABELS[items.length];
-        onChange({ ...content, items: [...items, { label: nextLabel, image_url: '', alt_vi: '' }], example });
-    };
-
-    const removeItem = (idx: number) => {
-        if (items.length <= 5) { alert('Tối thiểu 5 ảnh'); return; }
-        const next = items.filter((_, i) => i !== idx);
-        onChange({ ...content, items: next, example });
-    };
+    const setCount = (n: number) => emit({ items: DEFAULT_LABELS.slice(0, n).map(l => ({ label: l })) });
 
     return (
-        <div className="space-y-2">
-            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2 rounded">
-                Bắt buộc 5 hoặc 6 ảnh (label A-E hoặc A-F).
+        <div className="space-y-3">
+            <p className="text-xs text-[var(--text-secondary)] bg-blue-500/10 p-2 rounded">
+                Tải lên <b>1 ảnh ghép</b> chứa các đáp án A–{DEFAULT_LABELS[optionCount - 1]} (đúng như đề in). Học viên sẽ chọn chữ cái ở từng câu.
             </p>
-            <div className="grid grid-cols-2 gap-3">
-                {items.map((item, idx) => (
-                    <div key={idx} className="p-2 border border-[var(--border)] rounded-lg bg-[var(--surface-secondary)]/30">
-                        <div className="flex items-center justify-between mb-1.5">
-                            <input
-                                type="text"
-                                maxLength={1}
-                                value={item.label}
-                                onChange={e => update(idx, { label: e.target.value.toUpperCase() })}
-                                className="w-10 px-2 py-1 border rounded text-center font-bold text-sm"
-                            />
-                            {items.length > 5 && (
-                                <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">
-                                    <Icon name="close" size="xs" />
-                                </button>
-                            )}
-                        </div>
-                        <UploadField
-                            label=""
-                            value={item.image_url}
-                            onChange={v => update(idx, { image_url: v })}
-                            type="image"
-                            accept="image/jpeg,image/png,image/webp,image/gif"
-                        />
-                        <input
-                            type="text"
-                            placeholder="Alt (vi, optional)"
-                            className="w-full mt-1.5 px-2 py-1 border rounded text-xs"
-                            value={item.alt_vi || ''}
-                            onChange={e => update(idx, { alt_vi: e.target.value })}
-                        />
-                    </div>
-                ))}
+
+            <div className="flex items-center gap-2">
+                <label className="text-xs text-[var(--text-muted)]">Số đáp án</label>
+                <select
+                    className="px-2 py-1 border rounded text-sm"
+                    value={optionCount}
+                    onChange={e => setCount(parseInt(e.target.value) || 6)}
+                >
+                    <option value={5}>5 (A–E)</option>
+                    <option value={6}>6 (A–F)</option>
+                </select>
             </div>
-            {items.length < 6 && (
-                <button onClick={addItem} className="text-xs text-[var(--primary)] hover:underline">
-                    + Thêm ảnh thứ {items.length + 1} (tối đa 6)
-                </button>
+
+            <UploadField
+                label="Ảnh lưới (ghép A–F)"
+                value={imageUrl}
+                onChange={v => emit({ image_url: v })}
+                type="image"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+            />
+
+            {legacyPerCell && !imageUrl && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2 rounded">
+                    Đề này đang dùng 6 ảnh rời (chuẩn cũ). Tải 1 ảnh ghép ở trên để chuyển chuẩn mới; nếu để trống, hệ thống vẫn hiển thị 6 ảnh rời cũ.
+                </p>
             )}
+
             <div className="border-t border-[var(--border)] pt-2 mt-2">
                 <label className="text-xs text-[var(--text-muted)] block mb-1">Ví dụ (tuỳ chọn) — minh hoạ cho user</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -362,30 +343,21 @@ function ImageGridEditor({ content, onChange }: { content: ImageGridContent | nu
                         maxLength={1}
                         className="px-2 py-1 border rounded text-sm uppercase"
                         value={example?.label || ''}
-                        onChange={e => onChange({
-                            items,
-                            example: { ...example, label: e.target.value.toUpperCase(), content: example?.content || { zh: '', pinyin: '' } },
-                        })}
+                        onChange={e => emit({ example: { label: e.target.value.toUpperCase(), content: example?.content || { zh: '', pinyin: '' } } })}
                     />
                     <input
                         type="text"
                         placeholder="Hán"
                         className="px-2 py-1 border rounded text-sm hanzi col-span-2"
                         value={example?.content?.zh || ''}
-                        onChange={e => onChange({
-                            items,
-                            example: { label: example?.label || '', content: { ...example?.content, zh: e.target.value } },
-                        })}
+                        onChange={e => emit({ example: { label: example?.label || '', content: { zh: e.target.value, pinyin: example?.content?.pinyin } } })}
                     />
                     <input
                         type="text"
                         placeholder="Pinyin"
                         className="px-2 py-1 border rounded text-sm italic col-span-3"
                         value={example?.content?.pinyin || ''}
-                        onChange={e => onChange({
-                            items,
-                            example: { label: example?.label || '', content: { zh: example?.content?.zh || '', pinyin: e.target.value } },
-                        })}
+                        onChange={e => emit({ example: { label: example?.label || '', content: { zh: example?.content?.zh || '', pinyin: e.target.value } } })}
                     />
                 </div>
             </div>

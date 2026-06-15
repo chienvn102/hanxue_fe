@@ -136,6 +136,63 @@ export const HSK_SECTION_PRESETS: Record<number, SectionPreset[]> = {
     ],
 };
 
+/**
+ * Bảng "mẫu đề" — mỗi section là danh sách part theo thứ tự { count, type }.
+ * MIRROR từ BE `hanxue_be/src/services/hsk-exam-template.service.js` (TEMPLATES).
+ * ⚠️ KEEP IN SYNC: nếu đổi cấu trúc đề ở BE, cập nhật bảng này.
+ *
+ * Dùng để KHÓA loại câu hỏi: loại câu đã cố định theo level HSK, admin không chọn lại.
+ */
+type TypePlanPart = { count: number; type: string };
+type SectionTypeKey = 'listening' | 'reading' | 'writing';
+
+export const HSK_QUESTION_PLAN: Record<number, Partial<Record<SectionTypeKey, TypePlanPart[]>>> = {
+    1: {
+        listening: [{ count: 5, type: 'true_false' }, { count: 5, type: 'image_grid_match' }, { count: 5, type: 'reply_match' }, { count: 5, type: 'multiple_choice' }],
+        reading: [{ count: 5, type: 'image_grid_match' }, { count: 5, type: 'true_false' }, { count: 5, type: 'reply_match' }, { count: 5, type: 'word_bank_fill' }],
+    },
+    2: {
+        listening: [{ count: 10, type: 'true_false' }, { count: 10, type: 'image_grid_match' }, { count: 10, type: 'reply_match' }, { count: 5, type: 'multiple_choice' }],
+        reading: [{ count: 5, type: 'image_grid_match' }, { count: 5, type: 'word_bank_fill' }, { count: 5, type: 'true_false' }, { count: 10, type: 'multiple_choice' }],
+    },
+    3: {
+        listening: [{ count: 10, type: 'image_grid_match' }, { count: 10, type: 'true_false' }, { count: 10, type: 'multiple_choice' }, { count: 10, type: 'multiple_choice' }],
+        reading: [{ count: 10, type: 'reply_match' }, { count: 10, type: 'word_bank_fill' }, { count: 10, type: 'multiple_choice' }],
+        writing: [{ count: 5, type: 'sentence_assembly' }, { count: 5, type: 'fill_hanzi' }],
+    },
+    4: {
+        listening: [{ count: 10, type: 'true_false' }, { count: 15, type: 'multiple_choice' }, { count: 20, type: 'multiple_choice' }],
+        reading: [{ count: 10, type: 'word_bank_fill' }, { count: 10, type: 'multiple_choice' }, { count: 20, type: 'multiple_choice' }],
+        writing: [{ count: 10, type: 'sentence_assembly' }, { count: 5, type: 'image_keyword_sentence' }],
+    },
+    5: {
+        listening: [{ count: 20, type: 'multiple_choice' }, { count: 25, type: 'multiple_choice' }],
+        reading: [{ count: 15, type: 'word_bank_fill' }, { count: 10, type: 'multiple_choice' }, { count: 20, type: 'multiple_choice' }],
+        writing: [{ count: 8, type: 'sentence_assembly' }, { count: 2, type: 'short_essay' }],
+    },
+    6: {
+        listening: [{ count: 15, type: 'multiple_choice' }, { count: 15, type: 'multiple_choice' }, { count: 20, type: 'multiple_choice' }],
+        reading: [{ count: 10, type: 'error_identify' }, { count: 10, type: 'multi_blank_choice' }, { count: 10, type: 'sentence_into_passage' }, { count: 20, type: 'multiple_choice' }],
+        writing: [{ count: 1, type: 'summary_essay' }],
+    },
+};
+
+/**
+ * Suy ra question_type cố định theo mẫu đề HSK cho câu thứ `indexInSection` (1-based)
+ * trong section — dùng khi THÊM câu thủ công (loại câu bị khóa theo template).
+ * Fallback: part cuối nếu vượt tổng số câu mẫu; 'multiple_choice' nếu chưa có plan.
+ */
+export function deriveQuestionType(level: number, sectionType: string, indexInSection: number): string {
+    const parts = HSK_QUESTION_PLAN[level]?.[sectionType as SectionTypeKey];
+    if (!parts || parts.length === 0) return 'multiple_choice';
+    let acc = 0;
+    for (const part of parts) {
+        acc += part.count;
+        if (indexInSection <= acc) return part.type;
+    }
+    return parts[parts.length - 1].type;
+}
+
 export const HSK_AVAILABLE_LEVELS: number[] = [1, 2, 3, 4, 5, 6];
 
 export interface QuestionFormData {

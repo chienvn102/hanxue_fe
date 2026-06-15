@@ -6,13 +6,12 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { UploadField } from '@/components/admin/UploadField';
-import { QuestionTypePicker } from '@/components/admin/QuestionTypePicker';
 import { QuestionFormByType } from '@/components/admin/QuestionFormByType';
 import { QuestionPreview } from '@/components/admin/QuestionPreview';
 import { GroupManager } from '@/components/admin/GroupManager';
 import {
     HSK_COLORS, EXAM_TYPES, SECTION_TYPES, QUESTION_TYPES, HSK_PRESETS,
-    DEFAULT_QUESTION_FORM,
+    DEFAULT_QUESTION_FORM, deriveQuestionType,
     type QuestionFormData,
 } from '@/components/admin/hsk-types';
 
@@ -338,9 +337,12 @@ export default function HskExamAdminPage() {
         setSelectedSection(section);
         setSelectedQuestion(null);
         const nextNumber = (section.questions?.length || 0) + 1;
+        // Loại câu KHÓA theo mẫu đề HSK (admin không chọn lại). Suy ra theo level + vị trí câu.
+        const level = exams.find(e => e.id === expandedExam)?.hsk_level || 1;
         setQuestionForm({
             ...DEFAULT_QUESTION_FORM,
             question_number: nextNumber,
+            question_type: deriveQuestionType(level, section.section_type, nextNumber),
         });
         setShowQuestionModal(true);
     };
@@ -802,33 +804,14 @@ export default function HskExamAdminPage() {
                                     />
                                 </div>
 
-                                {/* Type picker */}
-                                <QuestionTypePicker
-                                    sectionType={selectedSection?.section_type || 'reading'}
-                                    selectedType={questionForm.question_type}
-                                    onSelect={type => {
-                                        const isListeningType = ['true_false', 'image_match', 'multiple_choice'].includes(type)
-                                            && selectedSection?.section_type === 'listening';
-                                        setQuestionForm({
-                                            ...questionForm,
-                                            question_type: type,
-                                            correct_answer: '',
-                                            options: ['', '', '', ''],
-                                            option_images: ['', '', '', ''],
-                                            // Clear audio fields when switching away from listening types
-                                            ...(!isListeningType && {
-                                                question_audio: '',
-                                                audio_start_time: 0,
-                                                audio_end_time: 0,
-                                                audio_play_count: 2,
-                                            }),
-                                            // Clear image when switching away from image-related types
-                                            ...(type !== 'image_match' && type !== 'short_answer' && {
-                                                question_image: '',
-                                            }),
-                                        });
-                                    }}
-                                />
+                                {/* Loại câu KHÓA theo mẫu đề HSK — chỉ hiển thị, không cho đổi. */}
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs text-[var(--text-muted)] whitespace-nowrap">Loại câu</label>
+                                    <span className="text-xs px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-500 font-medium">
+                                        {QUESTION_TYPES.find(t => t.value === questionForm.question_type)?.label || questionForm.question_type}
+                                    </span>
+                                    <span className="text-[11px] text-[var(--text-muted)]">(cố định theo mẫu đề HSK)</span>
+                                </div>
 
                                 {/* Dynamic form */}
                                 <QuestionFormByType
@@ -836,6 +819,7 @@ export default function HskExamAdminPage() {
                                     onChange={setQuestionForm}
                                     sectionType={selectedSection?.section_type || 'reading'}
                                     examType={(exams.find(e => e.id === expandedExam)?.exam_type === 'exam') ? 'exam' : 'practice'}
+                                    hskLevel={exams.find(e => e.id === expandedExam)?.hsk_level}
                                 />
                             </div>
 

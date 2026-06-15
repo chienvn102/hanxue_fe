@@ -18,25 +18,36 @@ export function GroupHeader({ group }: Props) {
     if (!content) return null;
 
     if (group.group_type === 'image_grid') {
-        const items = (content.items as { label: string; image_url: string; alt_vi?: string }[]) || [];
+        const singleImage = (content.image_url as string) || '';
+        const items = (content.items as { label: string; image_url?: string; alt_vi?: string }[]) || [];
         const example = content.example as { label: string; content: { zh: string; pinyin?: string } } | undefined;
         return (
             <div className="mb-6 p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
                 {group.instructions_vi && (
                     <p className="text-xs text-[var(--text-muted)] italic mb-3">{group.instructions_vi}</p>
                 )}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {items.map(item => (
-                        <div key={item.label} className="flex flex-col items-center text-center">
-                            <span className="text-sm font-bold text-[var(--text-secondary)] mb-2">{item.label}</span>
-                            <img
-                                src={getMediaUrl(item.image_url)}
-                                alt={item.alt_vi || item.label}
-                                className="w-full max-w-[200px] aspect-square object-contain rounded-lg bg-white"
-                            />
-                        </div>
-                    ))}
-                </div>
+                {singleImage ? (
+                    // Chuẩn mới: 1 ảnh ghép A–F (như đề in). Học viên chọn chữ cái ở từng câu.
+                    <img
+                        src={getMediaUrl(singleImage)}
+                        alt={group.title_vi || 'Lưới ảnh A–F'}
+                        className="w-full max-w-2xl mx-auto rounded-lg bg-white"
+                    />
+                ) : (
+                    // Back-compat: đề cũ dùng 6 ảnh rời theo từng label.
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {items.map(item => (
+                            <div key={item.label} className="flex flex-col items-center text-center">
+                                <span className="text-sm font-bold text-[var(--text-secondary)] mb-2">{item.label}</span>
+                                <img
+                                    src={getMediaUrl(item.image_url || '')}
+                                    alt={item.alt_vi || item.label}
+                                    className="w-full max-w-[200px] aspect-square object-contain rounded-lg bg-white"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
                 {example && (
                     <div className="mt-4 pt-3 border-t border-[var(--border)] text-sm text-[var(--text-muted)]">
                         <span className="mr-2">例如：</span>

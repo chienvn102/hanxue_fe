@@ -18,6 +18,8 @@ interface QuestionFormByTypeProps {
      * 'practice' (mặc định) = giữ form audio per câu như cũ.
      */
     examType?: ExamType;
+    /** HSK level của đề — để bật nút "Tạo pinyin" (chỉ HSK1/2). */
+    hskLevel?: number;
 }
 
 interface GroupOption {
@@ -33,13 +35,15 @@ const GROUP_TYPE_REQUIRED: Record<string, 'image_grid' | 'word_bank' | 'reply_ba
     reply_match: 'reply_bank',
 };
 
-export function QuestionFormByType({ form, onChange, sectionType, sectionId, examType = 'practice' }: QuestionFormByTypeProps) {
+export function QuestionFormByType({ form, onChange, sectionType, sectionId, examType = 'practice', hskLevel }: QuestionFormByTypeProps) {
     const isListening = sectionType === 'listening';
     const isExamMode = examType === 'exam';
     const type = form.question_type;
     const requiredGroupType = GROUP_TYPE_REQUIRED[type];
+    const canGenPinyin = hskLevel === 1 || hskLevel === 2;
 
     const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
+    const [genningPinyin, setGenningPinyin] = useState(false);
 
     // Fetch groups khi cần (image_grid_match / word_bank_fill / reply_match)
     useEffect(() => {
@@ -59,6 +63,38 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
 
     const set = <K extends keyof QuestionFormData>(key: K, value: QuestionFormData[K]) => {
         onChange({ ...form, [key]: value });
+    };
+
+    // Tạo pinyin (pinyin-pro, deterministic) cho câu hỏi + đáp án — chỉ HSK1/2.
+    const genPinyin = async () => {
+        if (!canGenPinyin) return;
+        try {
+            setGenningPinyin(true);
+            const token = localStorage.getItem('adminToken');
+            const res = await fetch(`${API_BASE}/api/admin/hsk-questions/gen-pinyin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ hsk_level: hskLevel, question_text: form.question_text, options: form.options }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                alert(data.message || 'Lỗi tạo pinyin');
+                return;
+            }
+            const nextMeta = { ...(form.meta || {}) } as Record<string, unknown>;
+            if (data.question_text_pinyin) {
+                nextMeta.pinyin = { ...((nextMeta.pinyin as Record<string, unknown>) || {}), question_text: data.question_text_pinyin };
+            }
+            onChange({
+                ...form,
+                options_pinyin: Array.isArray(data.options_pinyin) && data.options_pinyin.length ? data.options_pinyin : form.options_pinyin,
+                meta: nextMeta,
+            });
+        } catch {
+            alert('Lỗi mạng khi tạo pinyin');
+        } finally {
+            setGenningPinyin(false);
+        }
     };
 
     const updateOption = (idx: number, value: string) => {
@@ -134,6 +170,21 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
                     onChange={e => set('question_text', e.target.value)}
                 />
             </div>
+
+            {/* Tạo pinyin tự động — chỉ HSK1/2 (pinyin-pro). Điền pinyin cho câu hỏi + đáp án. */}
+            {canGenPinyin && (
+                <div>
+                    <button
+                        type="button"
+                        onClick={genPinyin}
+                        disabled={genningPinyin}
+                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20 disabled:opacity-50 transition-colors font-medium"
+                    >
+                        ✨ {genningPinyin ? 'Đang tạo pinyin...' : 'Tạo pinyin (HSK1/2)'}
+                    </button>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1">Tự điền pinyin cho câu hỏi + các đáp án (pinyin-pro).</p>
+                </div>
+            )}
 
             {/* ── Audio config — listening or when audio is present ──
                 Exam mode: audio liên tục dùng section.audio_url ở cấp section.
