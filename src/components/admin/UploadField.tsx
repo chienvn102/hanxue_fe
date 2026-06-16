@@ -28,9 +28,7 @@ export function UploadField({ label, value, onChange, type, accept }: {
 }) {
     const [uploading, setUploading] = useState(false);
 
-    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const doUpload = async (file: File) => {
         setUploading(true);
         try {
             const url = await uploadFile(file, type);
@@ -39,8 +37,27 @@ export function UploadField({ label, value, onChange, type, accept }: {
             alert('Upload thất bại');
         } finally {
             setUploading(false);
-            e.target.value = '';
         }
+    };
+
+    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        await doUpload(file);
+        e.target.value = '';
+    };
+
+    // Dán ảnh từ clipboard (chụp màn hình → Ctrl+V). Chỉ áp cho field ảnh; nếu
+    // clipboard không có ảnh thì để paste text (URL) chạy bình thường.
+    const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+        if (type !== 'image' || uploading) return;
+        const items = e.clipboardData?.items ? Array.from(e.clipboardData.items) : [];
+        const imgItem = items.find(it => it.kind === 'file' && it.type.startsWith('image/'));
+        if (!imgItem) return;
+        const file = imgItem.getAsFile();
+        if (!file) return;
+        e.preventDefault();
+        await doUpload(file);
     };
 
     return (
@@ -49,10 +66,11 @@ export function UploadField({ label, value, onChange, type, accept }: {
             <div className="flex gap-2">
                 <input
                     type="text"
-                    placeholder={`URL ${type} (hoặc upload)`}
+                    placeholder={type === 'image' ? 'URL · upload · hoặc dán ảnh (Ctrl+V)' : `URL ${type} (hoặc upload)`}
                     className="flex-1 px-3 py-2 border rounded-lg text-sm"
                     value={value}
                     onChange={e => onChange(e.target.value)}
+                    onPaste={handlePaste}
                 />
                 <label className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${uploading ? 'bg-[var(--surface-secondary)] text-[var(--text-muted)]' : 'bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20'}`}>
                     {uploading ? '...' : <span>&#8593;</span>}

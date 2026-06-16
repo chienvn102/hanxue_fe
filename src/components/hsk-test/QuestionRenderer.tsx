@@ -77,26 +77,26 @@ export function QuestionRenderer({ question, group, value, onChange }: Props) {
             return <SentenceIntoPassage {...props} />;
 
         // ─── true_false: chọn variant dựa vào fields ───────────────────
+        // ƯU TIÊN câu CÓ ẢNH trước — nếu không, các câu nghe "看图判断" (HSK1 1-5)
+        // rơi vào nhánh statement-only và MẤT ảnh (AudioStatementJudge không render ảnh).
         case 'true_false':
-            // Audio + image → AudioImageJudge
-            if (question.questionAudio && question.questionImage && !question.statement) {
-                return <AudioImageJudge {...props} />;
+            // Ảnh + chữ Hán (reading 21-25: ảnh + từ) → ImageCharJudge.
+            if (question.questionImage && question.questionText) {
+                return <ImageCharJudge {...props} />;
             }
-            // Audio + ★ statement → AudioStatementJudge
-            if (question.questionAudio && question.statement) {
-                return <AudioStatementJudge {...props} />;
+            // Ảnh, không có chữ Hán (listening 1-5 "看图判断") → AudioImageJudge.
+            // KHÔNG gate theo questionAudio: chế độ thi dùng audio liên tục ở section,
+            // câu KHÔNG có audio riêng nhưng VẪN phải hiện ảnh. AudioImageJudge tự
+            // ẩn player khi questionAudio rỗng.
+            if (question.questionImage) {
+                return <AudioImageJudge {...props} />;
             }
             // Passage + ★ statement → ParagraphStatementJudge
             if (question.passage && question.statement) {
                 return <ParagraphStatementJudge {...props} />;
             }
-            // Image + Hanzi → ImageCharJudge
-            if (question.questionImage && question.questionText && !question.questionAudio) {
-                return <ImageCharJudge {...props} />;
-            }
-            // Statement-only (no per-question audio) — exam mode dùng audio liên tục
-            // ở section level (xem FullTestAudio.tsx). AudioStatementJudge tự ẩn
-            // audio player khi questionAudio rỗng nên reuse được.
+            // Audio/statement (nghe) — AudioStatementJudge tự ẩn audio player khi
+            // questionAudio rỗng (exam mode dùng audio liên tục ở section level).
             if (question.statement) {
                 return <AudioStatementJudge {...props} />;
             }
