@@ -25,6 +25,8 @@ interface QuestionFormByTypeProps {
     examType?: ExamType;
     /** HSK level của đề — để bật nút "Tạo pinyin" (chỉ HSK1/2). */
     hskLevel?: number;
+    /** v2: form tối giản — chỉ nội dung + đáp án + giải thích; ẩn điểm/độ khó/cấu hình audio/chọn group (dùng mặc định). */
+    simplified?: boolean;
 }
 
 interface GroupOption {
@@ -40,12 +42,14 @@ const GROUP_TYPE_REQUIRED: Record<string, 'image_grid' | 'word_bank' | 'reply_ba
     reply_match: 'reply_bank',
 };
 
-export function QuestionFormByType({ form, onChange, sectionType, sectionId, examType = 'practice', hskLevel }: QuestionFormByTypeProps) {
+export function QuestionFormByType({ form, onChange, sectionType, sectionId, examType = 'practice', hskLevel, simplified = false }: QuestionFormByTypeProps) {
     const isListening = sectionType === 'listening';
     const isExamMode = examType === 'exam';
     const type = form.question_type;
     const requiredGroupType = GROUP_TYPE_REQUIRED[type];
     const canGenPinyin = hskLevel === 1 || hskLevel === 2;
+    // v2 tối giản: ẩn upload audio/timings per câu (dùng 1 audio cấp đề), chỉ giữ transcript.
+    const minimalAudio = isExamMode || simplified;
 
     const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
     const [genningPinyin, setGenningPinyin] = useState(false);
@@ -197,9 +201,9 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
             {(isListening || form.question_audio) && (
                 <div className="bg-blue-50/50 dark:bg-blue-950/20 rounded-lg p-3 space-y-3 border border-blue-200/50 dark:border-blue-800/30">
                     <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                        {isExamMode ? 'Transcript câu này (audio liên tục ở cấp section)' : 'Cấu hình Audio'}
+                        {minimalAudio ? 'Transcript câu này (audio 1 file ở cấp đề)' : 'Cấu hình Audio'}
                     </h4>
-                    {!isExamMode && (
+                    {!minimalAudio && (
                         <>
                             <UploadField
                                 label="Audio câu hỏi"
@@ -269,8 +273,8 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
                 </div>
             )}
 
-            {/* ── Group selector — chỉ hiện khi type cần shared resource ── */}
-            {requiredGroupType && (
+            {/* ── Group selector — chỉ hiện khi type cần shared resource (ẩn ở v2: group_id đã khóa) ── */}
+            {requiredGroupType && !simplified && (
                 <div className="bg-purple-50/50 dark:bg-purple-950/20 rounded-lg p-3 border border-purple-200/50 dark:border-purple-800/30">
                     <label className="text-xs font-semibold text-purple-600 dark:text-purple-400 block mb-2">
                         Group ({requiredGroupType}) dùng chung cho cụm câu *
@@ -805,31 +809,34 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
 
             {/* ── Footer: Points + Difficulty + Explanation ── */}
             <div className="border-t border-[var(--border)] pt-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="text-xs text-[var(--text-muted)] block mb-1">Điểm</label>
-                        <input
-                            type="number" min={1}
-                            className="w-full px-3 py-2 border rounded-lg text-sm"
-                            value={form.points}
-                            onChange={e => set('points', parseInt(e.target.value) || 1)}
-                        />
+                {/* Điểm + Độ khó: ẩn ở v2 (mặc định 1đ / độ khó 1) cho gọn. */}
+                {!simplified && (
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs text-[var(--text-muted)] block mb-1">Điểm</label>
+                            <input
+                                type="number" min={1}
+                                className="w-full px-3 py-2 border rounded-lg text-sm"
+                                value={form.points}
+                                onChange={e => set('points', parseInt(e.target.value) || 1)}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-[var(--text-muted)] block mb-1">Độ khó</label>
+                            <select
+                                className="w-full px-3 py-2 border rounded-lg text-sm"
+                                value={form.difficulty}
+                                onChange={e => set('difficulty', parseInt(e.target.value))}
+                            >
+                                <option value={1}>1 — Dễ</option>
+                                <option value={2}>2 — Trung bình</option>
+                                <option value={3}>3 — Khó</option>
+                                <option value={4}>4 — Rất khó</option>
+                                <option value={5}>5 — Siêu khó</option>
+                            </select>
+                        </div>
                     </div>
-                    <div>
-                        <label className="text-xs text-[var(--text-muted)] block mb-1">Độ khó</label>
-                        <select
-                            className="w-full px-3 py-2 border rounded-lg text-sm"
-                            value={form.difficulty}
-                            onChange={e => set('difficulty', parseInt(e.target.value))}
-                        >
-                            <option value={1}>1 — Dễ</option>
-                            <option value={2}>2 — Trung bình</option>
-                            <option value={3}>3 — Khó</option>
-                            <option value={4}>4 — Rất khó</option>
-                            <option value={5}>5 — Siêu khó</option>
-                        </select>
-                    </div>
-                </div>
+                )}
                 <div>
                     <label className="text-xs text-[var(--text-muted)] block mb-1">Giải thích đáp án</label>
                     <textarea

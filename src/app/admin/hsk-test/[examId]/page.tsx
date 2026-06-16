@@ -509,6 +509,7 @@ export default function HskExamDetailAdminPage() {
                                 sectionId={editing.section_id}
                                 examType={exam.exam_type}
                                 hskLevel={exam.hsk_level}
+                                simplified={exam.format_version === 2}
                             />
                         </div>
 

@@ -149,6 +149,7 @@ export function GroupManager({ sectionId, token, locked = false }: Props) {
                     sectionId={sectionId}
                     token={token}
                     group={editingGroup}
+                    locked={locked}
                     onClose={() => { setShowModal(false); setEditingGroup(null); }}
                     onSaved={() => { fetchGroups(); setShowModal(false); setEditingGroup(null); }}
                 />
@@ -161,11 +162,12 @@ export function GroupManager({ sectionId, token, locked = false }: Props) {
  * Modal editor — tạo / sửa group
  * ───────────────────────────────────────────────────────────────────── */
 function GroupEditorModal({
-    sectionId, token, group, onClose, onSaved,
+    sectionId, token, group, locked = false, onClose, onSaved,
 }: {
     sectionId: number;
     token: string | null;
     group: Group | null;
+    locked?: boolean;
     onClose: () => void;
     onSaved: () => void;
 }) {
@@ -238,36 +240,41 @@ function GroupEditorModal({
                         </div>
                     )}
 
-                    <div className="grid grid-cols-3 gap-3">
-                        <div className="col-span-2">
-                            <label className="text-xs text-[var(--text-muted)] block mb-1">Tiêu đề (vi, tuỳ chọn)</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 border rounded-lg text-sm"
-                                value={titleVi}
-                                onChange={e => setTitleVi(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs text-[var(--text-muted)] block mb-1">Order</label>
-                            <input
-                                type="number"
-                                className="w-full px-3 py-2 border rounded-lg text-sm"
-                                value={orderIndex}
-                                onChange={e => setOrderIndex(parseInt(e.target.value) || 0)}
-                            />
-                        </div>
-                    </div>
+                    {/* Tiêu đề / Order / Hướng dẫn: ẩn ở chế độ khóa (v2) — chỉ sửa nội dung. */}
+                    {!locked && (
+                        <>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="col-span-2">
+                                    <label className="text-xs text-[var(--text-muted)] block mb-1">Tiêu đề (vi, tuỳ chọn)</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-3 py-2 border rounded-lg text-sm"
+                                        value={titleVi}
+                                        onChange={e => setTitleVi(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-[var(--text-muted)] block mb-1">Order</label>
+                                    <input
+                                        type="number"
+                                        className="w-full px-3 py-2 border rounded-lg text-sm"
+                                        value={orderIndex}
+                                        onChange={e => setOrderIndex(parseInt(e.target.value) || 0)}
+                                    />
+                                </div>
+                            </div>
 
-                    <div>
-                        <label className="text-xs text-[var(--text-muted)] block mb-1">Hướng dẫn (vi, tuỳ chọn)</label>
-                        <textarea
-                            className="w-full px-3 py-2 border rounded-lg text-sm"
-                            rows={2}
-                            value={instructionsVi}
-                            onChange={e => setInstructionsVi(e.target.value)}
-                        />
-                    </div>
+                            <div>
+                                <label className="text-xs text-[var(--text-muted)] block mb-1">Hướng dẫn (vi, tuỳ chọn)</label>
+                                <textarea
+                                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                                    rows={2}
+                                    value={instructionsVi}
+                                    onChange={e => setInstructionsVi(e.target.value)}
+                                />
+                            </div>
+                        </>
+                    )}
 
                     {/* Content editor per type */}
                     <div className="border-t border-[var(--border)] pt-3 mt-3">
