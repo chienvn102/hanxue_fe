@@ -54,6 +54,18 @@ const INSTRUCTION: Record<string, string> = {
     fill_hanzi: 'Viết chữ Hán theo pinyin.',
 };
 
+// Tiêu đề cụm "第 X-Y 题：<chỉ dẫn>" — giống hệt trang làm bài để admin thấy đúng phần.
+const PART_PROMPT_BY_TYPE: Record<string, string> = {
+    true_false: '判断对错', multiple_choice: '请选出正确答案', sentence_order: '排列顺序',
+    sentence_assembly: '完成句子', fill_hanzi: '看拼音写汉字', word_bank_fill: '选词填空',
+    image_match: '看图选项', image_grid_match: '看图选项', reply_match: '问答匹配',
+};
+function makePartPrompt(qType: string | undefined, fromN: number, toN: number): string {
+    const zh = qType ? (PART_PROMPT_BY_TYPE[qType] || '') : '';
+    const range = fromN === toN ? `第 ${fromN} 题` : `第 ${fromN}-${toN} 题`;
+    return zh ? `${range}：${zh}。` : range;
+}
+
 // Signed/public GCS URL (dài >500, hết hạn 24h) → gs:// ngắn + vĩnh viễn (cùng object).
 function toMediaRef(v: string): string {
     if (!v) return v;
@@ -130,6 +142,23 @@ export default function HskV2ExamEditorPage() {
         exam?.sections.forEach(s => (s.groups || []).forEach(g => m.set(g.id, g)));
         return m;
     }, [exam]);
+
+    // Cụm "第 X-Y 题" của câu hiện tại (run liên tiếp cùng group_id, hoặc cùng type nếu
+    // standalone) — như trang làm bài, để biết câu 21-25 thuộc phần "判断对错".
+    const partInfo = useMemo(() => {
+        const cq = flat[cur];
+        if (!cq) return null;
+        const secQs = flat.filter(x => x.section_id === cq.section_id);
+        const byId = new Map<number, { first: number; last: number; type: string }>();
+        let run: { first: number; last: number; type: string; gid: number | null | undefined } | null = null;
+        for (const x of secQs) {
+            const same = run !== null && ((!run.gid && !x.group_id && run.type === x.question_type) || (!!run.gid && run.gid === x.group_id));
+            if (same && run) run.last = x.question_number;
+            else run = { first: x.question_number, last: x.question_number, type: x.question_type, gid: x.group_id };
+            byId.set(x.id, run);
+        }
+        return byId.get(cq.id) || null;
+    }, [flat, cur]);
 
     const setQ = (qid: number, patch: Partial<QForm>) => {
         setForms(prev => ({ ...prev, [qid]: { ...prev[qid], ...patch } }));
@@ -266,6 +295,12 @@ export default function HskV2ExamEditorPage() {
                         <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-muted)]">{q.question_type}</span>
                     </div>
 
+                    {/* Tiêu đề cụm "第 X-Y 题：..." như trang làm bài */}
+                    {partInfo && (
+                        <div className="mb-3 p-2.5 rounded-lg bg-[var(--primary)]/5 border-l-4 border-[var(--primary)]">
+                            <p className="text-sm font-semibold text-[var(--primary)] hanzi">{makePartPrompt(partInfo.type, partInfo.first, partInfo.last)}</p>
+                        </div>
+                    )}
                     {/* Instruction box (đỏ như exam) */}
                     <div className="mb-4 p-3 rounded-lg bg-red-500/5 border border-red-500/20 text-sm text-[var(--text-secondary)]">
                         <Icon name="info" size="xs" className="inline mr-1 text-red-500" />
@@ -279,7 +314,7 @@ export default function HskV2ExamEditorPage() {
 
                     {/* Tài nguyên dùng chung (group): lưới ảnh / ngân hàng / đoạn văn — sửa nội dung */}
                     {group && (
-                        <GroupResourceEditor group={group} content={groupForms[group.id] || {}} onChange={patch => setG(group.id, patch)} />
+                        <GroupResourceEditor group={group} content={groupForms[group.id] || {}} onChange={patch => setG(group.id, patch)} hskLevel={exam.hsk_level} />
                     )}
 
                     {/* Nội dung câu — editable */}
@@ -329,7 +364,10 @@ function QuestionBody({ q, fm, groupLabels, set, hskLevel }: { q: FlatQ; fm: QFo
     };
     const genPinyin = async () => {
         const text = type === 'true_false' ? fm.statement : fm.question_text;
-        if (!text.trim()) { alert('Nhập nội dung tiếng Trung trước.'); return; }
+        // Nhiều câu HSK1 (nghe chọn đáp án) KHÔNG có đề chữ, chỉ có đáp án cần pinyin.
+        // Chỉ chặn khi CẢ đề lẫn đáp án đều trống; còn lại vẫn gen pinyin cho đáp án.
+        const hasOptions = fm.options.some(o => o && o.trim());
+        if (!text.trim() && !hasOptions) { alert('Nhập nội dung câu HOẶC đáp án tiếng Trung trước.'); return; }
         setGenning(true);
         try {
             const tk = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
@@ -351,9 +389,10 @@ function QuestionBody({ q, fm, groupLabels, set, hskLevel }: { q: FlatQ; fm: QFo
         finally { setGenning(false); }
     };
     const pinyinBlock = showPy ? (
-        <div className="flex items-center gap-2 mb-3">
-            <input value={metaPy[stemKey] || ''} onChange={e => setStemPy(e.target.value)}
-                placeholder="pinyin câu (HSK1/2)" className="flex-1 px-3 py-1.5 border rounded text-sm italic text-[var(--text-muted)]" />
+        <div className="flex items-start gap-2 mb-3">
+            <textarea value={metaPy[stemKey] || ''} onChange={e => setStemPy(e.target.value)} rows={2}
+                placeholder="pinyin câu (HSK1/2) — tự xuống dòng theo nội dung"
+                className="flex-1 px-3 py-1.5 border rounded text-sm italic text-[var(--text-muted)] resize-y leading-relaxed" />
             <button type="button" onClick={genPinyin} disabled={genning}
                 className="shrink-0 text-xs px-2.5 py-1.5 rounded bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20 disabled:opacity-50">
                 ✨ {genning ? '...' : 'Tạo pinyin'}
@@ -382,7 +421,7 @@ function QuestionBody({ q, fm, groupLabels, set, hskLevel }: { q: FlatQ; fm: QFo
                 </div>
                 {/* transcript nghe */}
                 {q.sectionType === 'listening' && (
-                    <input value={fm.transcript} onChange={e => set({ transcript: e.target.value })} placeholder="Lời thoại nghe (transcript)" className="w-full px-3 py-1.5 border rounded text-sm hanzi mb-3" />
+                    <textarea value={fm.transcript} onChange={e => set({ transcript: e.target.value })} rows={2} placeholder="Lời thoại nghe (transcript)" className="w-full px-3 py-1.5 border rounded text-sm hanzi mb-3 resize-y leading-relaxed" />
                 )}
                 <TrueFalseChoice value={normalizeTrueFalseAnswer(fm.correct_answer) || fm.correct_answer} onChange={v => set({ correct_answer: v })} style="AB" />
                 <p className="text-[11px] text-[var(--text-muted)] mt-1">Bấm A.TRUE / B.FALSE = đánh dấu đáp án đúng.</p>
@@ -395,7 +434,7 @@ function QuestionBody({ q, fm, groupLabels, set, hskLevel }: { q: FlatQ; fm: QFo
             <div>
                 {stem}
                 {q.sectionType === 'listening' && (
-                    <input value={fm.transcript} onChange={e => set({ transcript: e.target.value })} placeholder="Lời thoại nghe (transcript)" className="w-full px-3 py-1.5 border rounded text-sm hanzi mb-3" />
+                    <textarea value={fm.transcript} onChange={e => set({ transcript: e.target.value })} rows={2} placeholder="Lời thoại nghe (transcript)" className="w-full px-3 py-1.5 border rounded text-sm hanzi mb-3 resize-y leading-relaxed" />
                 )}
                 <div className="space-y-2">
                     {fm.options.map((opt, idx) => {
@@ -421,7 +460,7 @@ function QuestionBody({ q, fm, groupLabels, set, hskLevel }: { q: FlatQ; fm: QFo
             <div>
                 {stem}
                 {q.sectionType === 'listening' && (
-                    <input value={fm.transcript} onChange={e => set({ transcript: e.target.value })} placeholder="Lời thoại nghe (transcript)" className="w-full px-3 py-1.5 border rounded text-sm hanzi mb-3" />
+                    <textarea value={fm.transcript} onChange={e => set({ transcript: e.target.value })} rows={2} placeholder="Lời thoại nghe (transcript)" className="w-full px-3 py-1.5 border rounded text-sm hanzi mb-3 resize-y leading-relaxed" />
                 )}
                 <div className="grid grid-cols-3 gap-3">
                     {(fm.option_images.length ? fm.option_images : ['', '', '']).map((url, idx) => {
@@ -447,7 +486,7 @@ function QuestionBody({ q, fm, groupLabels, set, hskLevel }: { q: FlatQ; fm: QFo
                 <textarea value={fm.question_text} onChange={e => set({ question_text: e.target.value })} rows={2} placeholder="Câu hỏi / câu có chỗ trống (tiếng Trung)..." className="w-full px-3 py-2 border rounded-lg text-lg hanzi mb-2" />
                 {pinyinBlock}
                 {q.sectionType === 'listening' && (
-                    <input value={fm.transcript} onChange={e => set({ transcript: e.target.value })} placeholder="Lời thoại nghe (transcript)" className="w-full px-3 py-1.5 border rounded text-sm hanzi mb-3" />
+                    <textarea value={fm.transcript} onChange={e => set({ transcript: e.target.value })} rows={2} placeholder="Lời thoại nghe (transcript)" className="w-full px-3 py-1.5 border rounded text-sm hanzi mb-3 resize-y leading-relaxed" />
                 )}
                 <label className="text-xs text-[var(--text-muted)] block mb-1">Đáp án đúng (chọn 1 chữ cái trong tài nguyên dùng chung):</label>
                 <div className="flex flex-wrap gap-2">
@@ -491,15 +530,47 @@ function QuestionBody({ q, fm, groupLabels, set, hskLevel }: { q: FlatQ; fm: QFo
 }
 
 /* Tài nguyên dùng chung: lưới ảnh (1 ảnh ghép) / ngân hàng từ-câu / đoạn văn. */
-function GroupResourceEditor({ group, content, onChange }: { group: Group; content: GroupContent; onChange: (p: Partial<GroupContent>) => void }) {
+function GroupResourceEditor({ group, content, onChange, hskLevel }: { group: Group; content: GroupContent; onChange: (p: Partial<GroupContent>) => void; hskLevel: number }) {
     const items = content.items || [];
+    const [genning, setGenning] = useState(false);
     const updateItem = (idx: number, patch: Partial<GroupItem>) => {
         const next = items.map((it, i) => (i === idx ? { ...it, ...patch } : it));
         onChange({ items: next });
     };
+    const isWordBank = group.group_type === 'word_bank';
+    const canGen = hskLevel <= 2 && (isWordBank || group.group_type === 'reply_bank');
+    // Tạo pinyin cho TẤT CẢ ô trong ngân hàng từ/câu của cụm (endpoint gen-pinyin, HSK1/2).
+    const genGroupPinyin = async () => {
+        const texts = items.map(it => (isWordBank ? it.word : it.sentence_zh) || '');
+        if (!texts.some(t => t.trim())) { alert('Nhập nội dung tiếng Trung trước.'); return; }
+        setGenning(true);
+        try {
+            const tk = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+            const res = await fetch(`${API_BASE}/api/admin/hsk-questions/gen-pinyin`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk || ''}` },
+                body: JSON.stringify({ hsk_level: hskLevel, options: texts }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) { alert(data.message || 'Lỗi tạo pinyin'); return; }
+            const py: string[] = Array.isArray(data.options_pinyin) ? data.options_pinyin : [];
+            const next = items.map((it, i) => (isWordBank
+                ? { ...it, pinyin: py[i] || it.pinyin || '' }
+                : { ...it, sentence_pinyin: py[i] || it.sentence_pinyin || '' }));
+            onChange({ items: next });
+        } catch { alert('Lỗi mạng khi tạo pinyin'); }
+        finally { setGenning(false); }
+    };
     return (
         <div className="mb-4 p-3 rounded-xl bg-purple-500/5 border border-purple-500/20">
-            <p className="text-[11px] font-semibold uppercase text-purple-600 dark:text-purple-400 mb-2">Tài nguyên dùng chung của cụm</p>
+            <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-[11px] font-semibold uppercase text-purple-600 dark:text-purple-400">Tài nguyên dùng chung của cụm</p>
+                {canGen && (
+                    <button type="button" onClick={genGroupPinyin} disabled={genning}
+                        className="shrink-0 text-xs px-2.5 py-1 rounded bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20 disabled:opacity-50">
+                        ✨ {genning ? '...' : 'Tạo pinyin'}
+                    </button>
+                )}
+            </div>
             {group.group_type === 'image_grid' && (
                 <div className="max-w-md">
                     <UploadField label="Ảnh lưới (1 ảnh ghép A–F)" value={content.image_url || ''} onChange={v => onChange({ image_url: v })} type="image" accept="image/jpeg,image/png,image/webp,image/gif" />
