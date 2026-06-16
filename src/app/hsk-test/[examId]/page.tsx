@@ -164,6 +164,8 @@ function ExamTakingPageContent() {
     const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
     const [showConfirmExit, setShowConfirmExit] = useState(false);
     const [showGrid, setShowGrid] = useState(false);
+    // Chế độ Thi: audio nghe liên tục đã chạy hết chưa → mở khóa các phần còn lại.
+    const [audioFinished, setAudioFinished] = useState(false);
 
     // Practice mode: lookup correct answers + explanations để show feedback ngay
     const [correctAnswerMap, setCorrectAnswerMap] = useState<Record<number, { answer: string; explanation?: string }>>({});
@@ -474,19 +476,20 @@ function ExamTakingPageContent() {
     const showPracticeSectionAudio = testMode === 'practice' && hasExamAudio
         && currentSection?.section_type === 'listening';
 
-    // Section gating cho test mode: không cho chuyển sang section sau nếu section
-    // hiện tại chưa làm hết. Tính set chỉ số section bị khoá (forward only).
-    // - Section đầu tiên có câu chưa trả lời → tất cả section sau đó bị khoá.
-    // - User vẫn có thể quay lại section trước để xem (không khoá backward).
+    // Section gating (chế độ Thi): khi còn audio nghe liên tục ĐANG phát, KHÓA các
+    // phần KHÔNG phải nghe (không cho nhảy sang đọc/viết). Audio chạy XONG (hoặc đề
+    // không có audio) → mở khóa toàn bộ + tự do chọn lại mọi câu trong map (kể cả
+    // xem/sửa lại phần nghe). Phần nghe luôn mở để làm trong lúc nghe.
     const lockedSectionIndices = new Set<number>();
-    if (testMode === 'full') {
-        let foundIncomplete = false;
-        for (let sIdx = 0; sIdx < exam.sections.length; sIdx++) {
-            const sectionQs = questions.filter(q => q.sectionIndex === sIdx);
-            const allAnswered = sectionQs.length > 0
-                && sectionQs.every(q => answers[q.id] !== undefined);
-            if (foundIncomplete) lockedSectionIndices.add(sIdx);
-            if (!allAnswered) foundIncomplete = true;
+    if (testMode === 'full' && hasExamAudio && !audioFinished) {
+        // Mở khóa nếu ĐÃ làm xong phần nghe (trả lời hết câu nghe) — phòng khi audio
+        // bị chặn autoplay, vẫn cho qua phần đọc/viết.
+        const listeningQs = questions.filter(q => exam.sections[q.sectionIndex]?.section_type === 'listening');
+        const listeningDone = listeningQs.length > 0 && listeningQs.every(q => answers[q.id] !== undefined);
+        if (!listeningDone) {
+            exam.sections.forEach((s, sIdx) => {
+                if (s.section_type !== 'listening') lockedSectionIndices.add(sIdx);
+            });
         }
     }
 
@@ -497,7 +500,7 @@ function ExamTakingPageContent() {
         if (target && lockedSectionIndices.has(target.sectionIndex)) {
             const targetSection = exam.sections[target.sectionIndex];
             const targetLabel = SECTION_TYPE_LABELS[targetSection?.section_type || ''] || 'phần tiếp theo';
-            alert(`Vui lòng làm hết các câu của phần trước khi chuyển sang ${targetLabel}.`);
+            alert(`Phần ${targetLabel} sẽ mở sau khi nghe hết audio.`);
             return;
         }
         setCurrentIndex(newIdx);
@@ -658,7 +661,7 @@ function ExamTakingPageContent() {
                                         onClick={() => {
                                             if (isLocked) {
                                                 const targetLabel = SECTION_TYPE_LABELS[q.sectionType] || 'phần tiếp theo';
-                                                alert(`Vui lòng làm hết các câu của phần trước khi chuyển sang ${targetLabel}.`);
+                                                alert(`Phần ${targetLabel} sẽ mở sau khi nghe hết audio.`);
                                                 return;
                                             }
                                             setCurrentIndex(q.globalIndex);
@@ -759,6 +762,7 @@ function ExamTakingPageContent() {
                         <FullTestAudio
                             audioUrl={listeningAudioUrl}
                             sectionTitle={audioSection.title || `Phần ${audioSection.section_order}`}
+                            onEnded={() => setAudioFinished(true)}
                         />
                     )}
 

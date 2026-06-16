@@ -6,6 +6,8 @@ import { AudioPlayer } from './AudioPlayer';
 interface Props {
     audioUrl: string;
     sectionTitle?: string;
+    /** Gọi khi audio chạy hết — để trang mở khóa các phần còn lại. */
+    onEnded?: () => void;
 }
 
 /**
@@ -19,7 +21,7 @@ interface Props {
  * (Trước migration 022, component này còn marker "Đang ở câu X" dựa vào
  * audio_start_time/audio_end_time. Đã bỏ — exam mode giờ không cần timestamp.)
  */
-export function FullTestAudio({ audioUrl, sectionTitle }: Props) {
+export function FullTestAudio({ audioUrl, sectionTitle, onEnded }: Props) {
     const [ended, setEnded] = useState(false);
 
     return (
@@ -44,7 +46,7 @@ export function FullTestAudio({ audioUrl, sectionTitle }: Props) {
                     mode="full"
                     autoPlay
                     maxPlays={1}
-                    onEnded={() => setEnded(true)}
+                    onEnded={() => { setEnded(true); onEnded?.(); }}
                 />
             </div>
         </div>
