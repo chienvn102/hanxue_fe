@@ -80,14 +80,20 @@ export function QuestionRenderer({ question, group, value, onChange }: Props) {
         // ƯU TIÊN câu CÓ ẢNH trước — nếu không, các câu nghe "看图判断" (HSK1 1-5)
         // rơi vào nhánh statement-only và MẤT ảnh (AudioStatementJudge không render ảnh).
         case 'true_false':
-            // Ảnh + chữ Hán (reading 21-25: ảnh + từ) → ImageCharJudge.
+            // Ảnh + chữ Hán IN trên đề (reading 21-25): chữ nằm ở questionText HOẶC
+            // statement (blueprint HSK1 lưu từ ở statement). Điều kiện "in chứ không
+            // đọc" = KHÔNG có transcript/audio (câu nghe thì chữ được ĐỌC). → ImageCharJudge.
             if (question.questionImage && question.questionText) {
                 return <ImageCharJudge {...props} />;
             }
-            // Ảnh, không có chữ Hán (listening 1-5 "看图判断") → AudioImageJudge.
-            // KHÔNG gate theo questionAudio: chế độ thi dùng audio liên tục ở section,
-            // câu KHÔNG có audio riêng nhưng VẪN phải hiện ảnh. AudioImageJudge tự
-            // ẩn player khi questionAudio rỗng.
+            // Reading "ảnh + TỪ in trên đề" (HSK1 21-25): từ nằm ở statement. Câu nghe
+            // "看图判断" (listening 1-5) KHÔNG có statement (lời được ĐỌC qua transcript,
+            // không gửi cho học viên), nên chỉ câu reading có statement mới vào đây. → ảnh + từ.
+            if (question.questionImage && question.statement) {
+                return <ImageCharJudge {...props} />;
+            }
+            // Ảnh, nội dung được ĐỌC (listening 1-5 "看图判断") → chỉ hiện ảnh.
+            // KHÔNG gate theo questionAudio: chế độ thi dùng audio liên tục ở section.
             if (question.questionImage) {
                 return <AudioImageJudge {...props} />;
             }

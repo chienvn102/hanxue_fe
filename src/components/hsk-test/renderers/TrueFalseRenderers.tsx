@@ -46,8 +46,10 @@ export function AudioImageJudge({ question, value, onChange }: RP) {
  * ───────────────────────────────────────────────────────────────────── */
 export function ImageCharJudge({ question, value, onChange }: RP) {
     const { showPinyin } = useHskTest();
-    const meta = (question.meta || {}) as { pinyin?: { question_text?: string } };
-    const pinyin = meta.pinyin?.question_text;
+    const meta = (question.meta || {}) as { pinyin?: { question_text?: string; statement?: string } };
+    // HSK1 reading 21-25 lưu từ ở `statement`; một số đề dùng `questionText`.
+    const word = question.questionText || question.statement || '';
+    const pinyin = meta.pinyin?.question_text || meta.pinyin?.statement;
     return (
         <div>
             {question.questionImage && (
@@ -57,10 +59,10 @@ export function ImageCharJudge({ question, value, onChange }: RP) {
                     className="max-h-48 rounded-lg my-3 object-contain"
                 />
             )}
-            {question.questionText && (
+            {word && (
                 <div className="my-3 text-center">
                     <PinyinRuby
-                        zh={question.questionText}
+                        zh={word}
                         pinyin={pinyin}
                         show={showPinyin}
                         fontSize="2xl"
