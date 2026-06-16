@@ -184,6 +184,19 @@ export default function HskV2ExamEditorPage() {
         } catch (e) { console.error(e); }
     };
 
+    // Sửa tên đề — lưu khi rời ô (blur) hoặc Enter. Bỏ qua nếu rỗng/không đổi.
+    const saveExamTitle = async (raw: string) => {
+        const t = raw.trim();
+        if (!exam || !t || t === exam.title) return;
+        try {
+            await fetch(`${API_BASE}/api/hsk-exams/${examId}`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token() || ''}` }, body: JSON.stringify({ title: t }),
+            });
+            setExam(prev => (prev ? { ...prev, title: t } : prev));
+            setSavedMsg('Đã lưu tên đề.');
+        } catch (e) { console.error(e); }
+    };
+
     if (loading) return <div className="p-6 text-center text-[var(--text-muted)]">Đang tải đề...</div>;
     if (error && !exam) return <div className="p-6 text-center"><Icon name="error" size="xl" className="text-red-500 mb-3" /><p className="mb-4">{error}</p><Link href="/admin/hsk-test-v2"><Button variant="secondary">Quay lại</Button></Link></div>;
     if (!exam || flat.length === 0) return null;
@@ -230,7 +243,15 @@ export default function HskV2ExamEditorPage() {
                 {/* Top: tiêu đề + audio đề */}
                 <div className="flex flex-wrap items-center gap-2 mb-3 pt-1">
                     <span className={`${HSK_COLORS[exam.hsk_level]} text-white text-xs font-bold px-2 py-1 rounded`}>HSK {exam.hsk_level}</span>
-                    <h1 className="font-bold text-[var(--text-main)]">{exam.title}</h1>
+                    <input
+                        key={exam.id}
+                        defaultValue={exam.title}
+                        onBlur={e => saveExamTitle(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        placeholder="Tên đề..."
+                        title="Sửa tên đề (lưu khi rời ô hoặc nhấn Enter)"
+                        className="flex-1 min-w-[200px] font-bold text-[var(--text-main)] bg-transparent border-b border-dashed border-[var(--border)] hover:border-[var(--text-muted)] focus:border-[var(--primary)] outline-none px-1 py-0.5"
+                    />
                     <span className="text-xs text-[var(--text-muted)] inline-flex items-center gap-1"><Icon name="lock" size="xs" /> cấu trúc khóa</span>
                 </div>
                 <div className="mb-4 bg-[var(--surface)] rounded-xl border border-[var(--border)] p-3">
