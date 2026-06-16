@@ -325,7 +325,7 @@ export default function AdminHskImportPage() {
                             )}
 
                             {job?.status === 'completed' && job.exam_id && (
-                                <Link href={`/admin/hsk-test?expand=${job.exam_id}`}>
+                                <Link href={v2 ? `/admin/hsk-test-v2/${job.exam_id}` : `/admin/hsk-test?expand=${job.exam_id}`}>
                                     <Button fullWidth>
                                         <Icon name="open_in_new" size="sm" />
                                         Mở đề vừa import

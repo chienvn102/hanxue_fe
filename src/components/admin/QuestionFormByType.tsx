@@ -27,6 +27,8 @@ interface QuestionFormByTypeProps {
     hskLevel?: number;
     /** v2: form tối giản — chỉ nội dung + đáp án + giải thích; ẩn điểm/độ khó/cấu hình audio/chọn group (dùng mặc định). */
     simplified?: boolean;
+    /** Số ô của group dùng chung (5 hoặc 6) — để picker đáp án A–F/A–E đúng số. */
+    groupItemCount?: number;
 }
 
 interface GroupOption {
@@ -42,7 +44,7 @@ const GROUP_TYPE_REQUIRED: Record<string, 'image_grid' | 'word_bank' | 'reply_ba
     reply_match: 'reply_bank',
 };
 
-export function QuestionFormByType({ form, onChange, sectionType, sectionId, examType = 'practice', hskLevel, simplified = false }: QuestionFormByTypeProps) {
+export function QuestionFormByType({ form, onChange, sectionType, sectionId, examType = 'practice', hskLevel, simplified = false, groupItemCount }: QuestionFormByTypeProps) {
     const isListening = sectionType === 'listening';
     const isExamMode = examType === 'exam';
     const type = form.question_type;
@@ -60,7 +62,8 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
 
     // Fetch groups khi cần (image_grid_match / word_bank_fill / reply_match)
     useEffect(() => {
-        if (!requiredGroupType || !sectionId) return;
+        // v2 (simplified): ẩn group selector → không cần fetch (tránh fetch hàng loạt khi render cả đề).
+        if (!requiredGroupType || !sectionId || simplified) return;
         const token = localStorage.getItem('adminToken');
         if (!token) return;
         fetch(`${API_BASE}/api/hsk-exams/sections/${sectionId}/groups`, {
@@ -72,7 +75,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
                 setGroupOptions(all.filter(g => g.group_type === requiredGroupType));
             })
             .catch(() => setGroupOptions([]));
-    }, [requiredGroupType, sectionId]);
+    }, [requiredGroupType, sectionId, simplified]);
 
     const set = <K extends keyof QuestionFormData>(key: K, value: QuestionFormData[K]) => {
         onChange({ ...form, [key]: value });
@@ -543,7 +546,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
                         Đáp án đúng — chọn 1 chữ cái trong group
                     </label>
                     <div className="flex flex-wrap gap-2">
-                        {['A', 'B', 'C', 'D', 'E', 'F'].map(letter => {
+                        {['A', 'B', 'C', 'D', 'E', 'F'].slice(0, groupItemCount || 6).map(letter => {
                             const selected = form.correct_answer === letter;
                             return (
                                 <button

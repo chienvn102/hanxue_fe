@@ -70,7 +70,7 @@ export default function HskTestV2Page() {
                 alert(data?.message || 'Tạo đề thất bại');
                 return;
             }
-            router.push(`/admin/hsk-test/${data.data.id}`);
+            router.push(`/admin/hsk-test-v2/${data.data.id}`);
         } catch (err) {
             console.error('Create v2 exam error:', err);
             alert('Lỗi mạng khi tạo đề');
@@ -167,7 +167,7 @@ export default function HskTestV2Page() {
                                 {exam.is_active ? 'Đang hoạt động' : 'Đã ẩn'}
                             </button>
                             <Link
-                                href={`/admin/hsk-test/${exam.id}`}
+                                href={`/admin/hsk-test-v2/${exam.id}`}
                                 className="text-sm font-medium px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 shrink-0 inline-flex items-center gap-1"
                             >
                                 <Icon name="edit" size="xs" /> Sửa
