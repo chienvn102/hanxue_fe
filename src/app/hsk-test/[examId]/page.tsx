@@ -852,14 +852,14 @@ function ExamTakingPageContent() {
                             );
                         })()}
 
-                        {/* Group header (image grid / word bank / reply bank / passage) — chỉ render trước câu đầu của cụm cùng group */}
+                        {/* Group header (lưới ảnh / ngân hàng từ-câu / đoạn văn).
+                            CHẾ ĐỘ 1-câu/màn: render cho MỌI câu trong cụm (KHÔNG chỉ câu đầu) để
+                            tài nguyên dùng chung "đi theo" hết group — học viên chuyển câu 11→15
+                            vẫn thấy ảnh lưới / ngân hàng / đoạn văn để đối chiếu. */}
                         {(() => {
                             const section = exam.sections[currentQuestion.sectionIndex];
                             const groupId = currentQuestion.groupId;
                             if (!groupId || !section.groups) return null;
-                            // Chỉ hiện group header nếu câu hiện tại là câu ĐẦU TIÊN trong section có group_id này
-                            const firstOfGroup = section.questions.find(q => q.groupId === groupId);
-                            if (!firstOfGroup || firstOfGroup.id !== currentQuestion.id) return null;
                             const group = section.groups.find(g => g.id === groupId);
                             if (!group) return null;
                             return <GroupHeader group={group} />;

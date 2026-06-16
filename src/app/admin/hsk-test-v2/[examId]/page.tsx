@@ -283,7 +283,7 @@ export default function HskV2ExamEditorPage() {
                     )}
 
                     {/* Nội dung câu — editable */}
-                    <QuestionBody q={q} fm={fm} groupLabels={groupLabels}
+                    <QuestionBody q={q} fm={fm} groupLabels={groupLabels} hskLevel={exam.hsk_level}
                         set={patch => setQ(q.id, patch)} />
 
                     {/* Giải thích */}
@@ -311,18 +311,65 @@ export default function HskV2ExamEditorPage() {
 }
 
 /* Nội dung câu theo loại — GIỐNG exam, editable. */
-function QuestionBody({ q, fm, groupLabels, set }: { q: FlatQ; fm: QForm; groupLabels: string[]; set: (p: Partial<QForm>) => void }) {
+function QuestionBody({ q, fm, groupLabels, set, hskLevel }: { q: FlatQ; fm: QForm; groupLabels: string[]; set: (p: Partial<QForm>) => void; hskLevel: number }) {
     const type = q.question_type;
+    const [genning, setGenning] = useState(false);
     const updateOpt = (idx: number, v: string) => { const next = [...fm.options]; next[idx] = v; set({ options: next }); };
     const updatePy = (idx: number, v: string) => { const next = [...(fm.options_pinyin || [])]; next[idx] = v; set({ options_pinyin: next }); };
     const updateImg = (idx: number, v: string) => { const next = [...fm.option_images]; next[idx] = v; set({ option_images: next }); };
 
-    // statement / question_text editable
+    // Pinyin cho câu — chỉ HSK1/2. Lưu ở meta.pinyin.{statement|question_text}; options ở options_pinyin.
+    const showPy = hskLevel <= 2;
+    const stemKey = type === 'true_false' ? 'statement' : 'question_text';
+    const metaPy = ((fm.meta as { pinyin?: Record<string, string> } | null)?.pinyin) || {};
+    const setStemPy = (v: string) => {
+        const m = { ...(fm.meta || {}) } as Record<string, unknown>;
+        m.pinyin = { ...((m.pinyin as Record<string, string>) || {}), [stemKey]: v };
+        set({ meta: m });
+    };
+    const genPinyin = async () => {
+        const text = type === 'true_false' ? fm.statement : fm.question_text;
+        if (!text.trim()) { alert('Nhập nội dung tiếng Trung trước.'); return; }
+        setGenning(true);
+        try {
+            const tk = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+            const res = await fetch(`${API_BASE}/api/admin/hsk-questions/gen-pinyin`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk || ''}` },
+                body: JSON.stringify({ hsk_level: hskLevel, question_text: text, options: fm.options }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) { alert(data.message || 'Lỗi tạo pinyin'); return; }
+            const patch: Partial<QForm> = {};
+            if (Array.isArray(data.options_pinyin) && data.options_pinyin.length) patch.options_pinyin = data.options_pinyin;
+            if (data.question_text_pinyin) {
+                const m = { ...(fm.meta || {}) } as Record<string, unknown>;
+                m.pinyin = { ...((m.pinyin as Record<string, string>) || {}), [stemKey]: data.question_text_pinyin };
+                patch.meta = m;
+            }
+            set(patch);
+        } catch { alert('Lỗi mạng khi tạo pinyin'); }
+        finally { setGenning(false); }
+    };
+    const pinyinBlock = showPy ? (
+        <div className="flex items-center gap-2 mb-3">
+            <input value={metaPy[stemKey] || ''} onChange={e => setStemPy(e.target.value)}
+                placeholder="pinyin câu (HSK1/2)" className="flex-1 px-3 py-1.5 border rounded text-sm italic text-[var(--text-muted)]" />
+            <button type="button" onClick={genPinyin} disabled={genning}
+                className="shrink-0 text-xs px-2.5 py-1.5 rounded bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20 disabled:opacity-50">
+                ✨ {genning ? '...' : 'Tạo pinyin'}
+            </button>
+        </div>
+    ) : null;
+
+    // statement / question_text editable (kèm pinyin nếu HSK1/2)
     const stem = (
-        <textarea value={fm.statement || fm.question_text}
-            onChange={e => set(type === 'true_false' ? { statement: e.target.value } : { question_text: e.target.value })}
-            rows={2} placeholder={type === 'true_false' ? 'Câu nhận định (tiếng Trung)...' : 'Nội dung câu hỏi (tiếng Trung)...'}
-            className="w-full px-3 py-2 border rounded-lg text-lg hanzi mb-3" />
+        <>
+            <textarea value={fm.statement || fm.question_text}
+                onChange={e => set(type === 'true_false' ? { statement: e.target.value } : { question_text: e.target.value })}
+                rows={2} placeholder={type === 'true_false' ? 'Câu nhận định (tiếng Trung)...' : 'Nội dung câu hỏi (tiếng Trung)...'}
+                className="w-full px-3 py-2 border rounded-lg text-lg hanzi mb-2" />
+            {pinyinBlock}
+        </>
     );
 
     if (type === 'true_false') {
@@ -397,7 +444,8 @@ function QuestionBody({ q, fm, groupLabels, set }: { q: FlatQ; fm: QForm; groupL
     if (type === 'image_grid_match' || type === 'reply_match' || type === 'word_bank_fill') {
         return (
             <div>
-                <textarea value={fm.question_text} onChange={e => set({ question_text: e.target.value })} rows={2} placeholder="Câu hỏi / câu có chỗ trống (tiếng Trung)..." className="w-full px-3 py-2 border rounded-lg text-lg hanzi mb-3" />
+                <textarea value={fm.question_text} onChange={e => set({ question_text: e.target.value })} rows={2} placeholder="Câu hỏi / câu có chỗ trống (tiếng Trung)..." className="w-full px-3 py-2 border rounded-lg text-lg hanzi mb-2" />
+                {pinyinBlock}
                 {q.sectionType === 'listening' && (
                     <input value={fm.transcript} onChange={e => set({ transcript: e.target.value })} placeholder="Lời thoại nghe (transcript)" className="w-full px-3 py-1.5 border rounded text-sm hanzi mb-3" />
                 )}
