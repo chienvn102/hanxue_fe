@@ -50,6 +50,10 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
     const canGenPinyin = hskLevel === 1 || hskLevel === 2;
     // v2 tối giản: ẩn upload audio/timings per câu (dùng 1 audio cấp đề), chỉ giữ transcript.
     const minimalAudio = isExamMode || simplified;
+    // Số ảnh đáp án cho image_match theo đúng đề (HSK1-3 = 3 ảnh A/B/C, không cứng 4).
+    const imageMatchLabels = ['A', 'B', 'C', 'D', 'E', 'F'].slice(
+        0, Math.min(6, Math.max(2, form.option_images?.length || form.options?.length || 3)),
+    );
 
     const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
     const [genningPinyin, setGenningPinyin] = useState(false);
@@ -390,7 +394,7 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
                             );
                         })}
                     </div>
-                    {form.options.length < 4 && (
+                    {form.options.length < 4 && !simplified && (
                         <button
                             type="button"
                             onClick={addOption}
@@ -431,14 +435,14 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
                 </div>
             )}
 
-            {/* ── Image match — 4 images with radio ── */}
+            {/* ── Image match — N ảnh đáp án theo đề (HSK1-3 = 3 ảnh A/B/C) ── */}
             {type === 'image_match' && (
                 <div>
                     <label className="text-xs text-[var(--text-muted)] block mb-2">
-                        Hình ảnh đáp án (A, B, C, D)
+                        Hình ảnh đáp án ({imageMatchLabels.join(', ')})
                     </label>
                     <div className="grid grid-cols-2 gap-3">
-                        {['A', 'B', 'C', 'D'].map((opt, idx) => (
+                        {imageMatchLabels.map((opt, idx) => (
                             <div key={opt} className={`p-2 rounded-lg border-2 transition-colors ${
                                 form.correct_answer === opt
                                     ? 'border-green-500 bg-green-50 dark:bg-green-900/10'

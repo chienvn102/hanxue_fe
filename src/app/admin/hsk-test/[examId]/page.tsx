@@ -487,7 +487,8 @@ export default function HskExamDetailAdminPage() {
                         </div>
 
                         <div className="max-h-[70vh] overflow-y-auto pr-2">
-                            {editing.section_type === 'listening' && exam.exam_type === 'practice' && (
+                            {/* Nút tạo audio (edge-tts) per câu — ẨN ở v2 (đề v2 chỉ dùng 1 audio cấp đề). */}
+                            {editing.section_type === 'listening' && exam.exam_type === 'practice' && exam.format_version !== 2 && (
                                 <div className="mb-4 flex justify-end">
                                     <Button
                                         variant="outline"

@@ -16,8 +16,8 @@ import { Icon } from '@/components/ui/Icon';
 import { HSK_COLORS, HSK_SECTION_PRESETS } from '@/components/admin/hsk-types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
-// HSK1-4 đã có format chuẩn (đáp án docx). HSK5/6 bổ sung sau.
-const V2_LEVELS = [1, 2, 3, 4];
+// HSK1-3 đã có blueprint chuẩn (đề thật + đáp án). HSK4-6 bổ sung sau.
+const V2_LEVELS = [1, 2, 3];
 
 interface ExamV2 {
     id: number;
@@ -35,6 +35,7 @@ export default function HskTestV2Page() {
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
     const [creating, setCreating] = useState(false);
+    const [seedContent, setSeedContent] = useState(true); // tạo kèm nội dung mẫu (đề thật)
 
     const token = () => (typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null);
 
@@ -62,7 +63,7 @@ export default function HskTestV2Page() {
             const res = await fetch(`${API_BASE}/api/hsk-exams/from-template`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token() || ''}` },
-                body: JSON.stringify({ level }),
+                body: JSON.stringify({ level, seed: seedContent }),
             });
             const data = await res.json();
             if (!res.ok || !data?.data?.id) {
@@ -115,9 +116,17 @@ export default function HskTestV2Page() {
                         Format khóa theo chuẩn HSK · chỉ sửa nội dung + đáp án · 1 file audio/đề.
                     </p>
                 </div>
-                <Button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5">
-                    <Icon name="add" size="sm" /> Tạo đề v2
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Link
+                        href="/admin/hsk-test/import?v2=1"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                    >
+                        <Icon name="upload_file" size="sm" /> Import OCR v2
+                    </Link>
+                    <Button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5">
+                        <Icon name="add" size="sm" /> Tạo đề v2
+                    </Button>
+                </div>
             </div>
 
             {loading ? (
@@ -184,9 +193,13 @@ export default function HskTestV2Page() {
                                 <Icon name="close" size="sm" />
                             </button>
                         </div>
-                        <p className="text-xs text-[var(--text-muted)] mb-4">
-                            Đề sẽ được dựng sẵn theo đúng format chuẩn của cấp. Bạn chỉ điền nội dung + đáp án sau.
+                        <p className="text-xs text-[var(--text-muted)] mb-3">
+                            Đề dựng sẵn ĐÚNG format chuẩn của cấp (số đáp án, lưới ảnh A–F/A–E, ngân hàng từ/câu).
                         </p>
+                        <label className="flex items-start gap-2 mb-4 text-sm cursor-pointer p-2 rounded-lg bg-[var(--surface-secondary)]/50">
+                            <input type="checkbox" checked={seedContent} onChange={e => setSeedContent(e.target.checked)} className="w-4 h-4 mt-0.5" />
+                            <span className="text-[var(--text-main)]">Tạo kèm <b>nội dung mẫu</b> (đề thật có sẵn câu hỏi/đáp án/ngân hàng — chỉ cần upload 1 audio). Bỏ chọn = đề trống tự nhập.</span>
+                        </label>
                         <div className="grid grid-cols-2 gap-3">
                             {V2_LEVELS.map(level => {
                                 const preset = HSK_SECTION_PRESETS[level] || [];

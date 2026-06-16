@@ -49,6 +49,7 @@ export default function AdminHskImportPage() {
     const [error, setError] = useState('');
     const [jobId, setJobId] = useState<number | null>(null);
     const [job, setJob] = useState<ImportJob | null>(null);
+    const [v2, setV2] = useState(false); // OCR v2 (blueprint-driven, HSK1-3)
 
     const preset = HSK_PRESETS[hskLevel];
     const canSubmit = examPdf && answerFile && (examType === 'practice' || audioFile) && !submitting;
@@ -64,6 +65,14 @@ export default function AdminHskImportPage() {
             return auto ? `HSK ${hskLevel} OCR Import` : prev;
         });
     }, [hskLevel]);
+
+    // Vào từ link /import?v2=1 (nút "Import OCR v2" ở trang v2) → bật sẵn v2.
+    useEffect(() => {
+        if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('v2') === '1') {
+            setV2(true);
+            setHskLevel(l => (l > 3 ? 3 : l));
+        }
+    }, []);
 
     useEffect(() => {
         if (!jobId) return;
@@ -114,6 +123,7 @@ export default function AdminHskImportPage() {
             const form = new FormData();
             form.append('hskLevel', String(hskLevel));
             form.append('examType', examType);
+            if (v2) form.append('formatVersion', '2');
             form.append('title', title.trim() || `HSK ${hskLevel} OCR Import`);
             form.append('examPdf', examPdf);
             form.append('answerFile', answerFile);
@@ -166,7 +176,7 @@ export default function AdminHskImportPage() {
                                 onChange={event => setHskLevel(Number(event.target.value))}
                                 className="mt-1 w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface)]"
                             >
-                                {[1, 2, 3, 4, 5, 6].map(level => (
+                                {(v2 ? [1, 2, 3] : [1, 2, 3, 4, 5, 6]).map(level => (
                                     <option key={level} value={level}>HSK {level}</option>
                                 ))}
                             </select>
@@ -185,6 +195,19 @@ export default function AdminHskImportPage() {
                             </select>
                         </label>
                     </div>
+
+                    {/* OCR v2: cấu trúc khóa theo blueprint (HSK1-3), ra đề format_version=2. */}
+                    <label className="flex items-start gap-2 text-sm cursor-pointer p-3 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                        <input
+                            type="checkbox"
+                            checked={v2}
+                            onChange={e => { setV2(e.target.checked); if (e.target.checked && hskLevel > 3) setHskLevel(3); }}
+                            className="w-4 h-4 mt-0.5"
+                        />
+                        <span className="text-[var(--text-main)]">
+                            <b>Import OCR v2</b> — cấu trúc chuẩn HSK1-3 (đúng số đáp án, lưới ảnh 6/5, ngân hàng từ/câu); AI chỉ điền nội dung → ra đề <b>format mới (v2)</b>.
+                        </span>
+                    </label>
 
                     <label className="block">
                         <span className="text-sm font-medium text-[var(--text-main)]">Tên đề</span>
