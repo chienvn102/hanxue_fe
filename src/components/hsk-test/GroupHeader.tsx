@@ -20,6 +20,9 @@ export function GroupHeader({ group }: Props) {
     if (group.group_type === 'image_grid') {
         const singleImage = (content.image_url as string) || '';
         const items = (content.items as { label: string; image_url?: string; alt_vi?: string }[]) || [];
+        // Chỉ những ô THỰC SỰ có ảnh mới render. Đề v2/seed dùng items chỉ-có-label
+        // (chưa gán ảnh) — nếu map hết sẽ ra 6 <img src=""> = 6 icon ảnh vỡ.
+        const itemsWithImg = items.filter(it => it.image_url);
         const example = content.example as { label: string; content: { zh: string; pinyin?: string } } | undefined;
         return (
             <div className="mb-6 p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
@@ -33,10 +36,10 @@ export function GroupHeader({ group }: Props) {
                         alt={group.title_vi || 'Lưới ảnh A–F'}
                         className="w-full max-w-2xl mx-auto rounded-lg bg-white"
                     />
-                ) : (
-                    // Back-compat: đề cũ dùng 6 ảnh rời theo từng label.
+                ) : itemsWithImg.length ? (
+                    // Back-compat: đề cũ dùng nhiều ảnh rời theo từng label.
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {items.map(item => (
+                        {itemsWithImg.map(item => (
                             <div key={item.label} className="flex flex-col items-center text-center">
                                 <span className="text-sm font-bold text-[var(--text-secondary)] mb-2">{item.label}</span>
                                 <img
@@ -46,6 +49,21 @@ export function GroupHeader({ group }: Props) {
                                 />
                             </div>
                         ))}
+                    </div>
+                ) : (
+                    // Chưa có ảnh (đề mới chưa gán / OCR chưa tách được) → placeholder gọn,
+                    // KHÔNG render ảnh vỡ. Học viên vẫn thấy nhãn A–F để đối chiếu.
+                    <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-secondary)] px-4 py-6 text-center">
+                        <p className="text-xs text-[var(--text-muted)]">Ảnh lưới A–F chưa được gán cho đề này.</p>
+                        {items.length > 0 && (
+                            <div className="mt-2 flex flex-wrap justify-center gap-2">
+                                {items.map(item => (
+                                    <span key={item.label} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border)] text-xs font-bold text-[var(--text-secondary)]">
+                                        {item.label}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
                 {example && (
