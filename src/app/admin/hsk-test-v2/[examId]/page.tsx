@@ -103,6 +103,15 @@ export default function HskV2ExamEditorPage() {
     const [cur, setCur] = useState(0);
     const [saving, setSaving] = useState(false);
     const [savedMsg, setSavedMsg] = useState('');
+    // Thu gọn thanh audio đề để có thêm không gian (giống toggle sidebar admin).
+    // Chỉ ẩn phần upload; thu gọn vẫn giữ player để bấm play. Nhớ trạng thái qua localStorage.
+    const [audioCollapsed, setAudioCollapsed] = useState(false);
+    useEffect(() => { setAudioCollapsed(localStorage.getItem('hskV2AudioCollapsed') === '1'); }, []);
+    const toggleAudio = () => setAudioCollapsed(c => {
+        const n = !c;
+        try { localStorage.setItem('hskV2AudioCollapsed', n ? '1' : '0'); } catch { /* ignore */ }
+        return n;
+    });
 
     const token = () => (typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null);
 
@@ -284,8 +293,24 @@ export default function HskV2ExamEditorPage() {
                     <span className="text-xs text-[var(--text-muted)] inline-flex items-center gap-1"><Icon name="lock" size="xs" /> cấu trúc khóa</span>
                 </div>
                 <div className="mb-4 bg-[var(--surface)] rounded-xl border border-[var(--border)] p-3">
-                    <label className="text-xs font-semibold text-[var(--text-main)] flex items-center gap-1.5 mb-1.5"><Icon name="audio_file" size="xs" /> Audio đề (1 file cho cả đề)</label>
-                    <UploadField label="" value={exam.audio_url || ''} onChange={saveExamAudio} type="audio" accept="audio/mpeg,audio/wav,audio/ogg,audio/webm" />
+                    <div className="flex items-center justify-between gap-2">
+                        <label className="text-xs font-semibold text-[var(--text-main)] flex items-center gap-1.5"><Icon name="audio_file" size="xs" /> Audio đề (1 file cho cả đề)</label>
+                        <button type="button" onClick={toggleAudio} title={audioCollapsed ? 'Mở rộng' : 'Thu gọn'}
+                            className="shrink-0 inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--primary)]">
+                            <Icon name={audioCollapsed ? 'expand_more' : 'expand_less'} size="sm" />
+                            {audioCollapsed ? 'Mở' : 'Thu gọn'}
+                        </button>
+                    </div>
+                    {audioCollapsed ? (
+                        // Thu gọn: bỏ ô upload, CHỈ giữ player để bấm play (tiết kiệm không gian).
+                        exam.audio_url
+                            ? <audio controls src={getMediaUrl(exam.audio_url)} className="mt-2 h-8 w-full" />
+                            : <p className="text-xs text-[var(--text-muted)] mt-1">Chưa có audio — bấm “Mở” để upload.</p>
+                    ) : (
+                        <div className="mt-1.5">
+                            <UploadField label="" value={exam.audio_url || ''} onChange={saveExamAudio} type="audio" accept="audio/mpeg,audio/wav,audio/ogg,audio/webm" />
+                        </div>
+                    )}
                 </div>
 
                 {/* Question card */}
