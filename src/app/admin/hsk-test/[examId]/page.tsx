@@ -20,9 +20,12 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { QuestionFormByType } from '@/components/admin/QuestionFormByType';
+import { UploadField } from '@/components/admin/UploadField';
+import { GroupManager } from '@/components/admin/GroupManager';
 import {
     HSK_COLORS, SECTION_TYPES, QUESTION_TYPES,
     DEFAULT_QUESTION_FORM,
+    normalizeTrueFalseAnswer,
     type QuestionFormData,
 } from '@/components/admin/hsk-types';
 
@@ -60,6 +63,7 @@ interface Section {
     title: string;
     instructions: string;
     audio_url?: string;
+    groups?: { id: number }[];
     questions?: Question[];
 }
 
@@ -71,6 +75,8 @@ interface ExamDetail {
     duration_minutes: number;
     passing_score: number;
     description?: string;
+    audio_url?: string | null;     // v2: 1 audio/đề
+    format_version?: number;       // 1 = v1, 2 = v2 (builder mới)
     sections: Section[];
 }
 
@@ -190,7 +196,9 @@ export default function HskExamDetailAdminPage() {
             options: normalizeOptions(q.options),
             options_pinyin: normalizePinyin(q.options, q.options_pinyin),
             option_images: (q.option_images && q.option_images.length >= 3) ? q.option_images : ['', '', '', ''],
-            correct_answer: q.correct_answer || '',
+            correct_answer: q.question_type === 'true_false'
+                ? (normalizeTrueFalseAnswer(q.correct_answer) || q.correct_answer || '')
+                : (q.correct_answer || ''),
             explanation: q.explanation || '',
             difficulty: q.difficulty || 1,
             points: q.points || 1,
@@ -220,7 +228,9 @@ export default function HskExamDetailAdminPage() {
                 options: editForm.options,
                 options_pinyin: editForm.options_pinyin,
                 option_images: editForm.option_images,
-                correct_answer: editForm.correct_answer,
+                correct_answer: editForm.question_type === 'true_false'
+                    ? (normalizeTrueFalseAnswer(editForm.correct_answer) || editForm.correct_answer)
+                    : editForm.correct_answer,
                 explanation: editForm.explanation,
                 difficulty: editForm.difficulty,
                 points: editForm.points,
@@ -280,6 +290,21 @@ export default function HskExamDetailAdminPage() {
         }
     };
 
+    // v2: lưu 1 audio cho cả đề (PUT exam.audio_url). Đề v1 vẫn dùng audio theo section.
+    const saveExamAudio = async (url: string) => {
+        try {
+            const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+            await fetch(`${API_BASE}/api/hsk-exams/${examId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
+                body: JSON.stringify({ audio_url: url }),
+            });
+            setExam(prev => (prev ? { ...prev, audio_url: url } : prev));
+        } catch (e) {
+            console.error('Save exam audio error:', e);
+        }
+    };
+
     if (loading) {
         return (
             <div className="p-6">
@@ -302,15 +327,18 @@ export default function HskExamDetailAdminPage() {
         );
     }
 
+    const backHref = exam.format_version === 2 ? '/admin/hsk-test-v2' : '/admin/hsk-test';
+    const adminToken = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+
     return (
         <div className="p-6 max-w-5xl mx-auto">
             {/* Header */}
             <div className="flex items-center gap-3 mb-2">
                 <Link
-                    href="/admin/hsk-test"
+                    href={backHref}
                     className="text-[var(--text-muted)] hover:text-[var(--primary)] text-sm flex items-center gap-1"
                 >
-                    <Icon name="arrow_back" size="xs" /> Danh sách đề thi
+                    <Icon name="arrow_back" size="xs" /> Danh sách đề thi {exam.format_version === 2 ? '(v2)' : ''}
                 </Link>
             </div>
             <div className="flex flex-wrap items-center gap-3 mb-1">
@@ -325,6 +353,23 @@ export default function HskExamDetailAdminPage() {
                     <Icon name="lock" size="xs" /> Cấu trúc đã khóa — chỉ sửa nội dung câu
                 </span>
             </p>
+
+            {/* v2: 1 file audio cho cả đề (phần Nghe). Đề v1 chưa set → test-taking fallback audio theo section. */}
+            <div className="mb-6 bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4">
+                <label className="text-sm font-semibold text-[var(--text-main)] flex items-center gap-1.5 mb-2">
+                    <Icon name="audio_file" size="sm" /> Audio đề (1 file nghe cho cả đề)
+                </label>
+                <UploadField
+                    label=""
+                    value={exam.audio_url || ''}
+                    onChange={saveExamAudio}
+                    type="audio"
+                    accept="audio/mpeg,audio/wav,audio/ogg,audio/webm"
+                />
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                    Upload 1 file nghe liên tục cho cả đề. Học viên phát ở phần Nghe (tự lưu khi chọn file).
+                </p>
+            </div>
 
             {/* Sections grouped — questions Q1..QN sequential */}
             <div className="space-y-6">
@@ -356,6 +401,13 @@ export default function HskExamDetailAdminPage() {
                                     </span>
                                 )}
                             </div>
+                            {/* Nội dung dùng chung (lưới ảnh A–F, ngân hàng từ/câu, đoạn đọc).
+                                Locked: chỉ sửa nội dung group, không thêm/xoá (giữ format). */}
+                            {(section.groups?.length ?? 0) > 0 && (
+                                <div className="px-5 pt-3">
+                                    <GroupManager sectionId={section.id} token={adminToken} locked />
+                                </div>
+                            )}
                             <ul>
                                 {qs.map(q => (
                                     <li

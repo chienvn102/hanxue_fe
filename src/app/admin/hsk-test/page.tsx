@@ -11,7 +11,7 @@ import { QuestionPreview } from '@/components/admin/QuestionPreview';
 import { GroupManager } from '@/components/admin/GroupManager';
 import {
     HSK_COLORS, EXAM_TYPES, SECTION_TYPES, QUESTION_TYPES, HSK_PRESETS,
-    DEFAULT_QUESTION_FORM, deriveQuestionType,
+    DEFAULT_QUESTION_FORM, deriveQuestionType, normalizeTrueFalseAnswer,
     type QuestionFormData,
 } from '@/components/admin/hsk-types';
 
@@ -105,7 +105,8 @@ export default function HskExamAdminPage() {
         try {
             setLoading(true);
             const token = localStorage.getItem('adminToken');
-            let url = `${API_BASE}/api/hsk-exams?limit=100`;
+            // v1 list chỉ hiện đề builder cũ (format_version=1); đề v2 ở /admin/hsk-test-v2.
+            let url = `${API_BASE}/api/hsk-exams?limit=100&format_version=1`;
             if (hskFilter) url += `&hsk=${hskFilter}`;
 
             const res = await fetch(url, {
@@ -388,7 +389,9 @@ export default function HskExamAdminPage() {
             options: normalizeOptions(question.options),
             options_pinyin: normalizePinyin(question.options, question.options_pinyin),
             option_images: question.option_images || ['', '', '', ''],
-            correct_answer: question.correct_answer || '',
+            correct_answer: question.question_type === 'true_false'
+                ? (normalizeTrueFalseAnswer(question.correct_answer) || question.correct_answer || '')
+                : (question.correct_answer || ''),
             explanation: question.explanation || '',
             difficulty: question.difficulty || 1,
             points: question.points || 1,
@@ -410,10 +413,17 @@ export default function HskExamAdminPage() {
                 ? `${API_BASE}/api/hsk-exams/questions/${selectedQuestion.id}`
                 : `${API_BASE}/api/hsk-exams/sections/${selectedSection?.id}/questions`;
 
+            const payload = {
+                ...questionForm,
+                correct_answer: questionForm.question_type === 'true_false'
+                    ? (normalizeTrueFalseAnswer(questionForm.correct_answer) || questionForm.correct_answer)
+                    : questionForm.correct_answer,
+            };
+
             await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(questionForm)
+                body: JSON.stringify(payload)
             });
             setShowQuestionModal(false);
             if (expandedExam) fetchExamDetail(expandedExam);

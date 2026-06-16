@@ -24,6 +24,7 @@ import {
 } from './renderers/WritingRenderers';
 import {
     LegacyMcq,
+    ImageMatch,
     LegacyTrueFalse,
     LegacyFillBlank,
     LegacyShortAnswer,
@@ -120,8 +121,10 @@ export function QuestionRenderer({ question, group, value, onChange }: Props) {
 
         case 'sentence_order':
         case 'error_identify':
-        case 'image_match':
             return <LegacyMcq {...props} />;
+
+        case 'image_match':
+            return <ImageMatch {...props} />;
 
         default:
             return <LegacyMcq {...props} />;

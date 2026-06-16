@@ -35,7 +35,8 @@ function AdminProtectedLayout({ children }: { children: React.ReactNode }) {
         { href: '/admin/vocabulary', icon: 'translate', label: 'Từ vựng' },
         { href: '/admin/grammar', icon: 'text_snippet', label: 'Ngữ pháp' },
         { href: '/admin/grammar-quiz', icon: 'fact_check', label: 'Trắc nghiệm NP' },
-        { href: '/admin/hsk-test', icon: 'quiz', label: 'Đề thi HSK' },
+        { href: '/admin/hsk-test', icon: 'quiz', label: 'Đề thi HSK (v1)' },
+        { href: '/admin/hsk-test-v2', icon: 'assignment', label: 'Đề thi HSK (v2)' },
         { href: '/admin/feedback', icon: 'forum', label: 'Phản hồi bài học' },
     ];
 
@@ -49,7 +50,8 @@ function AdminProtectedLayout({ children }: { children: React.ReactNode }) {
 
                 <nav className="flex-1 p-4 space-y-1">
                     {navItems.map(item => {
-                        const isActive = pathname.startsWith(item.href);
+                        // Exact-segment match: '/admin/hsk-test-v2' không làm sáng luôn '/admin/hsk-test' (v1).
+                        const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                         return (
                             <Link
                                 key={item.href}

@@ -1,6 +1,6 @@
 'use client';
 
-import type { HskQuestion } from '@/lib/api';
+import { getMediaUrl, type HskQuestion } from '@/lib/api';
 import { McqChoice } from '../McqChoice';
 import { TrueFalseChoice } from '../TrueFalseChoice';
 import { useHskTest } from '../HskTestContext';
@@ -46,6 +46,51 @@ export function LegacyMcq({ question, value, onChange }: RP) {
                 </div>
             )}
             <McqChoice options={question.options} value={value} onChange={onChange} />
+        </div>
+    );
+}
+
+/**
+ * ImageMatch — câu chọn 1 trong các ẢNH (A/B/C[/D]) theo audio/đề.
+ * HSK1 nghe 6-10: 3 ảnh A/B/C. Ảnh nằm ở optionImages[]; học viên chọn chữ cái.
+ */
+export function ImageMatch({ question, value, onChange }: RP) {
+    const { showPinyin } = useHskTest();
+    const meta = (question.meta || {}) as { pinyin?: { question_text?: string } };
+    const labels = ['A', 'B', 'C', 'D'];
+    const images = question.optionImages || [];
+    const items = labels
+        .map((label, idx) => ({ label, url: images[idx] || '' }))
+        .filter(it => it.url); // chỉ hiện ô có ảnh (thường 3 ảnh A/B/C)
+    return (
+        <div>
+            <QuestionAudio question={question} />
+            {question.questionText && (
+                <div className="my-3">
+                    <PinyinRuby zh={question.questionText} pinyin={meta.pinyin?.question_text} show={showPinyin} fontSize="lg" />
+                </div>
+            )}
+            <div className={`grid gap-3 mt-3 ${items.length <= 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                {items.map(it => {
+                    const selected = value === it.label;
+                    return (
+                        <button
+                            key={it.label}
+                            type="button"
+                            onClick={() => onChange(it.label)}
+                            className={`relative rounded-xl border-2 overflow-hidden transition-colors ${selected
+                                ? 'border-[var(--primary)] ring-2 ring-[var(--primary)]/40'
+                                : 'border-[var(--border)] hover:border-[var(--text-muted)]'}`}
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={getMediaUrl(it.url)} alt={it.label} className="w-full aspect-square object-contain bg-white" />
+                            <span className={`absolute top-1 left-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${selected
+                                ? 'bg-[var(--primary)] text-white'
+                                : 'bg-black/50 text-white'}`}>{it.label}</span>
+                        </button>
+                    );
+                })}
+            </div>
         </div>
     );
 }

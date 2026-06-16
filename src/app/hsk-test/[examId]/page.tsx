@@ -204,6 +204,7 @@ function ExamTakingPageContent() {
                         total_questions: totalQ,
                         duration_minutes: data.duration_minutes,
                         passing_score: 0,
+                        audio_url: data.audio_url, // v2: 1 audio/đề (listening)
                         attemptId: 0,
                         startedAt: new Date().toISOString(),
                         savedAnswers: [],
@@ -458,11 +459,17 @@ function ExamTakingPageContent() {
     // Audio section = section (đầu tiên) có audio_url, thường là listening.
     // Lift ra ngoài conditional theo currentSection để FullTestAudio KHÔNG unmount
     // khi user navigate sang reading/writing — đảm bảo audio chạy liền mạch.
-    const audioSectionIdx = exam.sections.findIndex(
+    // Ưu tiên 1 audio cấp ĐỀ (v2 exam.audio_url); fallback audio theo SECTION (đề v1).
+    const examAudioUrl = exam.audio_url || null;
+    let audioSectionIdx = exam.sections.findIndex(
         s => s.section_type === 'listening' && Boolean(s.audio_url)
     );
+    if (audioSectionIdx < 0 && examAudioUrl) {
+        audioSectionIdx = exam.sections.findIndex(s => s.section_type === 'listening');
+    }
     const audioSection = audioSectionIdx >= 0 ? exam.sections[audioSectionIdx] : null;
-    const hasExamAudio = Boolean(audioSection) && exam.exam_type === 'exam';
+    const listeningAudioUrl = examAudioUrl || audioSection?.audio_url || null;
+    const hasExamAudio = Boolean(audioSection) && Boolean(listeningAudioUrl) && exam.exam_type === 'exam';
     const showSectionAudio = testMode === 'full' && hasExamAudio;
     const showPracticeSectionAudio = testMode === 'practice' && hasExamAudio
         && currentSection?.section_type === 'listening';
@@ -748,9 +755,9 @@ function ExamTakingPageContent() {
                         listening, nhưng giữ ở đây cho an toàn).
                         Migration 022: audio không còn timestamp per câu — chỉ 1 file
                         liên tục từ đầu đến cuối, user tự note đáp án theo thứ tự. */}
-                    {showSectionAudio && audioSection && (
+                    {showSectionAudio && audioSection && listeningAudioUrl && (
                         <FullTestAudio
-                            audioUrl={audioSection.audio_url!}
+                            audioUrl={listeningAudioUrl}
                             sectionTitle={audioSection.title || `Phần ${audioSection.section_order}`}
                         />
                     )}
@@ -764,8 +771,8 @@ function ExamTakingPageContent() {
                                     🎧 Luyện tập — {audioSection.title || `Phần ${audioSection.section_order}`} (audio có thể replay/tua)
                                 </p>
                                 <AudioPlayer
-                                    key={audioSection.audio_url}
-                                    src={audioSection.audio_url!}
+                                    key={listeningAudioUrl}
+                                    src={listeningAudioUrl!}
                                     mode="practice"
                                 />
                             </div>

@@ -1288,6 +1288,7 @@ export interface HskExamStartResponse {
     total_questions: number;
     duration_minutes: number;
     passing_score: number;
+    audio_url?: string;   // v2: 1 audio/đề (listening). Ưu tiên hơn section.audio_url.
     attemptId: number;
     startedAt: string;
     /** Legacy field — luôn rỗng sau migration 022. Giữ field để FE cũ không crash. */
@@ -1439,6 +1440,7 @@ export interface HskExamAnswersResponse {
     hsk_level: number;
     exam_type: 'practice' | 'exam';
     duration_minutes: number;
+    audio_url?: string;   // v2: 1 audio/đề (listening)
     sections: HskAnswerSection[];
 }
 

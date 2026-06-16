@@ -87,6 +87,24 @@ export const QUESTION_TYPES = [
     { value: 'short_answer', label: 'Viết ngắn' },
 ];
 
+export const TRUE_FALSE_ANSWER_OPTIONS = [
+    { value: 'A', label: 'Đúng', icon: 'check_circle' },
+    { value: 'B', label: 'Sai', icon: 'cancel' },
+] as const;
+
+export function normalizeTrueFalseAnswer(raw: string | null | undefined): 'A' | 'B' | '' {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+    const lower = value.toLowerCase();
+    if (lower === 'a' || lower === 'true' || lower === 't' || lower === '1' || lower === 'đúng' || lower === 'dung') {
+        return 'A';
+    }
+    if (lower === 'b' || lower === 'false' || lower === 'f' || lower === '0' || lower === 'sai') {
+        return 'B';
+    }
+    return '';
+}
+
 export const HSK_PRESETS: Record<number, { duration_minutes: number; passing_score: number }> = {
     1: { duration_minutes: 35, passing_score: 120 },
     2: { duration_minutes: 50, passing_score: 120 },
@@ -148,21 +166,21 @@ type SectionTypeKey = 'listening' | 'reading' | 'writing';
 
 export const HSK_QUESTION_PLAN: Record<number, Partial<Record<SectionTypeKey, TypePlanPart[]>>> = {
     1: {
-        listening: [{ count: 5, type: 'true_false' }, { count: 5, type: 'image_grid_match' }, { count: 5, type: 'reply_match' }, { count: 5, type: 'multiple_choice' }],
-        reading: [{ count: 5, type: 'image_grid_match' }, { count: 5, type: 'true_false' }, { count: 5, type: 'reply_match' }, { count: 5, type: 'word_bank_fill' }],
+        listening: [{ count: 5, type: 'true_false' }, { count: 5, type: 'image_match' }, { count: 5, type: 'image_grid_match' }, { count: 5, type: 'multiple_choice' }],
+        reading: [{ count: 5, type: 'true_false' }, { count: 5, type: 'image_grid_match' }, { count: 5, type: 'reply_match' }, { count: 5, type: 'word_bank_fill' }],
     },
     2: {
-        listening: [{ count: 10, type: 'true_false' }, { count: 10, type: 'image_grid_match' }, { count: 10, type: 'reply_match' }, { count: 5, type: 'multiple_choice' }],
-        reading: [{ count: 5, type: 'image_grid_match' }, { count: 5, type: 'word_bank_fill' }, { count: 5, type: 'true_false' }, { count: 10, type: 'multiple_choice' }],
+        listening: [{ count: 10, type: 'true_false' }, { count: 5, type: 'image_grid_match' }, { count: 5, type: 'image_grid_match' }, { count: 10, type: 'multiple_choice' }, { count: 5, type: 'multiple_choice' }],
+        reading: [{ count: 5, type: 'image_grid_match' }, { count: 5, type: 'word_bank_fill' }, { count: 5, type: 'true_false' }, { count: 5, type: 'reply_match' }, { count: 5, type: 'reply_match' }],
     },
     3: {
-        listening: [{ count: 10, type: 'image_grid_match' }, { count: 10, type: 'true_false' }, { count: 10, type: 'multiple_choice' }, { count: 10, type: 'multiple_choice' }],
-        reading: [{ count: 10, type: 'reply_match' }, { count: 10, type: 'word_bank_fill' }, { count: 10, type: 'multiple_choice' }],
+        listening: [{ count: 5, type: 'image_grid_match' }, { count: 5, type: 'image_grid_match' }, { count: 10, type: 'true_false' }, { count: 10, type: 'multiple_choice' }, { count: 10, type: 'multiple_choice' }],
+        reading: [{ count: 5, type: 'reply_match' }, { count: 5, type: 'reply_match' }, { count: 10, type: 'word_bank_fill' }, { count: 10, type: 'multiple_choice' }],
         writing: [{ count: 5, type: 'sentence_assembly' }, { count: 5, type: 'fill_hanzi' }],
     },
     4: {
         listening: [{ count: 10, type: 'true_false' }, { count: 15, type: 'multiple_choice' }, { count: 20, type: 'multiple_choice' }],
-        reading: [{ count: 10, type: 'word_bank_fill' }, { count: 10, type: 'multiple_choice' }, { count: 20, type: 'multiple_choice' }],
+        reading: [{ count: 10, type: 'word_bank_fill' }, { count: 10, type: 'sentence_order' }, { count: 20, type: 'multiple_choice' }],
         writing: [{ count: 10, type: 'sentence_assembly' }, { count: 5, type: 'image_keyword_sentence' }],
     },
     5: {

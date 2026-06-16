@@ -90,7 +90,8 @@ export default function AdminHskTestNewPage() {
                 throw new Error(json.message || `Không tạo được đề (HTTP ${res.status})`);
             }
 
-            router.replace(`/admin/hsk-test?expand=${json.data.id}`);
+            // Đề tạo từ template = v2 → vào thẳng editor (đề này không nằm ở list v1).
+            router.replace(`/admin/hsk-test/${json.data.id}`);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Lỗi không xác định');
             setSubmitting(false);

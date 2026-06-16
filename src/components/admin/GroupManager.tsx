@@ -51,9 +51,11 @@ const GROUP_TYPE_LABELS: Record<GroupType, string> = {
 interface Props {
     sectionId: number;
     token: string | null;
+    /** v2: chỉ cho sửa nội dung group, ẩn nút Thêm/Xoá (giữ format khóa). */
+    locked?: boolean;
 }
 
-export function GroupManager({ sectionId, token }: Props) {
+export function GroupManager({ sectionId, token, locked = false }: Props) {
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
@@ -101,13 +103,15 @@ export function GroupManager({ sectionId, token }: Props) {
                         Groups (shared resource) — {groups.length}
                     </span>
                 </div>
-                <Button
-                    onClick={() => { setEditingGroup(null); setShowModal(true); }}
-                    className="text-xs px-2 py-1 flex items-center gap-1"
-                >
-                    <Icon name="add" size="xs" />
-                    Thêm group
-                </Button>
+                {!locked && (
+                    <Button
+                        onClick={() => { setEditingGroup(null); setShowModal(true); }}
+                        className="text-xs px-2 py-1 flex items-center gap-1"
+                    >
+                        <Icon name="add" size="xs" />
+                        Thêm group
+                    </Button>
+                )}
             </div>
 
             {loading && <p className="text-xs text-[var(--text-muted)]">Đang tải...</p>}
@@ -129,9 +133,11 @@ export function GroupManager({ sectionId, token }: Props) {
                                 <button onClick={() => { setEditingGroup(g); setShowModal(true); }} className="p-0.5 text-blue-400 hover:text-blue-600">
                                     <Icon name="edit" size="xs" />
                                 </button>
-                                <button onClick={() => handleDelete(g.id)} className="p-0.5 text-[var(--text-muted)] hover:text-red-500">
-                                    <Icon name="delete" size="xs" />
-                                </button>
+                                {!locked && (
+                                    <button onClick={() => handleDelete(g.id)} className="p-0.5 text-[var(--text-muted)] hover:text-red-500">
+                                        <Icon name="delete" size="xs" />
+                                    </button>
+                                )}
                             </div>
                         </li>
                     ))}

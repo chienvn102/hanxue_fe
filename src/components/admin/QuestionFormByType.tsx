@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { ExamType, QuestionFormData } from './hsk-types';
+import {
+    TRUE_FALSE_ANSWER_OPTIONS,
+    normalizeTrueFalseAnswer,
+    type ExamType,
+    type QuestionFormData,
+} from './hsk-types';
 import { UploadField } from './UploadField';
 import { Icon } from '@/components/ui/Icon';
 
@@ -398,23 +403,26 @@ export function QuestionFormByType({ form, onChange, sectionType, sectionId, exa
                 <div>
                     <label className="text-xs text-[var(--text-muted)] block mb-2">Đáp án đúng</label>
                     <div className="grid grid-cols-2 gap-3">
-                        {(['Đúng', 'Sai'] as const).map(val => (
-                            <button
-                                key={val}
-                                type="button"
-                                onClick={() => set('correct_answer', val)}
-                                className={`p-4 rounded-xl border-2 text-center font-semibold transition-all ${
-                                    form.correct_answer === val
-                                        ? val === 'Đúng'
-                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                                            : 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                                        : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--text-muted)]'
-                                }`}
-                            >
-                                <Icon name={val === 'Đúng' ? 'check_circle' : 'cancel'} size="lg" className="block mb-1" />
-                                {val}
-                            </button>
-                        ))}
+                        {TRUE_FALSE_ANSWER_OPTIONS.map(opt => {
+                            const selected = normalizeTrueFalseAnswer(form.correct_answer) === opt.value;
+                            return (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => set('correct_answer', opt.value)}
+                                    className={`p-4 rounded-xl border-2 text-center font-semibold transition-all ${
+                                        selected
+                                            ? opt.value === 'A'
+                                                ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                                                : 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                                            : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--text-muted)]'
+                                    }`}
+                                >
+                                    <Icon name={opt.icon} size="lg" className="block mb-1" />
+                                    {opt.label}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             )}

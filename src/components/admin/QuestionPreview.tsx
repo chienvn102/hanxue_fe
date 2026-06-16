@@ -1,7 +1,7 @@
 'use client';
 
 import type { QuestionFormData } from './hsk-types';
-import { SECTION_COLORS } from './hsk-types';
+import { SECTION_COLORS, TRUE_FALSE_ANSWER_OPTIONS, normalizeTrueFalseAnswer } from './hsk-types';
 import { Icon } from '@/components/ui/Icon';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
@@ -130,21 +130,24 @@ export function QuestionPreview({ form, sectionType }: QuestionPreviewProps) {
                     {/* ── True/False preview ── */}
                     {type === 'true_false' && (
                         <div className="grid grid-cols-2 gap-2 flex-1">
-                            {['Đúng', 'Sai'].map(val => (
-                                <div
-                                    key={val}
-                                    className={`p-3 rounded-xl border-2 text-center text-xs font-semibold ${
-                                        form.correct_answer === val
-                                            ? val === 'Đúng'
-                                                ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-600'
-                                                : 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600'
-                                            : 'border-[var(--border)] text-[var(--text-secondary)]'
-                                    }`}
-                                >
-                                    <span className="text-lg block mb-0.5">{val === 'Đúng' ? '✅' : '❌'}</span>
-                                    {val}
-                                </div>
-                            ))}
+                            {TRUE_FALSE_ANSWER_OPTIONS.map(opt => {
+                                const selected = normalizeTrueFalseAnswer(form.correct_answer) === opt.value;
+                                return (
+                                    <div
+                                        key={opt.value}
+                                        className={`p-3 rounded-xl border-2 text-center text-xs font-semibold ${
+                                            selected
+                                                ? opt.value === 'A'
+                                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-600'
+                                                    : 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600'
+                                                : 'border-[var(--border)] text-[var(--text-secondary)]'
+                                        }`}
+                                    >
+                                        <Icon name={opt.icon} size="md" className="block mx-auto mb-0.5" />
+                                        {opt.label}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
 
