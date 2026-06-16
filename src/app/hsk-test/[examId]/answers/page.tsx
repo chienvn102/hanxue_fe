@@ -47,7 +47,7 @@ interface AnswerCardProps {
  * still suppress by omitting the props).
  */
 function AnswerCard({ question, questionNumber, sectionAudioUrl, sectionInstructions }: AnswerCardProps) {
-    const [showTranscript, setShowTranscript] = useState(false);
+    const [showTranscript, setShowTranscript] = useState(true);
     const { showPinyin } = useHskTest();
     const correct = question.correctAnswer;
     const meta = (question.meta || {}) as Record<string, unknown>;
@@ -74,20 +74,23 @@ function AnswerCard({ question, questionNumber, sectionAudioUrl, sectionInstruct
                 )}
             </div>
 
-            {/* Audio + transcript toggle */}
+            {/* Audio câu này — chỉ khi có audio riêng từng câu (đề cũ). */}
             {question.questionAudio && (
+                <AudioPlayer src={question.questionAudio} label="Audio câu này" />
+            )}
+            {/* Transcript phần nghe — render ĐỘC LẬP với audio. Đề v2 dùng 1 audio chung
+                cả đề (không có audio riêng từng câu); nếu lồng trong khối questionAudio thì
+                transcript sẽ KHÔNG bao giờ hiện ở các câu nghe v2. */}
+            {question.transcript && (
                 <div className="space-y-2">
-                    <AudioPlayer src={question.questionAudio} label="Audio câu này" />
-                    {question.transcript && (
-                        <button
-                            onClick={() => setShowTranscript(!showTranscript)}
-                            className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1"
-                        >
-                            <Icon name={showTranscript ? 'expand_less' : 'expand_more'} size="xs" />
-                            {showTranscript ? 'Ẩn' : 'Hiện'} transcript
-                        </button>
-                    )}
-                    {showTranscript && question.transcript && (
+                    <button
+                        onClick={() => setShowTranscript(!showTranscript)}
+                        className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1"
+                    >
+                        <Icon name={showTranscript ? 'expand_less' : 'expand_more'} size="xs" />
+                        {showTranscript ? 'Ẩn' : 'Hiện'} transcript
+                    </button>
+                    {showTranscript && (
                         <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm hanzi whitespace-pre-wrap">
                             {question.transcript}
                         </div>

@@ -121,7 +121,7 @@ function ResultQuestionBody({
 
             {/* Transcript (collapsible — usually long) */}
             {question.transcript && (
-                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/30">
+                <details open className="rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]/30">
                     <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1">
                         <Icon name="record_voice_over" size="xs" />
                         Transcript audio
@@ -353,7 +353,7 @@ function ExamResultInner() {
                                 {passed ? 'ĐẠT' : 'CHƯA ĐẠT'}
                             </span>
                             <span className="text-sm text-[var(--text-muted)]">
-                                (Cần {exam.passingScore} điểm)
+                                (Đạt khi ≥ {Math.ceil((attempt.max_score || 0) * 0.7)}/{attempt.max_score} điểm · 70%)
                             </span>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -187,7 +187,10 @@ export default function HskV2ExamEditorPage() {
                 const payload = {
                     question_text: fm.question_text, passage: fm.passage, statement: fm.statement,
                     question_image: toMediaRef(fm.question_image), transcript: fm.transcript,
-                    options: fm.options, options_pinyin: fm.options_pinyin, option_images: fm.option_images.map(toMediaRef),
+                    // Nhúng pinyin VÀO options ([{label,text,pinyin}]) — BE chỉ lưu cột `options`,
+                    // KHÔNG có `options_pinyin`, nên gửi rời sẽ mất pinyin đáp án ở trang làm bài.
+                    options: fm.options.map((text, i) => ({ label: String.fromCharCode(65 + i), text, pinyin: (fm.options_pinyin || [])[i] || '' })),
+                    option_images: fm.option_images.map(toMediaRef),
                     correct_answer: flatQ?.question_type === 'true_false' ? (normalizeTrueFalseAnswer(fm.correct_answer) || fm.correct_answer) : fm.correct_answer,
                     explanation: fm.explanation, meta: fm.meta,
                 };
