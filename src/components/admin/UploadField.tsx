@@ -17,7 +17,9 @@ async function uploadFile(file: File, type: 'audio' | 'image'): Promise<string> 
     });
     if (!res.ok) throw new Error('Upload failed');
     const data = await res.json();
-    return data.url;
+    // LƯU ref chuẩn (gs://… ngắn + vĩnh viễn), KHÔNG lưu data.url (signed URL dài >500
+    // ký tự → vỡ cột VARCHAR(500) + hết hạn sau 24h). getMediaUrl() tự resolve gs:// khi hiển thị.
+    return data.ref || data.url;
 }
 
 export function UploadField({ label, value, onChange, type, accept }: {

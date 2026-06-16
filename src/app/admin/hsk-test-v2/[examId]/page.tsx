@@ -54,6 +54,13 @@ const INSTRUCTION: Record<string, string> = {
     fill_hanzi: 'Viết chữ Hán theo pinyin.',
 };
 
+// Signed/public GCS URL (dài >500, hết hạn 24h) → gs:// ngắn + vĩnh viễn (cùng object).
+function toMediaRef(v: string): string {
+    if (!v) return v;
+    const m = v.match(/^https?:\/\/storage\.googleapis\.com\/([^/]+)\/([^?]+)/);
+    return m ? `gs://${m[1]}/${decodeURIComponent(m[2])}` : v;
+}
+
 function toForm(q: Question): QForm {
     const opts = Array.isArray(q.options) ? q.options : [];
     const optionTexts = opts.map(o => (typeof o === 'string' ? o : (o && typeof o === 'object' ? String((o as { text?: string; word?: string }).text || (o as { word?: string }).word || '') : '')));
@@ -141,8 +148,8 @@ export default function HskV2ExamEditorPage() {
                 const flatQ = flat.find(q => q.id === qid);
                 const payload = {
                     question_text: fm.question_text, passage: fm.passage, statement: fm.statement,
-                    question_image: fm.question_image, transcript: fm.transcript,
-                    options: fm.options, options_pinyin: fm.options_pinyin, option_images: fm.option_images,
+                    question_image: toMediaRef(fm.question_image), transcript: fm.transcript,
+                    options: fm.options, options_pinyin: fm.options_pinyin, option_images: fm.option_images.map(toMediaRef),
                     correct_answer: flatQ?.question_type === 'true_false' ? (normalizeTrueFalseAnswer(fm.correct_answer) || fm.correct_answer) : fm.correct_answer,
                     explanation: fm.explanation, meta: fm.meta,
                 };
@@ -153,9 +160,11 @@ export default function HskV2ExamEditorPage() {
             }
             for (const gid of Array.from(dirtyG)) {
                 const gr = groupsById.get(gid);
+                const gcontent = { ...groupForms[gid] };
+                if (gcontent.image_url) gcontent.image_url = toMediaRef(gcontent.image_url);
                 const r = await fetch(`${API_BASE}/api/hsk-exams/groups/${gid}`, {
                     method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token() || ''}` },
-                    body: JSON.stringify({ group_type: gr?.group_type, content: groupForms[gid] }),
+                    body: JSON.stringify({ group_type: gr?.group_type, content: gcontent }),
                 });
                 if (!r.ok) throw new Error(`Lưu group id ${gid} lỗi`);
             }
@@ -166,11 +175,12 @@ export default function HskV2ExamEditorPage() {
     };
 
     const saveExamAudio = async (url: string) => {
+        const ref = toMediaRef(url);
         try {
             await fetch(`${API_BASE}/api/hsk-exams/${examId}`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token() || ''}` }, body: JSON.stringify({ audio_url: url }),
+                method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token() || ''}` }, body: JSON.stringify({ audio_url: ref }),
             });
-            setExam(prev => (prev ? { ...prev, audio_url: url } : prev));
+            setExam(prev => (prev ? { ...prev, audio_url: ref } : prev));
         } catch (e) { console.error(e); }
     };
 
@@ -216,7 +226,7 @@ export default function HskV2ExamEditorPage() {
             </aside>
 
             {/* Main — 1 câu/màn như exam */}
-            <main className="flex-1 min-w-0 pb-24">
+            <main className="flex-1 min-w-0 pb-4">
                 {/* Top: tiêu đề + audio đề */}
                 <div className="flex flex-wrap items-center gap-2 mb-3 pt-1">
                     <span className={`${HSK_COLORS[exam.hsk_level]} text-white text-xs font-bold px-2 py-1 rounded`}>HSK {exam.hsk_level}</span>
@@ -269,13 +279,12 @@ export default function HskV2ExamEditorPage() {
                     <span className="text-xs text-[var(--text-muted)]">{cur + 1} / {flat.length}</span>
                     <Button variant="outline" disabled={cur === flat.length - 1} onClick={() => setCur(c => Math.min(flat.length - 1, c + 1))}>Câu sau <Icon name="arrow_forward" size="sm" /></Button>
                 </div>
+                {/* Thanh lưu — dính đáy màn, KHÔNG phụ thuộc độ rộng sidebar admin (thu gọn được). */}
+                <div className="sticky bottom-0 mt-4 bg-[var(--surface)] border-t border-[var(--border)] px-1 py-3 flex items-center justify-between gap-4 z-20">
+                    <span className="text-sm text-[var(--text-muted)]">{dirtyCount > 0 ? `${dirtyCount} mục chưa lưu` : (savedMsg || 'Tất cả đã lưu')}{error && <span className="text-red-500 ml-2">{error}</span>}</span>
+                    <Button onClick={saveAll} disabled={saving || dirtyCount === 0} className="flex items-center gap-1.5"><Icon name="save" size="sm" /> {saving ? 'Đang lưu...' : `Lưu tất cả${dirtyCount ? ` (${dirtyCount})` : ''}`}</Button>
+                </div>
             </main>
-
-            {/* Thanh lưu cố định */}
-            <div className="fixed bottom-0 left-64 right-0 bg-[var(--surface)] border-t border-[var(--border)] px-6 py-3 flex items-center justify-between gap-4 z-20">
-                <span className="text-sm text-[var(--text-muted)]">{dirtyCount > 0 ? `${dirtyCount} mục chưa lưu` : (savedMsg || 'Tất cả đã lưu')}{error && <span className="text-red-500 ml-2">{error}</span>}</span>
-                <Button onClick={saveAll} disabled={saving || dirtyCount === 0} className="flex items-center gap-1.5"><Icon name="save" size="sm" /> {saving ? 'Đang lưu...' : `Lưu tất cả${dirtyCount ? ` (${dirtyCount})` : ''}`}</Button>
-            </div>
         </div>
     );
 }
