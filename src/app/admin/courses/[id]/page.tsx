@@ -18,6 +18,14 @@ interface Course {
     is_active: number | boolean;
     order_index: number;
     lesson_count?: number;
+    final_exam_id?: number | null;
+}
+
+interface ExamOption {
+    id: number;
+    title: string;
+    hsk_level: number;
+    format_version?: number;
 }
 
 interface LessonItem {
@@ -47,10 +55,14 @@ export default function AdminCourseDetailPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<{
+        title: string; description: string; hsk_level: number;
+        order_index: number; is_active: number; final_exam_id: number | '';
+    }>({
         title: '', description: '', hsk_level: 1,
-        order_index: 0, is_active: 1,
+        order_index: 0, is_active: 1, final_exam_id: '',
     });
+    const [exams, setExams] = useState<ExamOption[]>([]);
 
     const [showAddLesson, setShowAddLesson] = useState(false);
     const [newLesson, setNewLesson] = useState({ title: '', order_index: 0, hsk_level: 1 });
@@ -69,12 +81,14 @@ export default function AdminCourseDetailPage() {
         if (!token) return;
         setLoading(true);
         try {
-            const [courseRes, lessonsRes] = await Promise.all([
+            const [courseRes, lessonsRes, examsRes] = await Promise.all([
                 fetch(`${API_BASE}/api/courses/${courseId}`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE}/api/lessons/course/${courseId}?include_inactive=1`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE}/api/hsk-exams?limit=200`, { headers: { Authorization: `Bearer ${token}` } }),
             ]);
             const cd = await courseRes.json();
             const ld = await lessonsRes.json();
+            const ed = await examsRes.json().catch(() => ({ data: [] }));
             if (cd.success) {
                 setCourse(cd.data);
                 setForm({
@@ -83,10 +97,12 @@ export default function AdminCourseDetailPage() {
                     hsk_level: cd.data.hsk_level || 1,
                     order_index: cd.data.order_index || 0,
                     is_active: cd.data.is_active ? 1 : 0,
+                    final_exam_id: cd.data.final_exam_id ?? '',
                 });
                 setNewLesson(s => ({ ...s, hsk_level: cd.data.hsk_level || 1 }));
             }
             if (ld.success) setLessons(ld.data || []);
+            setExams(Array.isArray(ed?.data) ? ed.data : []);
         } catch (e) {
             console.error('Load failed', e);
         } finally {
@@ -333,6 +349,29 @@ export default function AdminCourseDetailPage() {
                             value={form.description}
                             onChange={e => setForm({ ...form, description: e.target.value })}
                         />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                            Bài thi cuối khóa (HSK)
+                        </label>
+                        <select
+                            className="w-full px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10 outline-none"
+                            value={form.final_exam_id}
+                            onChange={e => setForm({ ...form, final_exam_id: e.target.value === '' ? '' : Number(e.target.value) })}
+                        >
+                            <option value="">— Không có (không yêu cầu thi cuối khóa) —</option>
+                            {[...exams]
+                                .sort((a, b) => (a.hsk_level - b.hsk_level) || a.title.localeCompare(b.title))
+                                .map(ex => (
+                                    <option key={ex.id} value={ex.id}>
+                                        HSK {ex.hsk_level} · {ex.title}{ex.format_version === 2 ? ' (v2)' : ''}
+                                    </option>
+                                ))}
+                        </select>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                            Học viên phải hoàn thành hết bài học rồi đạt ≥ 70% bài thi này mới hoàn thành khóa và mở khóa kế tiếp.
+                        </p>
                     </div>
 
                     <div className="flex gap-3 pt-2">

@@ -8,7 +8,7 @@ import { Icon } from '@/components/ui/Icon';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/components/AuthContext';
-import { fetchCourseById, fetchLessonsByCourse } from '@/lib/api';
+import { fetchCourseById, fetchLessonsByCourse, fetchCourseFinalExam, type CourseFinalExamStatus } from '@/lib/api';
 
 interface Lesson {
     id: number;
@@ -163,6 +163,7 @@ export default function CourseDetailPage() {
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
     const [lockedMsg, setLockedMsg] = useState<string | null>(null);
+    const [finalExam, setFinalExam] = useState<CourseFinalExamStatus | null>(null);
 
     const fetchData = useCallback(async () => {
         try {
@@ -177,6 +178,14 @@ export default function CourseDetailPage() {
             const ld = lessonsData as { success: boolean; data: Lesson[] };
             if (cd.success) setCourse(cd.data);
             if (ld.success) setLessons(ld.data);
+
+            // Best-effort: end-of-course exam status (only meaningful when set).
+            try {
+                const fe = await fetchCourseFinalExam(params.id as string);
+                setFinalExam(fe?.examId ? fe : null);
+            } catch {
+                setFinalExam(null);
+            }
         } catch (error) {
             const errCode = (error as { code?: string })?.code;
             if (errCode === 'COURSE_LOCKED') {
@@ -330,6 +339,52 @@ export default function CourseDetailPage() {
                                 )}
                             </div>
                         </div>
+
+                        {/* End-of-course HSK exam (admin-chosen). Unlocks after all
+                            lessons are passed; must pass it to complete the course. */}
+                        {finalExam?.examId && (
+                            <div className={`rounded-2xl border p-6 ${
+                                finalExam.passed
+                                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                                    : finalExam.examUnlocked
+                                        ? 'border-[var(--primary)]/40 bg-[var(--primary)]/5'
+                                        : 'border-[var(--border)] bg-[var(--surface)]'
+                            }`}>
+                                <div className="flex items-start gap-3">
+                                    <Icon
+                                        name={finalExam.passed ? 'workspace_premium' : finalExam.examUnlocked ? 'quiz' : 'lock'}
+                                        className={finalExam.passed ? 'text-emerald-500' : finalExam.examUnlocked ? 'text-[var(--primary)]' : 'text-[var(--text-muted)]'}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-[var(--text-main)]">Bài kiểm tra cuối khóa</h3>
+                                        <p className="text-sm text-[var(--text-secondary)] mt-0.5">
+                                            {finalExam.exam?.title || `HSK ${finalExam.exam?.hsk_level ?? course.hsk_level}`}
+                                        </p>
+                                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                                            {finalExam.passed
+                                                ? 'Bạn đã đạt bài thi cuối khóa — khóa học đã hoàn thành.'
+                                                : finalExam.examUnlocked
+                                                    ? 'Đạt ≥ 70% để hoàn thành khóa và mở khóa kế tiếp.'
+                                                    : 'Hoàn thành tất cả bài học (mỗi bài ≥ 70%) để mở bài thi này.'}
+                                        </p>
+                                        <div className="mt-3">
+                                            {finalExam.examUnlocked ? (
+                                                <Link href={`/hsk-test/${finalExam.examId}`}>
+                                                    <Button className={finalExam.passed ? '' : 'bg-[var(--primary)] text-white'} variant={finalExam.passed ? 'secondary' : undefined}>
+                                                        <Icon name="play_arrow" size="sm" />
+                                                        {finalExam.passed ? 'Làm lại bài thi' : 'Làm bài thi cuối khóa'}
+                                                    </Button>
+                                                </Link>
+                                            ) : (
+                                                <Button disabled variant="secondary">
+                                                    <Icon name="lock" size="sm" /> Chưa mở khóa
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Sidebar */}

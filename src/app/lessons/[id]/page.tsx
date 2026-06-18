@@ -16,6 +16,8 @@ import {
     updateLessonProgress,
 } from '@/lib/api';
 
+const ENFORCE_UNLOCK = process.env.NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT === 'true';
+
 interface LessonItem {
     id: number;
     title: string;
@@ -182,6 +184,45 @@ export default function LessonPage() {
                                     courseLessons.map((item, idx) => {
                                         const isCurrent = item.id === Number(params.id);
                                         const isCompleted = item.progress_status === 'completed';
+                                        const prevCompleted = idx === 0 || courseLessons[idx - 1]?.progress_status === 'completed';
+                                        const locked = ENFORCE_UNLOCK && !isCurrent && !isCompleted && !prevCompleted;
+
+                                        const badge = (
+                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
+                                                isCurrent
+                                                    ? 'bg-[var(--primary)] text-white'
+                                                    : isCompleted
+                                                        ? 'bg-emerald-500/20 text-emerald-500'
+                                                        : 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'
+                                            }`}>
+                                                {isCurrent ? <Icon name="play_arrow" size="xs" />
+                                                    : isCompleted ? <Icon name="check" size="xs" />
+                                                    : locked ? <Icon name="lock" size="xs" />
+                                                    : idx + 1}
+                                            </div>
+                                        );
+                                        const label = (
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`text-sm font-medium line-clamp-1 ${
+                                                    isCurrent ? 'text-[var(--primary)]' : 'text-[var(--text-main)]'
+                                                }`}>
+                                                    {item.title}
+                                                </p>
+                                            </div>
+                                        );
+
+                                        if (locked) {
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    title="Hoàn thành bài trước (đạt ≥ 70%) để mở khóa"
+                                                    className="p-3 rounded-lg flex items-center gap-3 opacity-50 cursor-not-allowed"
+                                                >
+                                                    {badge}
+                                                    {label}
+                                                </div>
+                                            );
+                                        }
                                         return (
                                             <Link
                                                 key={item.id}
@@ -192,28 +233,8 @@ export default function LessonPage() {
                                                         : 'hover:bg-[var(--surface-secondary)]'
                                                 }`}
                                             >
-                                                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
-                                                    isCurrent
-                                                        ? 'bg-[var(--primary)] text-white'
-                                                        : isCompleted
-                                                            ? 'bg-emerald-500/20 text-emerald-500'
-                                                            : 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'
-                                                }`}>
-                                                    {isCurrent ? (
-                                                        <Icon name="play_arrow" size="xs" />
-                                                    ) : isCompleted ? (
-                                                        <Icon name="check" size="xs" />
-                                                    ) : (
-                                                        idx + 1
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className={`text-sm font-medium line-clamp-1 ${
-                                                        isCurrent ? 'text-[var(--primary)]' : 'text-[var(--text-main)]'
-                                                    }`}>
-                                                        {item.title}
-                                                    </p>
-                                                </div>
+                                                {badge}
+                                                {label}
                                             </Link>
                                         );
                                     })

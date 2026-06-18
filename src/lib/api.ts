@@ -1779,6 +1779,10 @@ export interface TextbookLessonProgress {
     grammar_done: boolean;
     exercise_done: boolean;
     completed_at: string | null;
+    // Scored exercise gate (avg of quiz + writing). null until attempted.
+    score_percentage?: number | null;
+    quiz_score?: number | null;
+    writing_score?: number | null;
 }
 
 export interface TextbookLessonPayload {
@@ -1903,6 +1907,19 @@ export interface WritingSubmissionResult {
     keywordMissed: string[];
     feedback: string;
     charCount: number;
+    // Groq grading feedback (null when AI grading disabled → keyword fallback).
+    ai?: {
+        source: string;
+        feedbackZh: string;
+        suggestedAnswer: string;
+        strengths: string[];
+        issues: string[];
+    } | null;
+    // Lesson aggregate after this submission.
+    lessonScore?: number | null;
+    lessonPassed?: boolean;
+    justCompleted?: boolean;
+    courseId?: number | null;
 }
 
 export async function submitWritingExercise(exerciseId: number, answerZh: string): Promise<WritingSubmissionResult> {
@@ -1916,6 +1933,93 @@ export async function submitWritingExercise(exerciseId: number, answerZh: string
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Failed to submit writing');
     }
+    const json = await res.json();
+    return json.data;
+}
+
+// ============================================================
+// Lesson quiz (vocab + grammar) — server-side session, anti-cheat.
+// /start never returns correct answers; grading happens server-side.
+// ============================================================
+
+export interface LessonQuizQuestion {
+    id: string;
+    kind: 'vocab' | 'grammar';
+    questionType: string;
+    questionText: string;
+    options: string[];
+}
+
+export interface LessonQuizStartResult {
+    token: string;
+    questions: LessonQuizQuestion[];
+}
+
+export interface LessonQuizAnswerResult {
+    correct: boolean;
+    correctAnswer: string;
+    explanation: string;
+}
+
+export interface LessonQuizFinishResult {
+    total: number;
+    answered: number;
+    correct: number;
+    score: number;
+    xpEarned: number;
+    lessonScore: number | null;
+    lessonPassed: boolean;
+    lessonCompleted: boolean;
+}
+
+export async function startLessonQuiz(lessonId: string | number): Promise<LessonQuizStartResult> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/${lessonId}/quiz/start`, { method: 'POST' });
+    if (!res.ok) throw new Error(await readApiError(res, 'Không tạo được quiz cho bài này'));
+    const json = await res.json();
+    return json.data;
+}
+
+export async function answerLessonQuiz(lessonId: string | number, payload: {
+    token: string;
+    questionId: string;
+    choice: string;
+}): Promise<LessonQuizAnswerResult> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/${lessonId}/quiz/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await readApiError(res, 'Không chấm được câu trả lời'));
+    const json = await res.json();
+    return json.data;
+}
+
+export async function finishLessonQuiz(lessonId: string | number, token: string): Promise<LessonQuizFinishResult> {
+    const res = await authFetch(`${API_BASE_URL}/api/lessons/${lessonId}/quiz/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+    });
+    if (!res.ok) throw new Error(await readApiError(res, 'Không hoàn tất được quiz'));
+    const json = await res.json();
+    return json.data;
+}
+
+// ============================================================
+// Course final exam (end-of-course HSK test chosen by admin)
+// ============================================================
+
+export interface CourseFinalExamStatus {
+    examId: number | null;
+    exam: { id: number; title: string; hsk_level: number; duration_minutes: number; total_questions: number } | null;
+    allLessonsPassed: boolean;
+    examUnlocked: boolean;
+    passed: boolean;
+}
+
+export async function fetchCourseFinalExam(courseId: string | number): Promise<CourseFinalExamStatus> {
+    const res = await authFetch(`${API_BASE_URL}/api/courses/${courseId}/final-exam`);
+    if (!res.ok) throw new Error(await readApiError(res, 'Không tải được bài thi cuối khóa'));
     const json = await res.json();
     return json.data;
 }

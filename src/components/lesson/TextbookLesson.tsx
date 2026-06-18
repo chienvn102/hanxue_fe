@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/Button';
 import {
     fetchTextbookLesson, markLessonSectionDone, submitWritingExercise, playAudio,
     type TextbookLessonPayload, type TextbookVocab, type TextbookGrammar,
-    type TextbookWritingExercise, type LessonSection,
+    type TextbookWritingExercise, type TextbookLessonProgress, type LessonSection,
 } from '@/lib/api';
 import { LessonFeedbackPanel } from './LessonFeedbackPanel';
+import LessonQuiz from './LessonQuiz';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
@@ -155,10 +156,12 @@ export default function TextbookLesson({ lessonId }: Props) {
             )}
             {activeTab === 'writing' && (
                 <WritingSection
+                    lessonId={Number(lessonId)}
                     exercises={writingExercises}
                     hskExams={hskExams}
-                    done={!!progress?.exercise_done}
-                    onMarkDone={() => markDone('exercise')}
+                    hasQuiz={vocabulary.length > 0 || grammar.length > 0}
+                    progress={progress}
+                    onChanged={reload}
                 />
             )}
 
@@ -380,21 +383,46 @@ function GrammarSection({
 // ---------------------------- Writing section -----------------------------
 
 function WritingSection({
-    exercises, hskExams, done, onMarkDone,
+    lessonId, exercises, hskExams, hasQuiz, progress, onChanged,
 }: {
+    lessonId: number;
     exercises: TextbookWritingExercise[];
     hskExams: TextbookLessonPayload['hskExams'];
-    done: boolean;
-    onMarkDone: () => void;
+    hasQuiz: boolean;
+    progress: TextbookLessonProgress | null;
+    onChanged: () => void;
 }) {
+    const passed = !!progress?.exercise_done;
+    const agg = progress?.score_percentage ?? null;
+
     return (
         <div className="space-y-4">
-            {exercises.length === 0 && hskExams.length === 0 && (
+            {exercises.length === 0 && hskExams.length === 0 && !hasQuiz && (
                 <EmptyState icon="edit_note" text="Bài này chưa có bài tập" />
             )}
 
+            {/* Lesson exercise score banner (quiz + writing average gates ≥70%). */}
+            {(hasQuiz || exercises.length > 0) && (
+                <div className={`p-3 rounded-xl border text-sm flex items-center gap-2 ${
+                    passed
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700'
+                        : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)]'
+                }`}>
+                    <Icon name={passed ? 'verified' : 'target'} size="sm" />
+                    <span>
+                        {passed ? 'Đã đạt bài tập' : 'Cần đạt trung bình ≥ 70% (quiz + bài viết) để mở bài tiếp theo'}
+                        {agg !== null && <> · Điểm hiện tại: <span className="font-semibold">{agg}%</span></>}
+                        {typeof progress?.quiz_score === 'number' && <> · Quiz {progress.quiz_score}%</>}
+                        {typeof progress?.writing_score === 'number' && <> · Viết {progress.writing_score}%</>}
+                    </span>
+                </div>
+            )}
+
+            {/* Auto-generated quiz from the lesson's vocab + grammar. */}
+            {hasQuiz && <LessonQuiz lessonId={lessonId} onFinished={onChanged} />}
+
             {exercises.map(ex => (
-                <WritingCard key={ex.id} exercise={ex} />
+                <WritingCard key={ex.id} exercise={ex} onSubmitted={onChanged} />
             ))}
 
             {hskExams.length > 0 && (
@@ -417,15 +445,11 @@ function WritingSection({
                     </div>
                 </div>
             )}
-
-            {(exercises.length > 0 || hskExams.length > 0) && (
-                <SectionFooter done={done} onMarkDone={onMarkDone} doneLabel="Đã làm bài tập" />
-            )}
         </div>
     );
 }
 
-function WritingCard({ exercise }: { exercise: TextbookWritingExercise }) {
+function WritingCard({ exercise, onSubmitted }: { exercise: TextbookWritingExercise; onSubmitted?: () => void }) {
     const [answer, setAnswer] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [result, setResult] = useState<Awaited<ReturnType<typeof submitWritingExercise>> | null>(null);
@@ -439,6 +463,7 @@ function WritingCard({ exercise }: { exercise: TextbookWritingExercise }) {
             setSubmitting(true);
             const r = await submitWritingExercise(exercise.id, answer);
             setResult(r);
+            onSubmitted?.(); // refresh lesson progress (writing_score feeds the gate)
         } catch (err) {
             console.error('submit writing', err);
         } finally {
@@ -486,7 +511,30 @@ function WritingCard({ exercise }: { exercise: TextbookWritingExercise }) {
                         </span>
                     </div>
                     <p className="text-sm text-[var(--text-main)]">{result.feedback}</p>
-                    {result.keywordMissed.length > 0 && (
+                    {result.ai && (
+                        <div className="space-y-1.5 pt-1">
+                            {result.ai.feedbackZh && (
+                                <p className="text-sm text-[var(--text-secondary)] hanzi">{result.ai.feedbackZh}</p>
+                            )}
+                            {result.ai.strengths.length > 0 && (
+                                <p className="text-xs text-emerald-600">
+                                    <span className="font-semibold">Điểm tốt: </span>{result.ai.strengths.join('; ')}
+                                </p>
+                            )}
+                            {result.ai.issues.length > 0 && (
+                                <p className="text-xs text-amber-600">
+                                    <span className="font-semibold">Cần sửa: </span>{result.ai.issues.join('; ')}
+                                </p>
+                            )}
+                            {result.ai.suggestedAnswer && (
+                                <p className="text-xs text-[var(--text-muted)]">
+                                    <span className="font-semibold">Gợi ý: </span>
+                                    <span className="hanzi">{result.ai.suggestedAnswer}</span>
+                                </p>
+                            )}
+                        </div>
+                    )}
+                    {!result.ai && result.keywordMissed.length > 0 && (
                         <p className="text-xs text-[var(--text-muted)]">
                             Còn thiếu: {result.keywordMissed.join(', ')}
                         </p>
