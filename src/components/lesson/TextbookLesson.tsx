@@ -147,9 +147,6 @@ export default function TextbookLesson({ lessonId }: Props) {
             {activeTab === 'grammar' && (
                 <GrammarSection
                     items={grammar}
-                    lessonId={Number(lessonId)}
-                    lessonTitle={lesson.title}
-                    hskLevel={lesson.hsk_level}
                     done={!!progress?.grammar_done}
                     onMarkDone={() => markDone('grammar')}
                 />
@@ -192,7 +189,6 @@ function VocabSection({
                 lessonId={lessonId}
                 lessonTitle={lessonTitle}
                 hskLevel={hskLevel}
-                kind="vocab"
             />
             {items.map(v => (
                 <div key={v.link_id} className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--primary)]/30 transition-all">
@@ -323,12 +319,9 @@ function PassageSection({
 // ---------------------------- Grammar section -----------------------------
 
 function GrammarSection({
-    items, lessonId, lessonTitle, hskLevel, done, onMarkDone,
+    items, done, onMarkDone,
 }: {
     items: TextbookGrammar[];
-    lessonId: number;
-    lessonTitle: string;
-    hskLevel: number;
     done: boolean;
     onMarkDone: () => void;
 }) {
@@ -337,12 +330,6 @@ function GrammarSection({
     }
     return (
         <div className="space-y-4">
-            <LessonPracticeBar
-                lessonId={lessonId}
-                lessonTitle={lessonTitle}
-                hskLevel={hskLevel}
-                kind="grammar"
-            />
             {items.map(g => (
                 <div key={g.id} className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--primary)]/30 transition-colors">
                     <div className="flex items-baseline gap-2 mb-2 flex-wrap">
@@ -571,27 +558,22 @@ function WritingCard({ exercise, onSubmitted }: { exercise: TextbookWritingExerc
 // ---------------------------- Practice CTA bar ----------------------------
 
 /**
- * Cụm lối tắt luyện tập theo bài. Hiện ở đầu tab Từ vựng (3 game) và tab
- * Ngữ pháp (Trắc nghiệm ngữ pháp). Mỗi link mang ?lesson=<id> để các trang
- * practice nạp đúng từ/ngữ pháp của bài.
+ * Cụm lối tắt luyện tập theo bài. Hiện ở đầu tab Từ vựng (3 game). Phần ngữ pháp
+ * không còn nút trắc nghiệm riêng vì quiz cuối bài đã bao gồm ngữ pháp.
+ * Mỗi link mang ?lesson=<id> để các trang practice nạp đúng từ của bài.
  */
 function LessonPracticeBar({
-    lessonId, lessonTitle, hskLevel, kind,
+    lessonId, lessonTitle, hskLevel,
 }: {
     lessonId: number;
     lessonTitle: string;
     hskLevel: number;
-    kind: 'vocab' | 'grammar';
 }) {
-    const ctas = kind === 'vocab'
-        ? [
-            { href: `/flashcard/session?lesson=${lessonId}&mode=choice`, icon: 'style',          label: 'Flashcard',  tint: 'bg-pink-500/10 text-pink-500' },
-            { href: `/practice/write?lesson=${lessonId}`,                icon: 'draw',           label: 'Viết chữ',   tint: 'bg-orange-500/10 text-orange-500' },
-            { href: `/practice/match?lesson=${lessonId}`,                icon: 'compare_arrows', label: 'Nối từ',     tint: 'bg-amber-500/10 text-amber-500' },
-        ]
-        : [
-            { href: `/practice/grammar-quiz?lesson=${lessonId}`, icon: 'menu_book', label: 'Trắc nghiệm ngữ pháp', tint: 'bg-rose-500/10 text-rose-500' },
-        ];
+    const ctas = [
+        { href: `/flashcard/session?lesson=${lessonId}&mode=choice`, icon: 'style',          label: 'Flashcard',  tint: 'bg-pink-500/10 text-pink-500' },
+        { href: `/practice/write?lesson=${lessonId}`,                icon: 'draw',           label: 'Viết chữ',   tint: 'bg-orange-500/10 text-orange-500' },
+        { href: `/practice/match?lesson=${lessonId}`,                icon: 'compare_arrows', label: 'Nối từ',     tint: 'bg-amber-500/10 text-amber-500' },
+    ];
 
     return (
         <div className="p-4 rounded-xl border border-[var(--primary)]/20 bg-[var(--primary)]/5">
