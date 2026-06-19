@@ -19,10 +19,12 @@ import {
     type Vocabulary,
 } from '@/lib/api';
 
+const PAGE_SIZE = 30;
+
 /**
  * Quản lý 1 bộ flashcard:
  *   - Sửa tên + mô tả deck
- *   - Liệt kê tất cả thẻ (không random)
+ *   - Liệt kê thẻ (phân trang)
  *   - Thêm thẻ bằng search vocab
  *   - Xoá thẻ khỏi deck
  *   - Xoá cả deck
@@ -52,6 +54,13 @@ export default function FlashcardDeckManagePage() {
     const [addingId, setAddingId] = useState<number | null>(null);
 
     const existingIds = useMemo(() => new Set(items.map(i => i.id)), [items]);
+
+    // Phân trang client-side danh sách thẻ.
+    const [page, setPage] = useState(1);
+    useEffect(() => { setPage(1); }, [deckId]);
+    const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+    const pageSafe = Math.min(page, totalPages);
+    const pagedItems = items.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -315,35 +324,84 @@ export default function FlashcardDeckManagePage() {
 
                 {/* Items list */}
                 <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
-                    <h2 className="text-sm font-semibold text-[var(--text-main)] mb-3">
-                        Thẻ trong bộ ({items.length})
-                    </h2>
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-sm font-semibold text-[var(--text-main)]">
+                            Thẻ trong bộ ({items.length})
+                        </h2>
+                        {totalPages > 1 && (
+                            <span className="text-xs text-[var(--text-muted)]">Trang {pageSafe}/{totalPages}</span>
+                        )}
+                    </div>
                     {items.length === 0 ? (
                         <p className="text-sm text-[var(--text-muted)] py-6 text-center">
                             Bộ này chưa có thẻ nào. Dùng ô tìm kiếm phía trên để thêm.
                         </p>
                     ) : (
-                        <ul className="divide-y divide-[var(--border)]">
-                            {items.map(item => (
-                                <li key={item.id} className="py-3 flex items-center gap-3">
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-xl font-semibold hanzi text-[var(--text-main)]">{item.simplified}</span>
-                                            <span className="text-sm text-[var(--text-muted)]">{item.pinyin}</span>
-                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)]">HSK {item.hskLevel}</span>
+                        <>
+                            <ul className="divide-y divide-[var(--border)]">
+                                {pagedItems.map(item => (
+                                    <li key={item.id} className="py-3 flex items-center gap-3">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-xl font-semibold hanzi text-[var(--text-main)]">{item.simplified}</span>
+                                                <span className="text-sm text-[var(--text-muted)]">{item.pinyin}</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)]">HSK {item.hskLevel}</span>
+                                            </div>
+                                            <p className="text-sm text-[var(--text-secondary)] mt-0.5">{item.meaningVi}</p>
                                         </div>
-                                        <p className="text-sm text-[var(--text-secondary)] mt-0.5">{item.meaningVi}</p>
-                                    </div>
+                                        <button
+                                            onClick={() => handleRemove(item.id)}
+                                            className="p-2 rounded-lg text-red-500 hover:bg-red-500/10"
+                                            title="Xoá khỏi bộ"
+                                        >
+                                            <Icon name="delete" size="sm" />
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+
+                            {totalPages > 1 && (
+                                <div className="flex items-center justify-center gap-1.5 mt-4 pt-4 border-t border-[var(--border)]">
                                     <button
-                                        onClick={() => handleRemove(item.id)}
-                                        className="p-2 rounded-lg text-red-500 hover:bg-red-500/10"
-                                        title="Xoá khỏi bộ"
+                                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                                        disabled={pageSafe <= 1}
+                                        className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
                                     >
-                                        <Icon name="delete" size="sm" />
+                                        <Icon name="chevron_left" size="sm" /> Trước
                                     </button>
-                                </li>
-                            ))}
-                        </ul>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .filter(n => n === 1 || n === totalPages || Math.abs(n - pageSafe) <= 1)
+                                        .reduce<number[]>((acc, n) => {
+                                            if (acc.length && n - acc[acc.length - 1] > 1) acc.push(-1);
+                                            acc.push(n);
+                                            return acc;
+                                        }, [])
+                                        .map((n, idx) => n === -1
+                                            ? <span key={`gap-${idx}`} className="px-1 text-[var(--text-muted)]">…</span>
+                                            : (
+                                                <button
+                                                    key={n}
+                                                    onClick={() => setPage(n)}
+                                                    className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                                                        n === pageSafe
+                                                            ? 'bg-[var(--primary)] text-white'
+                                                            : 'border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
+                                                    }`}
+                                                >
+                                                    {n}
+                                                </button>
+                                            )
+                                        )}
+                                    <button
+                                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={pageSafe >= totalPages}
+                                        className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                                    >
+                                        Sau <Icon name="chevron_right" size="sm" />
+                                    </button>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </main>
