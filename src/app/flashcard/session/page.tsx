@@ -41,6 +41,11 @@ function FlashcardSessionContent() {
     const mode = searchParams.get('mode') || 'choice';
     const lesson = searchParams.get('lesson') || '';
 
+    // Thoát/kết thúc: nếu vào từ 1 deck (sổ tay flashcard) → quay lại /flashcard;
+    // nếu vào từ trang Luyện tập (nghe viết/gõ nghĩa/trắc nghiệm) → về /practice.
+    const exitHref = deck ? '/flashcard' : '/practice';
+    const exitLabel = deck ? 'Danh sách flashcard' : 'Về luyện tập';
+
     const switchHsk = (next: string) => {
         if (next === hsk) return;
         const sp = new URLSearchParams(searchParams.toString());
@@ -264,7 +269,7 @@ function FlashcardSessionContent() {
                 <div className="text-center">
                     <Icon name="sentiment_dissatisfied" size="xl" className="text-[var(--primary)] mb-4" />
                     <p className="text-xl text-[var(--primary)] mb-4">{error}</p>
-                    <Link href="/flashcard">
+                    <Link href={exitHref}>
                         <Button variant="secondary">
                             <Icon name="arrow_back" size="sm" />
                             Quay lại
@@ -301,9 +306,9 @@ function FlashcardSessionContent() {
                                 <Icon name="refresh" size="sm" />
                                 Luyện tập lại
                             </Button>
-                            <Link href="/vocab">
+                            <Link href={exitHref}>
                                 <Button>
-                                    Học tiếp
+                                    {exitLabel}
                                     <Icon name="arrow_forward" size="sm" />
                                 </Button>
                             </Link>
@@ -612,7 +617,7 @@ function FlashcardSessionContent() {
 
                     {/* Action Buttons */}
                     <div className="flex flex-col gap-3">
-                        <Link href="/flashcard">
+                        <Link href={exitHref}>
                             <Button variant="secondary" fullWidth>
                                 <Icon name="arrow_back" size="sm" />
                                 Thoát phiên học

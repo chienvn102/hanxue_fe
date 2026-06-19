@@ -95,6 +95,9 @@ export default function PracticeHubPage() {
     const openConfig = (g: GameTile) => {
         if (!g.available) return;
         if (!isAuthenticated) { router.push('/login'); return; }
+        // Viết chữ: vào thẳng trang chọn từ (tự có bộ lọc HSK / theo bài học) thay
+        // vì mở popup cấu hình.
+        if (g.id === 'write') { router.push('/practice/write'); return; }
         // Game không theo lesson → ép mode 'all'.
         if (!LESSON_SCOPED.includes(g.id) && mode === 'lesson') setMode('all');
         setActiveGame(g);

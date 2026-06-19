@@ -14,6 +14,8 @@ import {
     fetchVocab,
     fetchLessonVocab,
     fetchLessonMeta,
+    fetchCoursesShort,
+    fetchLessonsShort,
     playAudio,
     type WritingWordResponse,
     type WritingDueItem,
@@ -21,6 +23,8 @@ import {
     type WritingSubmitResponse,
     type Vocabulary,
     type LessonMeta,
+    type CourseShort,
+    type LessonShort,
 } from '@/lib/api';
 import { playSfx } from '@/lib/sound';
 import { useAuth } from '@/components/AuthContext';
@@ -84,6 +88,7 @@ export default function PracticeWritePage() {
    ======================================================================== */
 
 function WritingPicker({ lessonId, onPick }: { lessonId: number | null; onPick: (word: string) => void }) {
+    const router = useRouter();
     const [due, setDue] = useState<WritingDueItem[]>([]);
     const [suggestions, setSuggestions] = useState<Vocabulary[]>([]);
     const [search, setSearch] = useState('');
@@ -95,6 +100,26 @@ function WritingPicker({ lessonId, onPick }: { lessonId: number | null; onPick: 
     // filter to single-character entries (writing operates per-character).
     const [lessonMeta, setLessonMeta] = useState<LessonMeta | null>(null);
     const [lessonChars, setLessonChars] = useState<Vocabulary[]>([]);
+
+    // In-page "Lọc theo bài học" filter (thay cho popup ở trang Luyện tập).
+    const [showLessonFilter, setShowLessonFilter] = useState<boolean>(!!lessonId);
+    const [courses, setCourses] = useState<CourseShort[]>([]);
+    const [courseId, setCourseId] = useState('');
+    const [lessonOpts, setLessonOpts] = useState<LessonShort[]>([]);
+    const [loadingCourses, setLoadingCourses] = useState(false);
+    const [loadingLessons, setLoadingLessons] = useState(false);
+
+    useEffect(() => {
+        if (!showLessonFilter || courses.length) return;
+        setLoadingCourses(true);
+        fetchCoursesShort().then(setCourses).finally(() => setLoadingCourses(false));
+    }, [showLessonFilter, courses.length]);
+
+    useEffect(() => {
+        if (!courseId) { setLessonOpts([]); return; }
+        setLoadingLessons(true);
+        fetchLessonsShort(courseId).then(setLessonOpts).finally(() => setLoadingLessons(false));
+    }, [courseId]);
 
     useEffect(() => {
         Promise.all([
@@ -149,6 +174,50 @@ function WritingPicker({ lessonId, onPick }: { lessonId: number | null; onPick: 
                         Chọn một từ để bắt đầu. Mỗi chữ trong từ sẽ qua 3 giai đoạn: mô phỏng → hoàn thiện → vẽ tự do.
                     </p>
                 </div>
+
+                {/* Lọc theo bài học (tùy chọn) */}
+                <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+                    <div className="flex items-center justify-between">
+                        <button
+                            onClick={() => setShowLessonFilter(s => !s)}
+                            className="flex items-center gap-2 text-sm font-semibold text-[var(--text-main)]"
+                        >
+                            <Icon name="filter_list" size="sm" className="text-[var(--primary)]" />
+                            Lọc theo bài học
+                            <Icon name={showLessonFilter ? 'expand_less' : 'expand_more'} size="sm" className="text-[var(--text-muted)]" />
+                        </button>
+                        {lessonId && (
+                            <button
+                                onClick={() => router.push('/practice/write')}
+                                className="text-xs text-[var(--text-muted)] hover:text-[var(--primary)] inline-flex items-center gap-1"
+                            >
+                                <Icon name="close" size="xs" /> Bỏ lọc
+                            </button>
+                        )}
+                    </div>
+                    {showLessonFilter && (
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <select
+                                value={courseId}
+                                onChange={e => setCourseId(e.target.value)}
+                                disabled={loadingCourses}
+                                className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text-main)] focus:border-[var(--primary)] outline-none disabled:opacity-60"
+                            >
+                                <option value="">{loadingCourses ? 'Đang tải…' : '— Chọn khóa —'}</option>
+                                {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                            </select>
+                            <select
+                                value={lessonId ? String(lessonId) : ''}
+                                onChange={e => { if (e.target.value) router.push(`/practice/write?lesson=${e.target.value}`); }}
+                                disabled={!courseId || loadingLessons}
+                                className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text-main)] focus:border-[var(--primary)] outline-none disabled:opacity-60"
+                            >
+                                <option value="">{!courseId ? 'Chọn khóa trước' : loadingLessons ? 'Đang tải…' : '— Chọn bài —'}</option>
+                                {lessonOpts.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+                            </select>
+                        </div>
+                    )}
+                </section>
 
                 {loading ? (
                     <div className="py-8 text-center text-[var(--text-muted)]">Đang tải...</div>

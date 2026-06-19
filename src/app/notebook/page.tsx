@@ -48,6 +48,8 @@ const filterOptions: { id: FilterType; label: string; icon: string }[] = [
     { id: 'mastered', label: 'Đã thuộc', icon: 'check_circle' },
 ];
 
+const PAGE_SIZE = 24;
+
 type NotebookTab = 'vocab' | 'grammar';
 
 function SavedGrammarCard({ item, onRemove }: { item: SavedGrammarItem; onRemove: () => void }) {
@@ -148,6 +150,7 @@ export default function NotebookPage() {
     const [activeTab, setActiveTab] = useState<NotebookTab>('vocab');
     const [savedGrammar, setSavedGrammar] = useState<SavedGrammarItem[]>([]);
     const [loadingGrammar, setLoadingGrammar] = useState(true);
+    const [page, setPage] = useState(1);
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -158,6 +161,9 @@ export default function NotebookPage() {
             setLoadingGrammar(false);
         }
     }, [isAuthenticated]);
+
+    // Về trang 1 khi đổi bộ lọc / tìm kiếm / sắp xếp.
+    useEffect(() => { setPage(1); }, [activeFilter, searchQuery, sortBy]);
 
     const fetchGrammar = async () => {
         try {
@@ -227,6 +233,12 @@ export default function NotebookPage() {
             if (sortBy === 'hsk') return (a.hsk_level || 0) - (b.hsk_level || 0);
             return new Date(b.added_at).getTime() - new Date(a.added_at).getTime();
         });
+
+    // Phân trang client-side (dữ liệu đã nạp đủ).
+    const totalPages = Math.max(1, Math.ceil(filteredVocabs.length / PAGE_SIZE));
+    const pageSafe = Math.min(page, totalPages);
+    const pagedVocabs = filteredVocabs.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+    const isLastPage = pageSafe >= totalPages;
 
     const stats = {
         total: savedVocabs.length,
@@ -410,28 +422,79 @@ export default function NotebookPage() {
                                 )}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filteredVocabs.map((vocab, index) => (
-                                    <div
-                                        key={`${vocab.notebook_id}-${vocab.vocabulary_id}`}
-                                        className="animate-fade-in"
-                                        style={{ animationDelay: `${index * 0.03}s` }}
-                                    >
-                                        <SavedVocabCard
-                                            vocab={vocab}
-                                            onRemove={() => handleRemoveVocab(vocab.vocabulary_id)}
-                                        />
-                                    </div>
-                                ))}
+                            <>
+                                <div className="flex items-center justify-between text-xs text-[var(--text-muted)] mb-1">
+                                    <span>{filteredVocabs.length} từ</span>
+                                    <span>Trang {pageSafe}/{totalPages}</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {pagedVocabs.map((vocab, index) => (
+                                        <div
+                                            key={`${vocab.notebook_id}-${vocab.vocabulary_id}`}
+                                            className="animate-fade-in"
+                                            style={{ animationDelay: `${index * 0.03}s` }}
+                                        >
+                                            <SavedVocabCard
+                                                vocab={vocab}
+                                                onRemove={() => handleRemoveVocab(vocab.vocabulary_id)}
+                                            />
+                                        </div>
+                                    ))}
 
-                                {/* Add new button */}
-                                <Link href="/vocab" className="group">
-                                    <div className="h-full min-h-[180px] rounded-xl border-2 border-dashed border-[var(--border)] flex flex-col items-center justify-center text-[var(--text-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors">
-                                        <Icon name="add" size="lg" />
-                                        <span className="mt-2 text-sm font-medium">Thêm từ mới</span>
+                                    {/* Add new button — chỉ ở trang cuối để không chen giữa danh sách */}
+                                    {isLastPage && (
+                                        <Link href="/vocab" className="group">
+                                            <div className="h-full min-h-[180px] rounded-xl border-2 border-dashed border-[var(--border)] flex flex-col items-center justify-center text-[var(--text-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors">
+                                                <Icon name="add" size="lg" />
+                                                <span className="mt-2 text-sm font-medium">Thêm từ mới</span>
+                                            </div>
+                                        </Link>
+                                    )}
+                                </div>
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="flex items-center justify-center gap-1.5 mt-6">
+                                        <button
+                                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                                            disabled={pageSafe <= 1}
+                                            className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                                        >
+                                            <Icon name="chevron_left" size="sm" /> Trước
+                                        </button>
+                                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                            .filter(n => n === 1 || n === totalPages || Math.abs(n - pageSafe) <= 1)
+                                            .reduce<number[]>((acc, n) => {
+                                                if (acc.length && n - acc[acc.length - 1] > 1) acc.push(-1); // gap marker
+                                                acc.push(n);
+                                                return acc;
+                                            }, [])
+                                            .map((n, idx) => n === -1
+                                                ? <span key={`gap-${idx}`} className="px-1 text-[var(--text-muted)]">…</span>
+                                                : (
+                                                    <button
+                                                        key={n}
+                                                        onClick={() => setPage(n)}
+                                                        className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                                                            n === pageSafe
+                                                                ? 'bg-[var(--primary)] text-white'
+                                                                : 'border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
+                                                        }`}
+                                                    >
+                                                        {n}
+                                                    </button>
+                                                )
+                                            )}
+                                        <button
+                                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                            disabled={pageSafe >= totalPages}
+                                            className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                                        >
+                                            Sau <Icon name="chevron_right" size="sm" />
+                                        </button>
                                     </div>
-                                </Link>
-                            </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
