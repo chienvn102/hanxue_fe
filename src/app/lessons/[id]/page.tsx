@@ -16,7 +16,8 @@ import {
     updateLessonProgress,
 } from '@/lib/api';
 
-const ENFORCE_UNLOCK = process.env.NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT === 'true';
+// Khóa bài học mặc định BẬT; tắt bằng NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT=false.
+const ENFORCE_UNLOCK = process.env.NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT !== 'false';
 
 interface LessonItem {
     id: number;

@@ -159,6 +159,7 @@ export default function TextbookLesson({ lessonId }: Props) {
                     hasQuiz={vocabulary.length > 0 || grammar.length > 0}
                     progress={progress}
                     onChanged={reload}
+                    onMarkDone={() => markDone('exercise')}
                 />
             )}
 
@@ -370,7 +371,7 @@ function GrammarSection({
 // ---------------------------- Writing section -----------------------------
 
 function WritingSection({
-    lessonId, exercises, hskExams, hasQuiz, progress, onChanged,
+    lessonId, exercises, hskExams, hasQuiz, progress, onChanged, onMarkDone,
 }: {
     lessonId: number;
     exercises: TextbookWritingExercise[];
@@ -378,14 +379,21 @@ function WritingSection({
     hasQuiz: boolean;
     progress: TextbookLessonProgress | null;
     onChanged: () => void;
+    onMarkDone: () => void;
 }) {
     const passed = !!progress?.exercise_done;
     const agg = progress?.score_percentage ?? null;
+    // Nothing to auto-score → fall back to a manual "done" button so the lesson
+    // can still be completed (otherwise the next lesson would stay locked).
+    const nothingToScore = !hasQuiz && exercises.length === 0;
 
     return (
         <div className="space-y-4">
-            {exercises.length === 0 && hskExams.length === 0 && !hasQuiz && (
-                <EmptyState icon="edit_note" text="Bài này chưa có bài tập" />
+            {nothingToScore && (
+                <>
+                    <EmptyState icon="edit_note" text="Bài này không có quiz/bài viết để chấm" />
+                    <SectionFooter done={passed} onMarkDone={onMarkDone} doneLabel="Đã hoàn thành phần bài tập" />
+                </>
             )}
 
             {/* Lesson exercise score banner (quiz + writing average gates ≥70%). */}

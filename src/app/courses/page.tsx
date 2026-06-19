@@ -19,6 +19,20 @@ interface Course {
     prerequisite_course_id?: number | null;
     prerequisite_title?: string;
     is_active?: boolean;
+    final_exam_id?: number | null;
+    final_exam_passed_cnt?: number;
+}
+
+// Lock is ON by default; disable only with NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT=false.
+const ENFORCE_UNLOCK = process.env.NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT !== 'false';
+
+// A course counts as "fully complete" when all lessons are done AND, if it has a
+// final exam, that exam is passed — mirrors the server-side unlock gate.
+function isCourseComplete(c: Course): boolean {
+    const lessonsDone = (c.lesson_count || 0) > 0 && (c.completed_lessons || 0) >= (c.lesson_count || 0);
+    if (!lessonsDone) return false;
+    if (c.final_exam_id) return (c.final_exam_passed_cnt || 0) > 0;
+    return true;
 }
 
 // HSK Level colors
@@ -259,18 +273,10 @@ export default function CoursesPage() {
                             const courseWithPrereqTitle: Course = prereq
                                 ? { ...course, prerequisite_title: prereq.title }
                                 : course;
-                            // Gating tắt: học viên truy cập tự do mọi khóa, không cần
-                            // hoàn thành theo thứ tự. Bật lại bằng env
-                            // NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT=true.
-                            const enforceUnlock = process.env.NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT === 'true';
-                            const isLocked = enforceUnlock && prereq
-                                ? (() => {
-                                    const prereqProgress = prereq.lesson_count > 0 && prereq.completed_lessons
-                                        ? Math.round((prereq.completed_lessons / prereq.lesson_count) * 100)
-                                        : 0;
-                                    return prereqProgress < 100;
-                                })()
-                                : false;
+                            // Khóa mặc định BẬT: phải hoàn thành khóa tiên quyết
+                            // (hết bài + đạt thi cuối nếu có) mới mở khóa kế tiếp.
+                            // Tắt bằng env NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT=false.
+                            const isLocked = ENFORCE_UNLOCK && prereq ? !isCourseComplete(prereq) : false;
 
                             return (
                                 <div

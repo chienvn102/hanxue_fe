@@ -316,10 +316,10 @@ export default function CourseDetailPage() {
                                     </div>
                                 ) : (
                                     lessons.map((lesson, index) => {
-                                        // Gating tắt: học viên có thể vào bất kỳ bài nào không cần
-                                        // hoàn thành bài trước. Bật lại bằng env
-                                        // NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT=true.
-                                        const enforceUnlock = process.env.NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT === 'true';
+                                        // Khóa bài mặc định BẬT: phải hoàn thành bài trước
+                                        // (đạt ≥70%) mới mở bài kế. Tắt bằng env
+                                        // NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT=false.
+                                        const enforceUnlock = process.env.NEXT_PUBLIC_COURSE_UNLOCK_ENFORCEMENT !== 'false';
                                         const isLocked = enforceUnlock
                                             && index > 0
                                             && lessons[index - 1].progress_status !== 'completed'
