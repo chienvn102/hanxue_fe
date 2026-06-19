@@ -44,6 +44,7 @@ function AdminProtectedLayout({ children }: { children: React.ReactNode }) {
 
     const navItems = [
         { href: '/admin/dashboard', icon: 'dashboard', label: 'Tổng quan' },
+        { href: '/admin/analytics', icon: 'monitoring', label: 'Thống kê' },
         { href: '/admin/users', icon: 'people', label: 'Người dùng' },
         { href: '/admin/courses', icon: 'school', label: 'Khóa học' },
         { href: '/admin/vocabulary', icon: 'translate', label: 'Từ vựng' },

@@ -36,13 +36,18 @@ export default function HskTestV2Page() {
     const [showCreate, setShowCreate] = useState(false);
     const [creating, setCreating] = useState(false);
     const [seedContent, setSeedContent] = useState(true); // tạo kèm nội dung mẫu (đề thật)
+    const [hskFilter, setHskFilter] = useState<number | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const token = () => (typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null);
 
     const fetchExams = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await fetch(`${API_BASE}/api/hsk-exams?format_version=2&limit=100`, {
+            // Lọc theo cấp HSK ở server (giống v1); tìm theo tên lọc client-side.
+            let url = `${API_BASE}/api/hsk-exams?format_version=2&limit=100`;
+            if (hskFilter) url += `&hsk=${hskFilter}`;
+            const res = await fetch(url, {
                 headers: { Authorization: `Bearer ${token() || ''}` },
             });
             const data = await res.json();
@@ -53,9 +58,13 @@ export default function HskTestV2Page() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [hskFilter]);
 
     useEffect(() => { fetchExams(); }, [fetchExams]);
+
+    const filteredExams = exams.filter(e =>
+        e.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     const createExam = async (level: number) => {
         try {
@@ -115,6 +124,10 @@ export default function HskTestV2Page() {
                     <p className="text-sm text-[var(--text-muted)] mt-1">
                         Format khóa theo chuẩn HSK · chỉ sửa nội dung + đáp án · 1 file audio/đề.
                     </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                        {hskFilter ? `HSK ${hskFilter}: ` : 'Tổng cộng '}{exams.length} đề
+                        {searchQuery && ` · ${filteredExams.length} khớp tìm kiếm`}
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Link
@@ -129,17 +142,53 @@ export default function HskTestV2Page() {
                 </div>
             </div>
 
+            {/* Filters — tìm kiếm + lọc theo cấp HSK (giống v1) */}
+            <div className="bg-[var(--surface)] rounded-xl shadow-sm border border-[var(--border)] p-4 mb-6">
+                <div className="flex gap-4 items-center flex-wrap">
+                    <input
+                        type="text"
+                        placeholder="Tìm kiếm đề thi..."
+                        className="flex-1 min-w-[200px] px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--text-main)] focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent outline-none"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                    />
+                    <div className="flex gap-1 flex-wrap">
+                        <button
+                            onClick={() => setHskFilter(null)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!hskFilter ? 'bg-[var(--primary)] text-white' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--border)]'}`}
+                        >
+                            Tất cả
+                        </button>
+                        {[1, 2, 3, 4, 5, 6].map(level => (
+                            <button
+                                key={level}
+                                onClick={() => setHskFilter(level)}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${hskFilter === level ? `${HSK_COLORS[level]} text-white` : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--border)]'}`}
+                            >
+                                HSK {level}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
             {loading ? (
                 <div className="text-center py-16 text-[var(--text-muted)]">Đang tải...</div>
             ) : exams.length === 0 ? (
                 <div className="text-center py-16 bg-[var(--surface)] rounded-xl border border-dashed border-[var(--border)]">
                     <Icon name="assignment" size="xl" className="text-[var(--text-muted)] mb-3" />
-                    <p className="text-[var(--text-secondary)] mb-4">Chưa có đề v2 nào. Tạo đề đầu tiên từ template chuẩn.</p>
+                    <p className="text-[var(--text-secondary)] mb-4">
+                        {hskFilter ? `Chưa có đề v2 nào ở HSK ${hskFilter}.` : 'Chưa có đề v2 nào. Tạo đề đầu tiên từ template chuẩn.'}
+                    </p>
                     <Button onClick={() => setShowCreate(true)}><Icon name="add" size="sm" /> Tạo đề v2</Button>
+                </div>
+            ) : filteredExams.length === 0 ? (
+                <div className="text-center py-16 text-[var(--text-muted)]">
+                    Không tìm thấy đề khớp “{searchQuery}”.
                 </div>
             ) : (
                 <ul className="space-y-2">
-                    {exams.map(exam => (
+                    {filteredExams.map(exam => (
                         <li
                             key={exam.id}
                             className="bg-[var(--surface)] rounded-xl border border-[var(--border)] px-4 py-3 flex items-center gap-3"
