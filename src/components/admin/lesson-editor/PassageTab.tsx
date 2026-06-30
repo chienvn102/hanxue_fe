@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { UploadField } from '@/components/admin/UploadField';
 import { getMediaUrl } from '@/lib/api';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 export interface PassageFields {
     passage_zh: string;

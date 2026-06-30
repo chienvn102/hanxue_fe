@@ -11,7 +11,7 @@ import { useAdminAuth } from '@/components/AdminAuthContext';
 import { Icon } from '@/components/ui/Icon';
 import { HSK_COLORS } from '@/components/admin/hsk-types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface SeriesPoint { date: string; count: number; }
 interface Analytics {

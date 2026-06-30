@@ -13,7 +13,7 @@ import { VocabTab } from '@/components/admin/lesson-editor/VocabTab';
 import { GrammarTab } from '@/components/admin/lesson-editor/GrammarTab';
 import { WritingTab } from '@/components/admin/lesson-editor/WritingTab';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 type Tab = 'info' | 'passage' | 'vocab' | 'grammar' | 'writing';
 

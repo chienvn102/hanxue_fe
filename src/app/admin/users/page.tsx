@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAdminAuth } from '@/components/AdminAuthContext';
 import { Icon } from '@/components/ui/Icon';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface User {
     id: number;

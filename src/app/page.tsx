@@ -13,7 +13,7 @@ import { VocabCard } from '@/components/VocabCard';
 import { playAudio, fetchProfile, fetchSavedVocabIds, toggleSaveVocab } from '@/lib/api';
 import { useAuth } from '@/components/AuthContext';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface Vocab {
   id: number;

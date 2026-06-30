@@ -5,7 +5,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import type { TextbookVocab } from '@/lib/api';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 // Khớp shape THẬT của GET /api/vocab (camelCase, envelope { data }).
 interface VocabSearchResult {

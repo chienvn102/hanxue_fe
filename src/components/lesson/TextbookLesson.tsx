@@ -12,7 +12,7 @@ import {
 import { LessonFeedbackPanel } from './LessonFeedbackPanel';
 import LessonQuiz from './LessonQuiz';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface Props {
     lessonId: number | string;

@@ -16,7 +16,7 @@ import {
     playAudio,
 } from '@/lib/api';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 export default function VocabDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = use(params);

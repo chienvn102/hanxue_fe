@@ -10,7 +10,7 @@ import { Icon } from '@/components/ui/Icon';
 import { fetchFlashcardSession, submitReview, fetchLessonMeta, type LessonMeta } from '@/lib/api';
 import { playSfx } from '@/lib/sound';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface Flashcard {
     id: number;

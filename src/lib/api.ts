@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 // Types
 export interface VocabTheme {
