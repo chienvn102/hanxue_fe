@@ -12,16 +12,12 @@ const slides = [
   {
     src: '/images/defense_2.jpg',
     title: 'Báo cáo Đồ án tốt nghiệp',
-    desc: 'Đồ án tốt nghiệp đại học đề tài "Xây dựng Website học tiếng Trung" - Hà Nội, ngày 20 tháng 06năm 2026.',
+    desc: 'đề tài "Xây dựng Website học tiếng Trung" - Hà Nội, năm 2026.',
   },
   {
     src: '/images/defense_1.jpg',
-    title: 'Kỷ niệm cùng lớp và thầy cô',
-    desc: 'AE phòng 212',
-  },
-  {
-    src: '/images/defense_3.jpg',
-    title: 'Hội đồng chấm Đồ án tốt nghiệp',
+    title: 'Kỷ niệm 212',
+    desc: 'ae 212',
   },
 ];
 
