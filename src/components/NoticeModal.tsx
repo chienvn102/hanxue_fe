@@ -89,7 +89,7 @@ export default function NoticeModal({ open, onClose }: NoticeModalProps) {
           {/* Main Notice text */}
           <div className="space-y-3">
             <p className="text-[var(--text-main)] font-semibold">
-              Kính gửi các bạn học viên và người dùng của HanXue,
+              Xin chào các võ hiệp, cuộc vui nào đến có lúc tàn...
             </p>
             <p>
               Hệ thống học tiếng Trung HanXue sẽ chính thức NGƯNG HOẠT ĐỘNG CÁC CHỨC NĂNG TƯƠNG TÁC và CHUYỂN SANG TRẠNG THÁI LƯU TRỮ (CHỈ ĐỌC) kể từ ngày <strong className="text-[var(--primary)] font-bold">01/08/2026</strong>.
@@ -101,7 +101,10 @@ export default function NoticeModal({ open, onClose }: NoticeModalProps) {
               Giao diện của website vẫn sẽ được duy trì hoạt động như một sản phẩm đồ án trưng bày, tuy nhiên các chức năng tương tác cốt lõi như làm bài tập, thi thử HSK, luyện viết chữ động và chat với trợ lý AI sẽ không thể sử dụng được nữa.
             </p>
             <p>
-              Chúng tôi xin gửi lời cảm ơn sâu sắc nhất tới tất cả các bạn đã đồng hành, học tập và ủng hộ dự án đồ án tốt nghiệp này trong suốt thời gian qua!
+              Chúng tôi xin gửi lời cảm ơn sâu sắc nhất tới tất cả các bạn đã đồng hành, học tập và ủng hộ dự án đồ án tốt nghiệp này trong suốt thời gian qua! Sự ủng hộ của các bạn chính là động lực để chúng tôi hoàn thiện sản phẩm và mang đến trải nghiệm học tập tốt nhất.
+            </p>
+            <p>
+              Chúc các bạn học tập tốt, thi cử thành công và đạt được những mục tiêu trong tương lai! Hẹn gặp lại các bạn trong những dự án tiếp theo!
             </p>
           </div>
 
