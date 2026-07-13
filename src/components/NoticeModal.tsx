@@ -89,7 +89,7 @@ export default function NoticeModal({ open, onClose }: NoticeModalProps) {
           {/* Main Notice text */}
           <div className="space-y-3">
             <p className="text-[var(--text-main)] font-semibold">
-              Xin chào các võ hiệp, cuộc vui nào đến có lúc tàn...
+              Xin chào các võ hiệp, cuộc vui nào cũng đến lúc tàn...
             </p>
             <p>
               Hệ thống học tiếng Trung HanXue sẽ chính thức NGƯNG HOẠT ĐỘNG CÁC CHỨC NĂNG TƯƠNG TÁC và CHUYỂN SANG TRẠNG THÁI LƯU TRỮ (CHỈ ĐỌC) kể từ ngày <strong className="text-[var(--primary)] font-bold">01/08/2026</strong>.
