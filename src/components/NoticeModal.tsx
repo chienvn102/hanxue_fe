@@ -10,7 +10,7 @@ interface NoticeModalProps {
 
 const slides = [
   {
-    src: '/images/defense_2.jpg',
+    src: '/images/defense_3.jpg',
     title: 'Báo cáo Đồ án tốt nghiệp',
     desc: 'đề tài "Xây dựng Website học tiếng Trung" - Hà Nội, năm 2026.',
   },
