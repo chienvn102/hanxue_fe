@@ -12,6 +12,7 @@ import { Reveal } from '@/components/ui/Reveal';
 import { VocabCard } from '@/components/VocabCard';
 import { playAudio, fetchProfile, fetchSavedVocabIds, toggleSaveVocab } from '@/lib/api';
 import { useAuth } from '@/components/AuthContext';
+import NoticeModal from '@/components/NoticeModal';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://167.172.69.210/hanxue';
 
@@ -58,6 +59,20 @@ export default function HomePage() {
   const [activeIdx, setActiveIdx] = useState(-1);
   const [loadingSuggest, setLoadingSuggest] = useState(false);
   const searchBoxRef = useRef<HTMLDivElement>(null);
+  const [showNotice, setShowNotice] = useState(false);
+
+  // Check if user has dismissed the notice on mount
+  useEffect(() => {
+    const isDismissed = localStorage.getItem('hanxue_notice_dismissed');
+    if (!isDismissed) {
+      setShowNotice(true);
+    }
+  }, []);
+
+  const handleCloseNotice = () => {
+    setShowNotice(false);
+    localStorage.setItem('hanxue_notice_dismissed', 'true');
+  };
 
   // Fetch fresh profile data on mount to keep stats updated
   useEffect(() => {
@@ -464,6 +479,21 @@ export default function HomePage() {
           </aside>
         </div>
       </main >
+
+      {/* Floating Notice Reopen Button */}
+      <button
+        onClick={() => setShowNotice(true)}
+        className="fixed bottom-6 right-6 z-40 bg-[var(--primary)] hover:bg-[var(--primary)]/95 text-white rounded-full p-3.5 shadow-2xl cursor-pointer flex items-center justify-center transition-all hover:scale-105 border border-white/10 group"
+        title="Xem thông báo lưu trữ & ảnh tốt nghiệp"
+      >
+        <Icon name="campaign" className="text-xl animate-pulse" />
+        <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-out whitespace-nowrap text-xs font-bold pl-0 group-hover:pl-2">
+          Thông báo lưu trữ & tốt nghiệp
+        </span>
+      </button>
+
+      {/* Retirement & Graduation Notice Modal */}
+      <NoticeModal open={showNotice} onClose={handleCloseNotice} />
 
       <Footer />
     </div >
