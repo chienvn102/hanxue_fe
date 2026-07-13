@@ -92,10 +92,10 @@ export default function NoticeModal({ open, onClose }: NoticeModalProps) {
               Kính gửi các bạn học viên và người dùng của HanXue,
             </p>
             <p>
-              Hệ thống học tiếng Trung HanXue sẽ chính thức **ngưng hoạt động các chức năng tương tác** và **chuyển sang trạng thái lưu trữ (chỉ đọc)** kể từ ngày <strong className="text-[var(--primary)] font-bold">01/08/2026</strong>.
+              Hệ thống học tiếng Trung HanXue sẽ chính thức NGƯNG HOẠT ĐỘNG CÁC CHỨC NĂNG TƯƠNG TÁC và CHUYỂN SANG TRẠNG THÁI LƯU TRỮ (CHỈ ĐỌC) kể từ ngày <strong className="text-[var(--primary)] font-bold">01/08/2026</strong>.
             </p>
             <p>
-              Lý do là vì các dịch vụ bên thứ ba cung cấp API phụ trợ (như nhận dạng giọng nói AI, dịch thuật tự động, phát âm âm thanh và máy chủ cơ sở dữ liệu cloud) ngừng cung cấp gói dịch vụ miễn phí hoặc ngừng hoạt động.
+              Lý do là vì các dịch vụ bên thứ ba cung cấp API phụ trợ (như nhận dạng giọng nói AI, dịch thuật tự động, phát âm âm thanh và máy chủ cơ sở dữ liệu cloud) ngừng cung cấp gói dịch vụ hoặc ngừng hoạt động.
             </p>
             <p>
               Giao diện của website vẫn sẽ được duy trì hoạt động như một sản phẩm đồ án trưng bày, tuy nhiên các chức năng tương tác cốt lõi như làm bài tập, thi thử HSK, luyện viết chữ động và chat với trợ lý AI sẽ không thể sử dụng được nữa.
